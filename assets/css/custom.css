@@ -419,27 +419,391 @@ body::before {
     white-space: nowrap;
 }
 
-/* ---------- 音乐播放器微调 ----------
-   APlayer 的固定播放器是左下角浮层，z-index 要高于正文容器，
-   圆角和边框跟主题卡片对齐。 */
-.aplayer.aplayer-fixed {
-    z-index: 90;
-    margin: 0 0 14px 14px;
-}
+/* ---------- 右上角唱片播放器 ----------
+   收起态是右上角一张 62px 的黑胶唱片，播放时转、暂停停在原地；
+   点开才展开歌单面板。上一版 APlayer 的左下角浮层已撤掉。
 
-.aplayer.aplayer-fixed .aplayer-body,
-.aplayer.aplayer-fixed .aplayer-list {
-    border-radius: var(--card-border-radius, 10px);
-}
-
-.aplayer .aplayer-info .aplayer-music,
-.aplayer .aplayer-info .aplayer-controller {
+   几个关键点：
+   · 颜色全走主题变量（--card-background 等），亮暗自动适配
+   · 旋转靠 animation-play-state 起停，不自己算角度，
+     所以暂停会停在当前角度而不是跳回 0°
+   · 面板用 visibility + opacity 过渡而不是 display:none，
+     收起时仍可测量，scrollIntoView 不会拿到 0 高度
+   · 窄屏改挂右下角 —— 手机上右上角是主题的汉堡菜单 */
+.mp {
+    position: fixed;
+    top: 20px;
+    right: 24px;
+    z-index: 95;
     font-family: var(--base-font-family);
 }
 
-/* 手机屏幕上播放器默认更小，避免挡住正文 */
-@media (max-width: 700px) {
-    .aplayer.aplayer-fixed {
-        margin: 0 0 8px 8px;
+/* ---------- 唱片本体 ---------- */
+
+.mp__disc {
+    display: block;
+    width: 62px;
+    height: 62px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.25s ease;
+}
+
+.mp__disc:hover,
+.mp__disc:focus-visible {
+    transform: scale(1.06);
+}
+
+.mp__disc:focus-visible {
+    outline: 2px solid var(--mp-accent, #5b7cfa);
+    outline-offset: 3px;
+}
+
+/* 盘面：同心圆纹路 + 中心向外的黑胶渐晕 */
+.mp__rotor {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+    background:
+        repeating-radial-gradient(circle at 50% 50%,
+            rgba(255, 255, 255, 0.055) 0 1px,
+            rgba(255, 255, 255, 0) 1px 4px),
+        radial-gradient(circle at 50% 50%, #2a2e36 0%, #0c0e11 58%, #1b1f25 100%);
+    box-shadow:
+        0 6px 20px rgba(0, 0, 0, 0.28),
+        0 0 0 1px rgba(0, 0, 0, 0.08);
+    animation: mp-spin 9s linear infinite;
+    animation-play-state: paused;
+}
+
+.mp.is-playing .mp__rotor {
+    animation-play-state: running;
+}
+
+@keyframes mp-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.mp__cover {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 58%;
+    height: 58%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    background: #23272e;
+}
+
+/* 唱片中心那个小孔 */
+.mp__spindle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8%;
+    height: 8%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: rgba(10, 12, 15, 0.85);
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.25);
+}
+
+/* ---------- 歌单面板 ---------- */
+
+.mp__panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 320px;
+    max-width: calc(100vw - 40px);
+    padding: 12px;
+    border-radius: var(--card-border-radius, 10px);
+    background: var(--card-background);
+    color: var(--card-text-color-main);
+    border: 1px solid rgba(128, 128, 128, 0.18);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transform-origin: top right;
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+}
+
+.mp.is-open .mp__panel {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.mp__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+.mp__now {
+    flex: 1;
+    min-width: 0;
+}
+
+.mp__now-title {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--card-text-color-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mp__now-artist {
+    margin: 2px 0 0;
+    font-size: 0.76rem;
+    color: var(--card-text-color-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mp__close {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    padding: 4px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--card-text-color-tertiary);
+    cursor: pointer;
+}
+
+.mp__close:hover {
+    background: rgba(128, 128, 128, 0.14);
+    color: var(--card-text-color-main);
+}
+
+/* 图标统一实心 + currentColor，尺寸由各自的按钮给 */
+.mp svg {
+    display: block;
+    fill: currentColor;
+}
+
+.mp__close svg {
+    width: 16px;
+    height: 16px;
+}
+
+.mp__btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.mp__status {
+    margin: 10px 2px;
+    font-size: 0.78rem;
+    color: var(--card-text-color-tertiary);
+}
+
+/* 列表只显示文字 —— 200 首就是 200 个图片请求，不值当 */
+.mp__list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+.mp__item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    color: var(--card-text-color-secondary);
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mp__item:hover {
+    background: rgba(128, 128, 128, 0.12);
+    color: var(--card-text-color-main);
+}
+
+.mp__item-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mp__item-artist {
+    flex: none;
+    max-width: 40%;
+    font-size: 0.74rem;
+    color: var(--card-text-color-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 当前曲目：主色 + 左侧细竖条，故意不加底色 —— 灰阶配色下多一层色块反而脏 */
+.mp__item.is-current {
+    position: relative;
+    color: var(--mp-accent, #5b7cfa);
+    font-weight: 600;
+}
+
+.mp__item.is-current::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--mp-accent, #5b7cfa);
+}
+
+.mp__item.is-current .mp__item-artist {
+    color: inherit;
+    opacity: 0.72;
+}
+
+/* ---------- 进度条与控制 ---------- */
+
+.mp__foot {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(128, 128, 128, 0.18);
+}
+
+.mp__bar {
+    position: relative;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(128, 128, 128, 0.22);
+    cursor: pointer;
+}
+
+.mp__bar:focus-visible {
+    outline: 2px solid var(--mp-accent, #5b7cfa);
+    outline-offset: 3px;
+}
+
+.mp__bar-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--mp-accent, #5b7cfa);
+    transition: width 0.12s linear;
+}
+
+.mp__controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 10px;
+}
+
+.mp__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--card-text-color-secondary);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mp__btn:hover {
+    background: rgba(128, 128, 128, 0.14);
+    color: var(--card-text-color-main);
+}
+
+.mp__btn--play {
+    width: 40px;
+    height: 40px;
+    color: var(--card-text-color-main);
+}
+
+/* 播放 / 暂停图标互斥。
+   选择器要带 .mp 前缀，否则压不过上面的 `.mp svg { display: block }` */
+.mp .mp__icon-pause {
+    display: none;
+}
+
+.mp.is-playing .mp__icon-play {
+    display: none;
+}
+
+.mp.is-playing .mp__icon-pause {
+    display: block;
+}
+
+/* ---------- 窄屏：改挂右下角，尺寸收一档 ---------- */
+
+@media (max-width: 1024px) {
+    .mp {
+        top: auto;
+        bottom: 18px;
+        right: 16px;
+    }
+
+    .mp__disc {
+        width: 52px;
+        height: 52px;
+    }
+
+    /* 面板改成向上展开，免得顶出屏幕上沿 */
+    .mp__panel {
+        top: auto;
+        bottom: calc(100% + 10px);
+        transform: translateY(6px);
+        transform-origin: bottom right;
+    }
+
+    .mp.is-open .mp__panel {
+        transform: translateY(0);
+    }
+
+    .mp__list {
+        max-height: 46vh;
+    }
+}
+
+/* 系统要求减少动态效果时，唱片不转（播放状态仍看得出） */
+@media (prefers-reduced-motion: reduce) {
+    .mp__rotor {
+        animation: none;
+    }
+
+    .mp__disc,
+    .mp__bar-fill,
+    .mp__panel {
+        transition: none;
     }
 }

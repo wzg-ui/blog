@@ -4,10 +4,11 @@
  * 放在 assets/ts/custom.ts 会被 Stack 自动打包（主题会检测这个文件），
  * 因此不需要额外引入任何资源。
  *
- * 目前有三块：
+ * 目前有四块：
  *   1. codegroup 短代码的标签页切换
  *   2. 粒子点阵背景
  *   3. 页脚的「本站已运行」计时器
+ *   4. 右上角的黑胶唱片播放器
  */
 
 function activateCodeGroup(group: Element, targetId: string) {
@@ -324,6 +325,299 @@ function setupSiteRuntime() {
     });
 }
 
+/* ============================================================
+   右上角唱片播放器
+   ------------------------------------------------------------
+   取代了原来的 APlayer 左下角浮层。设计要求：
+   · 收起时是右上角一张黑胶唱片，播放时转，暂停就停在原地
+   · 点开才展开歌单面板，点哪首放哪首，带进度条与上下曲
+   · 数据仍走 Meting 兼容接口，配置在 params.toml 的 [music]
+
+   几个刻意的处理：
+   · 列表不显示封面 —— 热歌榜 200 首就是 200 个图片请求，
+     只给唱片本体加载一张，省下的流量比列表好看重要
+   · 歌单元数据在页面空闲时预取，点开面板不用等
+   · 旋转靠 animation-play-state 起停，不是自己算角度，
+     所以暂停会停在当前角度，不会跳回 0°
+   · 标签页切到后台就暂停，不在看不见的地方放歌
+   · 单曲取流失败自动跳下一首，但不无限跳（连错 3 次就停）
+   ============================================================ */
+
+interface MusicTrack {
+    name: string;
+    artist: string;
+    url: string;
+    pic?: string;
+}
+
+function setupMusicPlayer() {
+    const root = document.getElementById('music-player') as HTMLElement | null;
+    if (!root) return;
+
+    const pick = <T extends Element>(selector: string) => root.querySelector(selector) as T | null;
+
+    const disc = pick<HTMLButtonElement>('.mp__disc');
+    const panel = pick<HTMLElement>('.mp__panel');
+    const cover = pick<HTMLImageElement>('.mp__cover');
+    const listEl = pick<HTMLUListElement>('.mp__list');
+    const statusEl = pick<HTMLElement>('.mp__status');
+    const nowTitle = pick<HTMLElement>('.mp__now-title');
+    const nowArtist = pick<HTMLElement>('.mp__now-artist');
+    const btnPlay = pick<HTMLButtonElement>('.mp__btn--play');
+    const btnPrev = pick<HTMLButtonElement>('.mp__btn--prev');
+    const btnNext = pick<HTMLButtonElement>('.mp__btn--next');
+    const btnClose = pick<HTMLButtonElement>('.mp__close');
+    const bar = pick<HTMLElement>('.mp__bar');
+    const barFill = pick<HTMLElement>('.mp__bar-fill');
+    const audio = pick<HTMLAudioElement>('.mp__audio');
+
+    if (!disc || !panel || !listEl || !audio) return;
+
+    const { api = '', server = 'netease', type = 'playlist', id = '' } = root.dataset;
+    if (!api || !id) return;
+
+    // :server / :type / :id 三个占位符由 Meting 接口约定，顺序不能动
+    const endpoint = api
+        .replace(':server', server)
+        .replace(':type', type)
+        .replace(':id', id);
+
+    const shuffling = root.dataset.order === 'random';
+    const volume = Number(root.dataset.volume ?? 0.5);
+    audio.volume = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0.5;
+
+    let tracks: MusicTrack[] = [];
+    let current = -1;
+    let loading = false;
+    let loaded = false;
+    let errorStreak = 0;
+    let flashTimer = 0;
+
+    /* 面板顶部那行状态，加载完本来会隐藏，这里借来当临时提示条。
+       QQ 音乐源下约七成曲子取不到直链，不提示的话用户只会看到画面自己跳走。 */
+    const flash = (text: string) => {
+        if (!statusEl) return;
+        statusEl.textContent = text;
+        statusEl.hidden = false;
+        window.clearTimeout(flashTimer);
+        flashTimer = window.setTimeout(() => {
+            statusEl.hidden = true;
+        }, 2600);
+    };
+
+    /* ---------- 列表渲染 ---------- */
+
+    const renderList = () => {
+        listEl.textContent = '';
+        const frag = document.createDocumentFragment();
+
+        tracks.forEach((track, i) => {
+            const li = document.createElement('li');
+            li.className = 'mp__item';
+            li.dataset.index = String(i);
+            if (i === current) li.classList.add('is-current');
+
+            const name = document.createElement('span');
+            name.className = 'mp__item-name';
+            name.textContent = track.name || '未知曲目';
+
+            const artist = document.createElement('span');
+            artist.className = 'mp__item-artist';
+            artist.textContent = track.artist || '';
+
+            li.append(name, artist);
+            frag.append(li);
+        });
+
+        listEl.append(frag);
+    };
+
+    function paintProgress() {
+        const { duration, currentTime } = audio;
+        const ratio = Number.isFinite(duration) && duration > 0 ? currentTime / duration : 0;
+        if (barFill) barFill.style.width = `${Math.min(100, Math.max(0, ratio * 100))}%`;
+        if (bar) bar.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
+    }
+
+    const paintCurrent = () => {
+        const track = tracks[current];
+        if (!track) return;
+
+        if (nowTitle) nowTitle.textContent = track.name || '未知曲目';
+        if (nowArtist) nowArtist.textContent = track.artist || '';
+        if (cover && track.pic) {
+            cover.src = track.pic;
+            cover.alt = `${track.name} - ${track.artist}`;
+        }
+
+        listEl.querySelectorAll<HTMLElement>('.mp__item').forEach((el) => {
+            el.classList.toggle('is-current', Number(el.dataset.index) === current);
+        });
+
+        const active = listEl.querySelector<HTMLElement>('.mp__item.is-current');
+        if (active) active.scrollIntoView({ block: 'nearest' });
+
+        paintProgress();
+    };
+
+    /* ---------- 播放控制 ---------- */
+
+    const playAt = (index: number) => {
+        if (!tracks.length) return;
+        current = (index + tracks.length) % tracks.length;
+        paintCurrent();
+        audio.src = tracks[current].url;
+        // 浏览器没给交互权限时 play() 会 reject，静默吞掉即可
+        void audio.play().catch(() => undefined);
+    };
+
+    const step = (delta: number) => {
+        if (!tracks.length) return;
+
+        if (!shuffling || tracks.length < 2) {
+            playAt(current < 0 ? 0 : current + delta);
+            return;
+        }
+
+        let next = current;
+        while (next === current) next = Math.floor(Math.random() * tracks.length);
+        playAt(next);
+    };
+
+    /* ---------- 歌单加载 ---------- */
+
+    const load = async () => {
+        if (loaded || loading) return;
+        loading = true;
+
+        try {
+            const res = await fetch(endpoint);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const data = (await res.json()) as MusicTrack[];
+            tracks = Array.isArray(data) ? data.filter((t) => t && t.url) : [];
+            if (!tracks.length) throw new Error('empty playlist');
+
+            loaded = true;
+            if (statusEl) statusEl.hidden = true;
+
+            // 随机播放时先替用户选一首，但不动手播 —— 自动播放会被拦
+            current = shuffling ? Math.floor(Math.random() * tracks.length) : 0;
+            renderList();
+            paintCurrent();
+
+            if (root.dataset.autoplay === 'true') playAt(current);
+        } catch {
+            if (statusEl) statusEl.textContent = '歌单加载失败，收起再点唱片重试';
+            tracks = [];
+            current = -1;
+        } finally {
+            loading = false;
+        }
+    };
+
+    /* ---------- 面板开合 ---------- */
+
+    const setOpen = (open: boolean) => {
+        root.classList.toggle('is-open', open);
+        panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+        disc.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) void load();
+    };
+
+    disc.addEventListener('click', () => setOpen(!root.classList.contains('is-open')));
+    btnClose?.addEventListener('click', () => setOpen(false));
+
+    document.addEventListener('click', (event) => {
+        if (root.classList.contains('is-open') && !root.contains(event.target as Node)) setOpen(false);
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && root.classList.contains('is-open')) setOpen(false);
+    });
+
+    /* ---------- 控件绑定 ---------- */
+
+    listEl.addEventListener('click', (event) => {
+        const item = (event.target as HTMLElement).closest<HTMLElement>('.mp__item');
+        if (!item) return;
+        playAt(Number(item.dataset.index));
+    });
+
+    btnPlay?.addEventListener('click', () => {
+        if (!audio.paused) {
+            audio.pause();
+            return;
+        }
+        if (audio.src) void audio.play().catch(() => undefined);
+        else playAt(current < 0 ? 0 : current);
+    });
+
+    btnPrev?.addEventListener('click', () => {
+        // 播过 3 秒先回开头，这是播放器的通用肌肉记忆
+        if (audio.currentTime > 3) {
+            audio.currentTime = 0;
+            return;
+        }
+        step(-1);
+    });
+
+    btnNext?.addEventListener('click', () => step(1));
+
+    const seek = (clientX: number) => {
+        if (!bar || !Number.isFinite(audio.duration) || audio.duration <= 0) return;
+        const rect = bar.getBoundingClientRect();
+        const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+        audio.currentTime = ratio * audio.duration;
+        paintProgress();
+    };
+
+    bar?.addEventListener('click', (event) => seek((event as unknown as MouseEvent).clientX));
+
+    bar?.addEventListener('keydown', (event) => {
+        const keyboardEvent = event as KeyboardEvent;
+        const jump = keyboardEvent.key === 'ArrowRight' ? 5 : keyboardEvent.key === 'ArrowLeft' ? -5 : 0;
+        if (!jump || !Number.isFinite(audio.duration)) return;
+        keyboardEvent.preventDefault();
+        audio.currentTime = Math.min(audio.duration, Math.max(0, audio.currentTime + jump));
+    });
+
+    /* ---------- 音频事件 ---------- */
+
+    audio.addEventListener('play', () => root.classList.add('is-playing'));
+    audio.addEventListener('pause', () => root.classList.remove('is-playing'));
+    audio.addEventListener('playing', () => { errorStreak = 0; });
+    audio.addEventListener('timeupdate', paintProgress);
+    audio.addEventListener('loadedmetadata', paintProgress);
+    audio.addEventListener('ended', () => step(1));
+
+    audio.addEventListener('error', () => {
+        if (!audio.error) return;
+        root.classList.remove('is-playing');
+        errorStreak += 1;
+        // 单曲取流失败不打断整个歌单，但连错太多次说明是接口挂了，别继续跳。
+        // 阈值给到 8：QQ 音乐源下约七成曲子取不到直链（版权/VIP），阈值小了会误停。
+        if (errorStreak <= 8 && tracks.length > 1) {
+            flash('这首取不到音源，已跳过');
+            window.setTimeout(() => step(1), 400);
+        }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && !audio.paused) audio.pause();
+    });
+
+    /* ---------- 空闲预取 ---------- */
+
+    const idle = (window as unknown as {
+        requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
+    }).requestIdleCallback;
+
+    if (typeof idle === 'function') idle(() => void load(), { timeout: 3000 });
+    else window.setTimeout(() => void load(), 1500);
+}
+
 document.addEventListener('DOMContentLoaded', setupCodeGroups);
 document.addEventListener('DOMContentLoaded', setupParticleBackground);
 document.addEventListener('DOMContentLoaded', setupSiteRuntime);
+document.addEventListener('DOMContentLoaded', setupMusicPlayer);

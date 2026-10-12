@@ -78,7 +78,9 @@ SortBy         = "default"
 
 [colorScheme]
     toggle  = true
-    default = "auto"
+    # 默认配色。auto = 跟随系统；dark = 新访客一律先看到深色（仍可用左下角按钮切换）。
+    # 只对「本机没存过偏好」的访客生效，改过的人保持自己的选择。
+    default = "dark"
 
 [imageProcessing]
     autoOrient = false
@@ -111,29 +113,42 @@ SortBy         = "default"
             placeholder = "说点什么…"
 
 # ============================================================
-#  背景音乐（APlayer + MetingJS，资源自托管在 static/aplayer/）
+#  背景音乐（右上角黑胶唱片，自研组件）
 #
-#  ⚠️ api 那一行别随手换：本机实测只有 injahow 能取到真音频，
+#  上一版是 APlayer + MetingJS 的左下角浮层，2026-10-12 换掉：
+#  浮层太大、位置抢眼，改成右上角一张会转的黑胶唱片 ——
+#  收起时只占 62px，点开才展开歌单，从列表里点哪首放哪首。
+#
+#  逻辑在 assets/ts/custom.ts 的 setupMusicPlayer()
+#  样式在 assets/css/custom.css 的「右上角唱片播放器」一节
+#
+#  ⚠️ 换 QQ 音乐（server = "tencent"）之前先读这段：
+#     2026-10-12 实测，tencent 的元数据（歌名 / 封面 / 歌词）正常，
+#     但**音频直链约七成取不到** —— 接口回 200 加一个空响应体，
+#     是被版权 / VIP 挡住，不是接口坏了。播放器遇到会自动跳下一首，
+#     并在面板顶部提示「取不到音源」。网易云目前取流成功率是 100%。
+#     ⇒ 想放 QQ 音乐就得接受这个折损；要全都能听，就换回 netease。
+#
+#  ⚠️ api 那一行也别随手换：实测只有 injahow 这家能取到真音频，
 #     i-meto 的取直链端点对所有平台都返回「服务器未知异常」。
 #     详见 static/aplayer/README.md
 # ============================================================
-[aplayer]
-    enable     = true
-    # ★ 换成自己的歌单 ID：网易云网页版歌单地址里 playlist?id= 后面那串数字
-    id         = "3778678"     # 现在填的是网易云「热歌榜」，先用它验证整条链路
-    server     = "netease"     # netease / tencent / kugou
-    type       = "playlist"    # playlist / album / artist / song
-    api        = "https://api.injahow.cn/meting/?server=:server&type=:type&id=:id"
+[music]
+    enable   = true
 
-    autoplay   = false         # 浏览器会拦截自动播放，开了也没用
-    order      = "random"      # random / list
-    volume     = 0.5
-    theme      = "#5b7cfa"     # 播放器主色
-    lrc        = true          # 显示歌词
-    fixed      = true          # 固定在左下角的迷你播放器
-    preload    = "none"        # 不点播放就不下载音频，省流量
-    listFolded = true          # 播放列表默认折叠
-    mini       = false         # 再缩一档，只剩一个圆按钮
+    # ★ 换成自己的歌：在对应平台建一个歌单，把歌加进去，再把 id 填过来。
+    #   网易云 → 网页版地址里 playlist?id= 后面那串数字
+    #   QQ 音乐 → 网页版地址里 playlist/ 后面那串数字（disstid）
+    id       = "7011264340"    # 现在是一张 QQ 音乐示例歌单（76 首），换成你自己的
+    server   = "tencent"       # netease / tencent / kugou
+    type     = "playlist"      # playlist / album / artist / song
+    api      = "https://api.injahow.cn/meting/?server=:server&type=:type&id=:id"
+
+    title    = "QQ 音乐歌单"    # 面板顶部的歌单名，换成自己的歌单后记得一起改
+    order    = "random"        # random / list —— 放完一首后随机还是按列表顺序
+    volume   = 0.5
+    accent   = "#5b7cfa"       # 进度条与当前曲目的高亮色
+    autoplay = false           # 浏览器会拦截自动播放，开了也没用
 
 # ============================================================
 #  访问统计（A 方案：Cloudflare Web Analytics，免服务器）
