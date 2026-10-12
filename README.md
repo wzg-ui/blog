@@ -168,12 +168,15 @@ baseURL = "https://你的域名/"
 
 ### 3. 部署到 Cloudflare Pages
 
-1. 把本仓库推到 GitHub（私有仓库也可以）
+1. 仓库已经建好了：<https://github.com/wzg-ui/blog>（公开）。改完直接推：
 
    ```bash
-   git remote add origin git@github.com:你的用户名/blog.git
-   git push -u origin main
+   git push
    ```
+
+   > **在 WorkBuddy 会话里推送可能报 `CONNECT tunnel failed, response 502`** ——
+   > 那是会话环境注入了本地代理（`http_proxy=127.0.0.1:25705`）导致，不是网络断。
+   > 临时绕过：`env -u http_proxy -u https_proxy git push`。
 
 2. 打开 Cloudflare 控制台 → Workers 和 Pages → 创建 → Pages → 连接到 Git
 3. 选择本仓库，构建配置填：
