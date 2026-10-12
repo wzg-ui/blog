@@ -1,0 +1,30 @@
+{{ define "body-class" }}template-archives{{ end }}
+{{ define "main" }}
+    {{/*
+      覆盖主题自带的 archives.html：去掉顶部的「分类云」区块。
+
+      那个区块会调用 `$.Site.GetPage "taxonomyTerm" "categories"`。
+      本站的文章不分类，categories 这个 taxonomy 根本不存在，
+      于是 Hugo 每次构建都打一条 `WARN Taxonomy categories not found`。
+      区块本身渲染出来也是空的，删掉既消警告又少一段无用代码。
+
+      将来如果重新启用分类，把主题里的那段拿回来即可
+      （themes/hugo-theme-stack/layouts/archives.html 第 3–16 行）。
+    */}}
+
+    {{ $pages := partial "helper/pages.html" .Site.Home }}
+
+    {{ range $pages.GroupByDate "2006" }}
+    {{ $id := lower (replace .Key " " "-") }}
+    <div class="archives-group" id="{{ $id }}">
+        <h2 class="archives-date section-title"><a href="{{ $.RelPermalink }}#{{ $id }}">{{ .Key }}</a></h2>
+        <div class="article-list--compact">
+            {{ range .Pages }}
+                {{ partial "article-list/compact" . }}
+            {{ end }}
+        </div>
+    </div>
+    {{ end }}
+
+    {{ partialCached "footer/footer" . }}
+{{ end }}

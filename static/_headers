@@ -23,11 +23,17 @@
 /photoswipe/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Hugo 打包出来的资源带内容指纹（如 main.abc123.css）
+/aplayer/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Hugo 打包出来的资源带内容指纹，路径在 /ts 与 /scss，不在 /js
 /css/*
   Cache-Control: public, max-age=31536000, immutable
 
-/js/*
+/ts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/scss/*
   Cache-Control: public, max-age=31536000, immutable
 
 # ------------------------------------------------------------

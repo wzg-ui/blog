@@ -1,0 +1,28 @@
+{{- /* 音乐播放器挂载点 —— APlayer + MetingJS
+       配置在 config/_default/params.toml 的 [aplayer]
+       资源自托管在 static/aplayer/，不依赖任何 CDN
+
+       坑：属性名必须写成 kebab-case。
+       MetingJS 用 _camelize() 先转小写再把「-x」变成「X」，
+       所以 lrc-type → lrcType 能识别，写 lrcType 会被 HTML 小写化后失效。
+       另外 lrc 这个名字被 MetingJS 当作元数据字段吃掉了，
+       控歌词必须用 lrc-type，不能用 lrc。 */ -}}
+{{- with .Site.Params.aplayer -}}
+{{- if and .enable .id -}}
+<meting-js
+    server="{{ .server }}"
+    type="{{ .type }}"
+    id="{{ .id }}"
+    api="{{ .api }}"
+    theme="{{ .theme }}"
+    order="{{ .order }}"
+    volume="{{ .volume }}"
+    preload="{{ .preload }}"
+    lrc-type="{{ if .lrc }}3{{ else }}0{{ end }}"
+    fixed="{{ .fixed }}"
+    list-folded="{{ .listFolded }}"
+    mini="{{ .mini }}"
+    autoplay="{{ .autoplay }}"
+></meting-js>
+{{- end -}}
+{{- end -}}

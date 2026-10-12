@@ -3,23 +3,27 @@
 # ============================================================
 
 # 主页 / 搜索索引要收录哪些内容区
-# ← 你的六个领域，全部列入；新增领域记得加在这里
-mainSections   = ["algorithm", "lowlevel", "ai", "rust", "math", "notes"]
+# ← 目前只有一个：posts（唯一的正文区，文章不分类）
+#   将来若拆出独立栏目，同步改这里、menu.toml、content/ 下的目录、README 的目录树
+mainSections   = ["posts"]
 rssFullContent = true
 SortBy         = "default"
 
 [footer]
     since      = 2026
-    customText = ""
+    # 站点的起始时刻，「本站已运行」计时器读的是这里的 data-since。
+    # 改时间只改这一处，脚本不用动。
+    customText = '本站已运行 <span id="site-runtime" data-since="2026-10-12T21:00:00+08:00">—</span>'
 
 [dateFormat]
-    published   = "2006-01-02"
-    lastUpdated = "2006-01-02"
+    # 精确到分钟：文章什么时候写的，列表页一眼能看到
+    published   = "2006-01-02 15:04"
+    lastUpdated = "2006-01-02 15:04"
 
 [sidebar]
     compact  = false
     avatar   = ""
-    subtitle = "算法竞赛 · C 底层 · AI · Rust · 数学"
+    subtitle = "想到什么写什么"
 
 [article]
     headingAnchor = true   # 标题带锚点，方便引用某一小节
@@ -28,7 +32,8 @@ SortBy         = "default"
     readingTime   = true
 
     [article.list]
-        showTags = true
+        # 站里不打标签，列表页就不必留标签的位置
+        showTags = false
 
     [article.license]
         enabled = false
@@ -52,21 +57,17 @@ SortBy         = "default"
 
 # 侧边栏部件
 # 注意：必须是带 type 字段的对象，不能写成字符串数组
+#
+# 曾经配过 categories 与 tag-cloud 两个部件。本站文章不分类、不打标签，
+# 这两个部件渲染出来是空的，还会让 Hugo 每次构建都打
+# `WARN Taxonomy categories not found` / `WARN Taxonomy tags not found`。
+# 将来启用分类或标签时，把对应的 [[widgets.homepage]] 块加回来即可。
+
 [[widgets.homepage]]
     type = "search"
 
 [[widgets.homepage]]
-    type = "categories"
-    [widgets.homepage.params]
-        limit = 12
-
-[[widgets.homepage]]
     type = "archives"
-
-[[widgets.homepage]]
-    type = "tag-cloud"
-    [widgets.homepage.params]
-        limit = 40
 
 [[widgets.page]]
     type = "toc"
@@ -108,3 +109,47 @@ SortBy         = "default"
         [comments.waline.locale]
             admin       = "博主"
             placeholder = "说点什么…"
+
+# ============================================================
+#  背景音乐（APlayer + MetingJS，资源自托管在 static/aplayer/）
+#
+#  ⚠️ api 那一行别随手换：本机实测只有 injahow 能取到真音频，
+#     i-meto 的取直链端点对所有平台都返回「服务器未知异常」。
+#     详见 static/aplayer/README.md
+# ============================================================
+[aplayer]
+    enable     = true
+    # ★ 换成自己的歌单 ID：网易云网页版歌单地址里 playlist?id= 后面那串数字
+    id         = "3778678"     # 现在填的是网易云「热歌榜」，先用它验证整条链路
+    server     = "netease"     # netease / tencent / kugou
+    type       = "playlist"    # playlist / album / artist / song
+    api        = "https://api.injahow.cn/meting/?server=:server&type=:type&id=:id"
+
+    autoplay   = false         # 浏览器会拦截自动播放，开了也没用
+    order      = "random"      # random / list
+    volume     = 0.5
+    theme      = "#5b7cfa"     # 播放器主色
+    lrc        = true          # 显示歌词
+    fixed      = true          # 固定在左下角的迷你播放器
+    preload    = "none"        # 不点播放就不下载音频，省流量
+    listFolded = true          # 播放列表默认折叠
+    mini       = false         # 再缩一档，只剩一个圆按钮
+
+# ============================================================
+#  访问统计（A 方案：Cloudflare Web Analytics，免服务器）
+#
+#  A 方案里统计不跑 Umami，改用 Cloudflare Web Analytics：
+#  零运维、不写 cookie、不采集个人信息，脚本是 defer 的，不拖慢首屏。
+#
+#  ★ 怎么拿 token：
+#    1. 登录 dash.cloudflare.com（没有账号就免费注册一个）
+#    2. Analytics & Logs → Web Analytics → Add a site
+#    3. hostname 填你线上那个域名（如 blzrw-blog-43569.app.workbuddy.host）
+#    4. 选「JavaScript snippet」方式，复制 data-cf-beacon 里 "token" 那串
+#    5. 把 token 贴到下面，enable 改成 true，再重新发布一次才生效
+#
+#  没填 token 时这段脚本完全不输出，页面上不会有任何多余请求。
+# ============================================================
+[analytics]
+    enable = false             # ★ 拿到 token 后改成 true
+    token  = ""                # ★ 粘贴 Cloudflare 给你的 token

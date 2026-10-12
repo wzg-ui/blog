@@ -1,55 +1,35 @@
 # ============================================================
 #  导航菜单
-#  六个领域统一放在顶部导航，保证任何一个领域都能被点进去
-#  （空领域不会出现在主页列表里，只能靠导航进入）
+#
+#  这里只放「手工声明」的菜单项。主题自带的两个页面导航项不在这里 ——
+#  它们写在各自页面的 front matter 里（menu.main）：
+#     content/page/search/index.md     搜索   weight -60
+#     content/page/archives/index.md   归档   weight -50
+#
+#  最终顺序（按 weight 升序）：主页 → 搜索 → 归档
+#
+#  曾经的 [[main]] posts（「文章」）已删除：/posts/ 栏目页不再生成
+#  （见 content/posts/_index.md 的 build 设置），首页就是文章入口。
 # ============================================================
 
+# 「主页」直接指向站点根目录。首页本身就是文章列表（置顶区 + 常规列表），
+# 点卡片标题即可进入文章 —— 所以这里不需要另建页面，给个入口就行。
+# 摆在最前面是学 haxo 那站：导航第一项永远是回到文章流。
 [[main]]
-    identifier = "algorithm"
-    name       = "算法竞赛"
-    url        = "/algorithm/"
-    weight     = 10
+    identifier = "home"
+    name       = "主页"
+    url        = "/"
+    weight     = -70
 
-[[main]]
-    identifier = "lowlevel"
-    name       = "C 与底层"
-    url        = "/lowlevel/"
-    weight     = 20
+    [main.params]
+        icon = "home"
 
-[[main]]
-    identifier = "ai"
-    name       = "AI"
-    url        = "/ai/"
-    weight     = 30
-
-[[main]]
-    identifier = "rust"
-    name       = "Rust"
-    url        = "/rust/"
-    weight     = 40
-
-[[main]]
-    identifier = "math"
-    name       = "数学"
-    url        = "/math/"
-    weight     = 50
-
-[[main]]
-    identifier = "notes"
-    name       = "随笔"
-    url        = "/notes/"
-    weight     = 60
-
-[[main]]
-    identifier = "about"
-    name       = "关于"
-    url        = "/about/"
-    weight     = 70
-
+# 侧边栏底部的小图标。外链一律新标签页打开（newTab）。
 [[social]]
     identifier = "github"
     name       = "GitHub"
-    url        = "https://github.com/你的用户名"
+    url        = "https://github.com/wzg-ui"
 
     [social.params]
-        icon = "brand-github"
+        icon   = "brand-github"
+        newTab = true

@@ -3,3 +3,23 @@
     {{- $css := . | minify | fingerprint -}}
     <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}" crossorigin="anonymous">
 {{- end -}}
+
+{{- /* 音乐播放器：样式与脚本，自托管在 static/aplayer/，不走 CDN。
+       两个脚本都用 defer —— 必须保证 APlayer 先于 MetingJS 执行，
+       因为 MetingJS 定义 <meting-js> 时会立刻触发 connectedCallback，
+       那一刻 window.APlayer 必须已经存在，否则播放器静默不出现。 */ -}}
+{{- with .Site.Params.aplayer -}}
+{{- if .enable }}
+    <link rel="stylesheet" href="{{ "aplayer/APlayer.min.css" | relURL }}">
+    <script src="{{ "aplayer/APlayer.min.js" | relURL }}" defer></script>
+    <script src="{{ "aplayer/Meting.min.js" | relURL }}" defer></script>
+{{- end -}}
+{{- end -}}
+
+{{- /* 访问统计：Cloudflare Web Analytics（A 方案，免服务器）
+       token 没填时整段不输出 —— 见 config/_default/params.toml 的 [analytics] */ -}}
+{{- with .Site.Params.analytics -}}
+{{- if and .enable .token }}
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "{{ .token }}"}'></script>
+{{- end -}}
+{{- end -}}

@@ -6,21 +6,18 @@ Hugo + Stack 主题。内容以 Markdown 存放，站点是构建产物，部署
 blog/
 ├── config/_default/        站点配置（改标题、域名、菜单、公式开关都在这里）
 │   ├── hugo.toml           主配置：域名、语言、永久链接
-│   ├── params.toml         主题参数：六个内容区、公式、侧边栏
+│   ├── params.toml         主题参数：内容区、公式、侧边栏
 │   ├── markup.toml         数学公式与代码高亮的渲染规则
 │   └── menu.toml           左侧导航菜单
 ├── content/                ★ 你写的东西全在这里
-│   ├── algorithm/          算法竞赛
-│   ├── lowlevel/           C 与底层
-│   ├── ai/                 AI
-│   ├── rust/               Rust
-│   ├── math/               数学（下分六个子领域）
-│   ├── notes/              随笔
-│   └── page/               关于、归档、搜索（固定页面，不用改）
+│   ├── posts/              文章（唯一内容区，不分类）
+│   └── page/               归档、搜索（固定页面，不用改）
 ├── layouts/                对本主题的定制
+│   ├── home.html           首页：置顶区 + 常规列表
+│   ├── archives.html       归档页（覆盖主题，去掉默认的「分类云」）
 │   ├── _shortcodes/        codegroup —— 代码并排/切换对照
 │   ├── _markup/            代码块文件名栏
-│   └── _partials/          覆盖主题默认行为（Mermaid 本地化、去 Google Fonts）
+│   └── _partials/          覆盖主题默认行为（Mermaid 本地化、去 Google Fonts、音乐播放器）
 ├── assets/                 custom.css 与 custom.ts（会被自动打包）
 ├── static/                 自托管资源：KaTeX / Mermaid / PhotoSwipe
 │   ├── _headers            Cloudflare Pages 缓存与安全响应头
@@ -42,12 +39,15 @@ blog/
 
 ### 新建一篇文章
 
-在 `content/` 下对应的领域目录里新建 `.md` 文件即可，**文件名就是 URL**。
+在 `content/posts/` 下新建 `.md` 文件即可，**文件名就是 URL**。
 
 ```
-content/math/linear-algebra/eigenvalue.md
-  → https://你的域名/math/linear-algebra/eigenvalue/
+content/posts/segment-tree-range-sum.md
+  → https://你的域名/posts/segment-tree-range-sum/
 ```
+
+文章不分栏目，写的时候不用先想「这篇该放哪儿」。等某类文章攒够数量，再考虑拆独立目录——
+届时记得同步 `params.toml` 的 `mainSections` 和 `menu.toml`。
 
 **文件名请用英文小写加连字符**（`segment-tree.md` 而不是 `线段树.md`），否则 URL 里会出现一长串 `%E7%BA%BF%E6%AE%B5%E6%A0%91`。
 
@@ -59,14 +59,27 @@ title: "线段树维护区间和"          # 显示用标题，可以写中文
 date: 2026-10-12                   # 首次发布日期
 slug: "segment-tree-range-sum"     # 可选，不写则用文件名
 description: "一句话摘要，会用于 SEO 和分享卡片"
-categories:
-    - 算法竞赛                      # 领域分类，和目录保持一致
-tags:
-    - 线段树                        # 标签随便加
+pinned: true                       # 可选，写这一行才会进首页「置顶」区
 ---
 ```
 
 字段后面空一行，再写 `<!--more-->`，这之前的内容会作为列表页的摘要。
+
+### 首页置顶
+
+首页最上面是「置顶」区，下面是按时间排的常规列表。
+
+**只有 front matter 里写了 `pinned: true` 的文章才会进置顶区**，不加就是普通文章。置顶区内部按 `weight` 升序排，`weight` 不写就按日期倒序——所以想控制置顶顺序，给它们编上号即可：
+
+```yaml
+weight: 1     # 置顶第一条
+weight: 2     # 置顶第二条
+```
+
+同一篇文章不会在置顶区和下面的列表里出现两次（置顶的那几篇会从常规列表里去掉）。
+
+> 站里没有分类、也没有标签 —— 别写 `categories` / `tags`，加了不报错但什么用都没有。
+> `/posts/` 这个栏目页也不生成，首页就是文章入口。
 
 ### 语法速查
 
@@ -146,7 +159,12 @@ baseURL = "https://你的域名/"
 - `[sidebar] avatar` —— 头像，把图片放到 `static/` 下再填 `/图片名.png`
 - `[footer] since` —— 起始年份
 
-`config/_default/menu.toml` 里的 GitHub 地址也要换成你自己的。
+左侧导航有三项：**主页 / 搜索 / 归档**。主页直接指向站点根目录（首页就是文章列表）。
+其中「搜索」「归档」不写在 `menu.toml` 里，而在各自页面的 front matter（`menu.main`）——
+想调顺序就改那两个文件里的 `weight`。
+
+侧边栏顶部那个 GitHub 图标指向 `https://github.com/wzg-ui`（配置在 `config/_default/menu.toml`
+的 `[[social]]`，外链已设 `newTab = true`）。换地址就改那一行，不想要这个图标就把整块删掉。
 
 ### 3. 部署到 Cloudflare Pages
 
@@ -221,16 +239,25 @@ docker compose up -d
 
 ## 四、本仓库对主题做的改动
 
-主题是内嵌的（`themes/hugo-theme-stack`），下面这四处是定制，主题升级时要注意：
+主题是内嵌的（`themes/hugo-theme-stack`），下面这些是定制，主题升级时要注意：
 
 | 文件 | 改动 | 为什么 |
 | --- | --- | --- |
 | `data/external.toml` | KaTeX、PhotoSwipe 改本地路径 | jsdelivr 在国内经常不可达，会导致公式完全不显示 |
 | `layouts/_partials/article/components/mermaid.html` | Mermaid 改本地路径 | 同上。主题里这个 CDN 是写死的，只能覆盖整个文件 |
 | `layouts/_partials/head/custom-font.html` | 置空 | 原本从 Google Fonts 加载 Lato，国内不稳且不含中文字形。改用系统字体栈，定义在 `assets/css/custom.css` |
+| `layouts/home.html` | 新增 | 首页 = 置顶区 + 常规列表。`pinned: true` 的文章钉在最前，且不再出现在下方列表里 |
+| `layouts/archives.html` | 覆盖主题 | 去掉归档页顶部的「分类云」（站里不分类，那块本来就是空的） |
+| `content/posts/_index.md` | `build: render never` | 不再输出 `/posts/` 栏目页 —— 首页已经是文章入口，导航里也没有「文章」 |
+| `content/page/_index.md` | `build: render never` | 同理，`content/page/` 只是归档/搜索的容器，不该有自己那个空壳列表页 |
 | `layouts/_shortcodes/codegroup.html` 等 | 新增 | 主题没有代码分组，这是自己加的 |
+| `static/aplayer/` | 新增 | APlayer + MetingJS 自托管，理由同上；API 选型见该目录的 README |
+| `layouts/_partials/footer/custom.html` | 新增 | 音乐播放器 + 页脚「本站已运行」的挂载点。属性必须写 kebab-case，原因写在文件注释里 |
+| `layouts/_partials/head/custom.html` | 追加播放器样式与脚本 | APlayer 必须先于 MetingJS 执行，两个都用 defer |
+| `assets/ts/custom.ts` | 追加粒子点阵背景与运行时长计时器 | canvas 由脚本自己插进 body，模板不用改 |
+| `assets/css/custom.css` | 追加整套灰阶配色、背景装饰、卡片整块可点 | 覆盖主题的 `:root` / `[data-scheme="dark"]` 变量 |
 
-**升级主题的正确姿势**：把新版本解压到 `themes/hugo-theme-stack`，然后逐个确认上表这四个文件是否还需要保留（尤其 mermaid 那个），跑一次 `hugo` 看有没有报错。
+**升级主题的正确姿势**：把新版本解压到 `themes/hugo-theme-stack`，然后逐个确认上表这些文件是否还需要保留（尤其 mermaid 那个），跑一次 `hugo` 看有没有报错。
 
 ---
 

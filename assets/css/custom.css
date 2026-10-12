@@ -4,8 +4,70 @@
    - 代码分组（codegroup 短代码）
    - 代码块文件名栏
    - 公式排版微调
+   - 背景装饰（光晕 / 点阵纹理）
+   - 粒子点阵背景的层级处理
+   - 页脚「本站已运行」
+   - 音乐播放器微调
    字号一律用 em（相对正文），避免受主题 rem 基准影响
    ============================================================ */
+
+/* ============================================================
+   配色：无彩色灰阶
+   ------------------------------------------------------------
+   抄的是 blog.haxo.top 那套思路（它的主题叫 shayu）。
+   要点不是"深色"，而是**整站没有任何彩色**：
+   强调关系全部靠明度差表达，链接、按钮、hover 都不引入色相。
+
+   主题默认用的是 #34495e 这种蓝灰做 accent，深色底是 #303030、
+   卡片 #424242 —— 卡片比背景亮，层次靠"卡片浮起来"。
+   这里反过来：卡片只比背景亮一点点，层次靠 1px 分隔线拉开。
+
+   加载顺序上 custom.css 在主题 style.css 之后（head/custom.html
+   是 head 里最后一个 partial），所以同特异性下这些值直接生效。
+   ============================================================ */
+
+/* ---------- 亮色 ---------- */
+:root {
+    --body-background: #eceef0;
+
+    --card-background: #ffffff;
+    --card-background-selected: #e4e6ea;
+    --card-text-color-main: #292b30;
+    --card-text-color-secondary: #60636a;
+    --card-text-color-tertiary: #7b7e85;
+    --card-separator-color: rgba(47, 49, 54, 0.14);
+
+    --body-text-color: #34363b;
+
+    /* 强调色也是灰的：亮色底上用近黑 */
+    --accent-color: #292b30;
+    --accent-color-darker: #111216;
+    --accent-color-text: #ffffff;
+
+    /* haxo 用的是 rounded-2xl（16px），比主题默认的 10px 更软 */
+    --card-border-radius: 16px;
+}
+
+/* ---------- 深色（主视觉）----------
+   底 #18171d 近黑微冷，面板 #1d1e22，两者只差一点点。
+   文字不用纯白，用 0.92 透明度的白，长文看起来不刺眼。 */
+:root[data-scheme="dark"] {
+    --body-background: #18171d;
+
+    --card-background: #1d1e22;
+    --card-background-selected: #2c2c2c;
+    --card-text-color-main: rgba(255, 255, 255, 0.92);
+    --card-text-color-secondary: #a8a8a8;
+    --card-text-color-tertiary: #9a9a9a;
+    --card-separator-color: rgba(66, 68, 74, 0.62);
+
+    --body-text-color: #d2d2d2;
+
+    /* 深色底上"强调"= 更亮的白 */
+    --accent-color: rgba(255, 255, 255, 0.92);
+    --accent-color-darker: #ffffff;
+    --accent-color-text: #18171d;
+}
 
 /* ---------- 字体栈 ----------
    主题原本用 Lato + 系统字体，Lato 不含中文字形，
@@ -199,4 +261,185 @@
 .article-content code:not(.chroma code) {
     padding: 0.1em 0.35em;
     border-radius: 4px;
+}
+
+/* ---------- 首页置顶区 ----------
+   首页第一屏是「置顶」，下面才是按时间排的常规列表（见 layouts/home.html）。
+   标题只用一个竖条 + 小字，不加底色也不加边框 —— 置顶的卡片本身和别的
+   卡片长得一样，区别只在位置和这个标签。灰阶配色下，多一层色块反而脏。 */
+.pinned-list {
+    margin-bottom: 2.4em;
+}
+
+/* 置顶区后面没有常规列表时，别在页脚前留一截空白 */
+.pinned-list:last-of-type {
+    margin-bottom: 0;
+}
+
+.pinned-list__title {
+    display: flex;
+    align-items: center;
+    gap: 0.62em;
+    margin: 0 0 1em;
+    font-size: 0.82em;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: var(--card-text-color-secondary, #60636a);
+}
+
+.pinned-list__title::before {
+    content: "";
+    flex: none;
+    width: 0.22em;
+    height: 1.05em;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.75;
+}
+
+/* ---------- 卡片整块可点 ----------
+   主题原本只有文章标题是链接，点卡片别的地方没反应。
+   这里把标题链接的 ::after 铺满整张卡片，实现「点哪儿都能进文章」，
+   同时 DOM 里仍然只有一个 <a> —— 不用嵌套链接，键盘 Tab、右键菜单、
+   在「新标签页打开」都保持正常。
+
+   副作用：卡片上层多了一层透明覆盖，拖选标题文字会比以前费劲一点。
+   真碍事就把这节删掉，其余部分不受影响。 */
+.article-list article {
+    position: relative;
+}
+
+.article-list article .article-title a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+}
+
+/* ---------- 背景装饰 ----------
+   粒子层是夜间专属（见下一节），亮色下页面就是一片纯灰；深色的粒子
+   也需要一点底光，才不至于像悬在纯黑里。所以这里按主题各给一层纹理。
+
+   全部无彩色：深色用冷白光晕，亮色用近黑点阵。混进任何色相都会破坏
+   「整站无彩色」这条线，也会跟卡片抢注意力。
+
+   层级：z-index 0，与 canvas 同级。::before 在盒树里排在 canvas 之前，
+   所以光晕永远压在粒子下面；正文容器是 z-index 1，两层都盖不到字。 */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    /* 亮色（默认）：22px 一格的细点阵，只在卡片外的留白处透出来 */
+    background-image: radial-gradient(
+        rgba(41, 43, 48, 0.085) 1px,
+        transparent 1px
+    );
+    background-size: 22px 22px;
+}
+
+/* 深色：左上、右下两团冷白光晕，把视线往中间收；
+   顶部再压一道极淡的横向光带，让页面有个「上方有光源」的方向感 */
+:root[data-scheme="dark"] body::before {
+    background-image:
+        radial-gradient(
+            60rem 40rem at 14% -8%,
+            rgba(255, 255, 255, 0.085),
+            transparent 60%
+        ),
+        radial-gradient(
+            50rem 34rem at 92% 108%,
+            rgba(255, 255, 255, 0.055),
+            transparent 62%
+        ),
+        linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.035),
+            transparent 28rem
+        );
+    background-size: auto;
+}
+
+/* 视口太窄时点阵显得密，这里把间距放宽一点 */
+@media (max-width: 700px) {
+    body::before {
+        background-size: 26px 26px;
+    }
+}
+
+/* ---------- 粒子点阵背景 ----------
+   canvas 由 assets/ts/custom.ts 自己插到 body 最前面，模板不用改。
+
+   关键在层级：body 有背景色，canvas 必须是 body 的子元素才能盖住它；
+   给 canvas 定 z-index: 0，再把正文容器抬到 1，否则 canvas 会被
+   body 背景整块挡住，页面上什么都看不到。
+
+   只在深色下出现，理由见下面的亮色规则。 */
+#bg-particles {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 450ms ease;
+}
+
+/* 亮色下整个隐藏 —— 这条学的是 haxo：
+   它的宇宙粒子层在白天主题里是 visibility: hidden，只留给夜间。
+   浅色底上撒浅色点会显脏，不如不出现。
+   脚本那边同步在亮色时停掉 rAF，画面看不见就不该继续烧 CPU。 */
+:root[data-scheme="light"] #bg-particles {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 450ms ease, visibility 0s linear 450ms;
+}
+
+.container.main-container,
+.site-footer {
+    position: relative;
+    z-index: 1;
+}
+
+/* 打印时别浪费墨，也别让点阵进纸面 */
+@media print {
+    #bg-particles,
+    body::before {
+        display: none;
+    }
+}
+
+/* ---------- 页脚「本站已运行」 ----------
+   数字每秒变一次，必须用等宽数字（tabular-nums），否则进位时整行会左右抖。
+   起始时刻由 params.toml 的 footer.customText 通过 data-since 传进来。 */
+#site-runtime {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+/* ---------- 音乐播放器微调 ----------
+   APlayer 的固定播放器是左下角浮层，z-index 要高于正文容器，
+   圆角和边框跟主题卡片对齐。 */
+.aplayer.aplayer-fixed {
+    z-index: 90;
+    margin: 0 0 14px 14px;
+}
+
+.aplayer.aplayer-fixed .aplayer-body,
+.aplayer.aplayer-fixed .aplayer-list {
+    border-radius: var(--card-border-radius, 10px);
+}
+
+.aplayer .aplayer-info .aplayer-music,
+.aplayer .aplayer-info .aplayer-controller {
+    font-family: var(--base-font-family);
+}
+
+/* 手机屏幕上播放器默认更小，避免挡住正文 */
+@media (max-width: 700px) {
+    .aplayer.aplayer-fixed {
+        margin: 0 0 8px 8px;
+    }
 }

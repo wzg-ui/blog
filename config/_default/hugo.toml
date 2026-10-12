@@ -3,10 +3,11 @@
 #  Hugo 0.167.0 extended  +  Stack 4.0.3
 # ============================================================
 
-# baseURL 用根相对路径：这样无论挂到 Cloudflare Pages、自有域名还是本地预览，
-# 都不会出现「站内链接全指向 example.com」这个经典事故。
-# Cloudflare Pages 构建时用 -b "$CF_PAGES_URL" 覆盖它，canonical 与 RSS 便成为绝对地址。
-baseURL = "/"
+# 站点正式地址（自定义域名）。必须是绝对地址：
+# 否则 sitemap / RSS / og:url 全是相对路径，分享卡片和搜索引擎拿不到真实地址。
+# 本地预览不受影响 —— hugo server 会自动把它覆盖成 http://localhost:1313/。
+# 换域名时只改这一行。
+baseURL = "https://blog.pieee.net/"
 title   = "BLZRW's Blog"
 
 locale                 = "zh-cn"
@@ -20,13 +21,21 @@ enableRobotsTXT = true
 enableEmoji     = true
 summaryLength   = 120
 
+# 本站文章不分类，也不打标签 —— 关掉这两类页面的生成。
+# 不关的话 Hugo 会输出空的 /categories/ 与 /tags/ 列表页。
+# 将来要用标签时，删掉这一行即可（Stack 的 ShowTags 开关在 params.toml）。
+#
+# ⚠️ 这一行必须留在所有 [表头] 之前 —— TOML 里表头之后的键都属于那张表，
+#    放到 [pagination] 后面会被解析成 pagination.disableKinds，完全无效。
+disableKinds = ["taxonomy", "term"]
+
 [pagination]
     pagerSize = 10
 
 # 内容目录即 URL。page 目录（关于/搜索）用 slug 作一级路径，
 # 其余内容保持 content/ 下的目录层级，例如：
-#   content/math/linear-algebra/eigenvalue.md
-#     -> /math/linear-algebra/eigenvalue/
+#   content/posts/segment-tree-range-sum.md
+#     -> /posts/segment-tree-range-sum/
 [permalinks]
     page = "/:slug/"
 

@@ -1,0 +1,49 @@
+{{ define "main" }}
+    {{- /* ============================================================
+           首页 = 置顶区 + 常规列表
+
+           - 置顶：front matter 里写了 `pinned: true` 的文章，按 weight /
+             日期排在最前。想钉住哪篇，就在那篇里加这一行。
+           - 常规：其余文章，沿用主题原来的分页逻辑。
+
+           两个集合互斥，同一篇不会出现两次 —— 但别用 complement 做差集，
+           原因见下面那行注释。
+           排序沿用主题的 pages-sort（weight 升序 → 日期降序）。
+           ============================================================ */ -}}
+
+    {{- $pages  := where .Site.RegularPages "Type" "in" .Site.Params.mainSections -}}
+    {{- $pinned := where $pages "Params.pinned" true -}}
+    {{- /* 用 where 反选，不要用 complement —— 实测 complement 对 page 集合
+           不生效，$rest 会把置顶那几篇也带进来，首页直接重复一遍。 */ -}}
+    {{- $rest   := where $pages "Params.pinned" "ne" true -}}
+
+    {{- with $pinned }}
+        <section class="pinned-list">
+            <h2 class="pinned-list__title">置顶</h2>
+            <section class="article-list">
+                {{- range . }}
+                    {{ partial "article-list/default" . }}
+                {{- end }}
+            </section>
+        </section>
+    {{- end }}
+
+    {{- /* ⚠️ .Paginate 必须包一层 if —— 传空集合进去时它不会返回空分页，
+           而是悄悄回退到这个页面的默认集合（.Pages），结果就是置顶的文章
+           在下面又原样列一遍。实测踩到，别把 if 去掉。 */ -}}
+    {{- $paginator := .Paginate $rest -}}
+    {{- if $rest }}
+        <section class="article-list">
+            {{- range $paginator.Pages }}
+                {{ partial "article-list/default" . }}
+            {{- end }}
+        </section>
+    {{- end }}
+
+    {{- partial "pagination.html" . -}}
+    {{- partial "footer/footer" . -}}
+{{ end }}
+
+{{ define "right-sidebar" }}
+    {{ partial "sidebar/right.html" (dict "Context" . "Scope" "homepage") }}
+{{ end }}
