@@ -17,7 +17,7 @@ blog/
 │   ├── archives.html       归档页（覆盖主题，去掉默认的「分类云」）
 │   ├── _shortcodes/        codegroup —— 代码并排/切换对照
 │   ├── _markup/            代码块文件名栏
-│   └── _partials/          覆盖主题默认行为（Mermaid 本地化、去 Google Fonts、音乐播放器）
+│   └── _partials/          覆盖主题默认行为（左侧导航折叠、Mermaid 本地化、去 Google Fonts、音乐播放器）
 ├── assets/                 custom.css 与 custom.ts（会被自动打包）
 ├── static/                 自托管资源：KaTeX / Mermaid / PhotoSwipe
 │   ├── _headers            Cloudflare Pages 缓存与安全响应头
@@ -163,6 +163,13 @@ baseURL = "https://你的域名/"
 其中「搜索」「归档」不写在 `menu.toml` 里，而在各自页面的 front matter（`menu.main`）——
 想调顺序就改那两个文件里的 `weight`。
 
+- **「归档」不是链接，是可展开的折叠项**：点一下在下面列出全部文章标题，点标题直接进文章。
+  模板在 `layouts/_partials/sidebar/left.html`（覆盖主题，主题的菜单不支持子级），
+  开合逻辑在 `custom.ts` 的 `setupArchiveMenu()`。列表取法与首页一致，所以顺序也一致。
+- **首页与列表页没有右侧栏**。`params.toml` 里的 `[[widgets.homepage]]` 已整段撤掉
+  （原先挂的是「搜索」框与「归档」部件，和左侧导航重复，又正好被右上角的唱片压住）。
+  ⚠️ 文章页右侧那个「目录」靠 `[[widgets.page]] type = "toc"`，**不要删**。
+
 侧边栏顶部那个 GitHub 图标指向 `https://github.com/wzg-ui`（配置在 `config/_default/menu.toml`
 的 `[[social]]`，外链已设 `newTab = true`）。换地址就改那一行，不想要这个图标就把整块删掉。
 
@@ -251,14 +258,15 @@ docker compose up -d
 | `layouts/_partials/head/custom-font.html` | 置空 | 原本从 Google Fonts 加载 Lato，国内不稳且不含中文字形。改用系统字体栈，定义在 `assets/css/custom.css` |
 | `layouts/home.html` | 新增 | 首页 = 置顶区 + 常规列表。`pinned: true` 的文章钉在最前，且不再出现在下方列表里 |
 | `layouts/archives.html` | 覆盖主题 | 去掉归档页顶部的「分类云」（站里不分类，那块本来就是空的） |
+| `layouts/_partials/sidebar/left.html` | 覆盖主题 | 把「归档」导航项改成可展开的折叠项（主题的菜单不支持子级）。其余部分与主题一致，升级时对照 diff 一次 |
 | `content/posts/_index.md` | `build: render never` | 不再输出 `/posts/` 栏目页 —— 首页已经是文章入口，导航里也没有「文章」 |
 | `content/page/_index.md` | `build: render never` | 同理，`content/page/` 只是归档/搜索的容器，不该有自己那个空壳列表页 |
 | `layouts/_shortcodes/codegroup.html` 等 | 新增 | 主题没有代码分组，这是自己加的 |
 | `static/aplayer/` | 已弃用（留档） | 上一版 APlayer + MetingJS 的自托管资源。2026-10-12 换成自研播放器后**不再加载**，留着备查与许可证 |
 | `layouts/_partials/footer/custom.html` | 新增 | 「右上角唱片播放器」+ 页脚「本站已运行」的挂载点，只把 `params.toml` 的 `[music]` 翻成 `data-*` |
 | `layouts/_partials/head/custom.html` | 追加统计骨架 | 已撤下 APlayer / MetingJS 的样式与脚本，现在只负责输出 Cloudflare 统计的 beacon |
-| `assets/ts/custom.ts` | 追加粒子点阵背景、运行时长计时器、右上角唱片播放器 | canvas 由脚本自己插进 body，模板不用改 |
-| `assets/css/custom.css` | 追加整套灰阶配色、背景装饰、卡片整块可点、唱片播放器样式 | 覆盖主题的 `:root` / `[data-scheme="dark"]` 变量 |
+| `assets/ts/custom.ts` | 追加粒子点阵背景、运行时长计时器、右上角唱片播放器、导航折叠 | canvas 由脚本自己插进 body，模板不用改 |
+| `assets/css/custom.css` | 追加整套灰阶配色、背景装饰、卡片整块可点、导航子菜单、唱片播放器样式 | 覆盖主题的 `:root` / `[data-scheme="dark"]` 变量 |
 
 **升级主题的正确姿势**：把新版本解压到 `themes/hugo-theme-stack`，然后逐个确认上表这些文件是否还需要保留（尤其 mermaid 那个），跑一次 `hugo` 看有没有报错。
 

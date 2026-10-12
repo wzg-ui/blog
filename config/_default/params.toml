@@ -58,16 +58,18 @@ SortBy         = "default"
 # 侧边栏部件
 # 注意：必须是带 type 字段的对象，不能写成字符串数组
 #
-# 曾经配过 categories 与 tag-cloud 两个部件。本站文章不分类、不打标签，
-# 这两个部件渲染出来是空的，还会让 Hugo 每次构建都打
+# ⚠️ 这里配什么，右侧栏就多一个块（没有配就是空的右栏）。
+# 2026-10-12 晚：用户要求**去掉首页右侧栏的搜索与归档** —— 那两个和左侧导航
+# 里的「搜索 / 归档」重复，右侧栏又正好被右上角的唱片播放器压住，
+# 所以 [[widgets.homepage]] 整段撤掉，右栏在首页与列表页不再出现。
+# 搜索走左侧导航的「搜索」页，归档走左侧导航的「归档」（可展开成文章标题）。
+#
+# 历史上还配过 categories 与 tag-cloud 两个部件。本站文章不分类、不打标签，
+# 那两个部件渲染出来是空的，还会让 Hugo 每次构建都打
 # `WARN Taxonomy categories not found` / `WARN Taxonomy tags not found`。
-# 将来启用分类或标签时，把对应的 [[widgets.homepage]] 块加回来即可。
-
-[[widgets.homepage]]
-    type = "search"
-
-[[widgets.homepage]]
-    type = "archives"
+# 将来启用分类或标签时，再把对应的部件加回来即可。
+#
+# [[widgets.page]] 保留：文章页右侧的目录（TOC）靠它。
 
 [[widgets.page]]
     type = "toc"
@@ -115,37 +117,56 @@ SortBy         = "default"
 # ============================================================
 #  背景音乐（右上角黑胶唱片，自研组件）
 #
-#  上一版是 APlayer + MetingJS 的左下角浮层，2026-10-12 换掉：
-#  浮层太大、位置抢眼，改成右上角一张会转的黑胶唱片 ——
-#  收起时只占 62px，点开才展开歌单，从列表里点哪首放哪首。
+#  两种音源，由 source 决定：
+#
+#  · source = "api"    走第三方 Meting 接口，不用自己准备文件。
+#      ⚠️ 换 QQ 音乐（server = "tencent"）之前先读这段：
+#        2026-10-12 实测，tencent 的元数据（歌名 / 封面 / 歌词）正常，
+#        但**音频直链约七成取不到** —— 接口回 200 加一个空响应体，
+#        是被版权 / VIP 挡住，不是接口坏了。
+#        **有 QQ 音乐会员也救不了**：① 公共接口走它自己服务端的登录态，
+#        传 cookie / uin 参数与不传的结果完全一致；② 就算自建接口把 VIP
+#        cookie 塞进去，回的是 .mflac / .mgg 加密音频，<audio> 解不了
+#        （2024 起改成 STag 加密，unlock-music 那类工具也大面积失效）；
+#        ③ 自建还要一台常驻服务器，跟纯静态托管的方案冲突。
+#        播放器遇到取不到的音源会自动跳下一首并飘一条提示。
+#        网易云目前取流 100%，要全都能听就把 server 换回 netease。
+#
+#  · source = "local"  放自己的音频文件，100% 能播、一个请求都不用发。
+#      把音频丢进 assets/music/，文件名写成「歌手 - 歌名.mp3」，
+#      同名 .jpg 会被当作封面；重新构建即可，歌单自动生成，不用手写列表。
+#      ⚠️ 音频文件会进 git 仓库，别放体积太大的东西。
+#      ⚠️ 把自己下载的商业音乐放到公开网站上分发有版权风险，自己权衡。
 #
 #  逻辑在 assets/ts/custom.ts 的 setupMusicPlayer()
 #  样式在 assets/css/custom.css 的「右上角唱片播放器」一节
-#
-#  ⚠️ 换 QQ 音乐（server = "tencent"）之前先读这段：
-#     2026-10-12 实测，tencent 的元数据（歌名 / 封面 / 歌词）正常，
-#     但**音频直链约七成取不到** —— 接口回 200 加一个空响应体，
-#     是被版权 / VIP 挡住，不是接口坏了。播放器遇到会自动跳下一首，
-#     并在面板顶部提示「取不到音源」。网易云目前取流成功率是 100%。
-#     ⇒ 想放 QQ 音乐就得接受这个折损；要全都能听，就换回 netease。
-#
-#  ⚠️ api 那一行也别随手换：实测只有 injahow 这家能取到真音频，
-#     i-meto 的取直链端点对所有平台都返回「服务器未知异常」。
-#     详见 static/aplayer/README.md
+#  api 那一行也别随手换：实测只有 injahow 这家能取到真音频。
 # ============================================================
 [music]
     enable   = true
+    source   = "api"           # api / local
 
-    # ★ 换成自己的歌：在对应平台建一个歌单，把歌加进去，再把 id 填过来。
-    #   网易云 → 网页版地址里 playlist?id= 后面那串数字
-    #   QQ 音乐 → 网页版地址里 playlist/ 后面那串数字（disstid）
-    id       = "7011264340"    # 现在是一张 QQ 音乐示例歌单（76 首），换成你自己的
-    server   = "tencent"       # netease / tencent / kugou
+    # ---- source = "api" 时才用到 ----
+    #   ★ 换自己的歌单：网易云网页版地址里 playlist?id= 后面那串数字，
+    #     填到下面 id，再把 title 改成你的歌单名，其余不用动。
+    #   ★ 想放多张歌单：id 用逗号隔开写多个，会自动合并成一份列表并去重。
+    id       = "18480725633,18480699721"   # PIEEE + 我喜欢的音乐（合并去重）
+    server   = "netease"       # netease / tencent / kugou
     type     = "playlist"      # playlist / album / artist / song
     api      = "https://api.injahow.cn/meting/?server=:server&type=:type&id=:id"
 
-    title    = "QQ 音乐歌单"    # 面板顶部的歌单名，换成自己的歌单后记得一起改
-    order    = "random"        # random / list —— 放完一首后随机还是按列表顺序
+    # ★ 专门用来「读歌单」的第二家接口 —— 音频仍然只走上面的 api。
+    #   为什么需要它：injahow 那台服务器把歌单结果**缓存 24 小时**
+    #   （源码里 CACHE_TIME = 86400），你刚往歌单里加的歌最长要等一天才出现。
+    #   i-meto 不缓存，实测加完立刻能读到；它的直链取不到音频（回 401 / 404），
+    #   所以脚本把列表里每首歌重新接到 api 上取流。
+    #   留空字符串 = 关掉这个优化，只用 api 读列表（会慢一天）。
+    listapi  = "https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id"
+
+    title    = "我的歌单"       # 面板顶部的歌单名，换成自己的歌单后记得一起改
+    # 初始播放模式。面板底部那排按钮随时可切，选完记在浏览器里，下次打开还是它。
+    #   shuffle 随机 / order 顺序 / reverse 逆序 / single 单曲循环
+    order    = "shuffle"
     volume   = 0.5
     accent   = "#5b7cfa"       # 进度条与当前曲目的高亮色
     autoplay = false           # 浏览器会拦截自动播放，开了也没用

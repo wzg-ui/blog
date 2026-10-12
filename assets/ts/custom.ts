@@ -326,12 +326,48 @@ function setupSiteRuntime() {
 }
 
 /* ============================================================
+   左侧导航：可展开的「归档」
+   ------------------------------------------------------------
+   模板（layouts/_partials/sidebar/left.html）已经把「归档」渲染成一个
+   带 <ol class="menu-children"> 的折叠项，这里只负责开合与无障碍属性。
+
+   为什么不用 <details>：得跟旁边导航项长得一模一样，
+   <details>/<summary> 自带三角标记和默认样式，压起来比重写还麻烦。
+   ============================================================ */
+
+function setupArchiveMenu() {
+    const folder = document.querySelector<HTMLElement>('#main-menu .menu-item--folder');
+    const btn = folder?.querySelector<HTMLButtonElement>('.menu-folder');
+    if (!folder || !btn) return;
+
+    const setOpen = (open: boolean) => {
+        folder.classList.toggle('is-open', open);
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+
+    // 初始态由模板写死（aria-expanded="false"），这里同步一次，避免两边说法不一致
+    setOpen(false);
+
+    btn.addEventListener('click', () => {
+        setOpen(!folder.classList.contains('is-open'));
+    });
+}
+
+/* ============================================================
    右上角唱片播放器
    ------------------------------------------------------------
    取代了原来的 APlayer 左下角浮层。设计要求：
    · 收起时是右上角一张黑胶唱片，播放时转，暂停就停在原地
    · 点开才展开歌单面板，点哪首放哪首，带进度条与上下曲
-   · 数据仍走 Meting 兼容接口，配置在 params.toml 的 [music]
+   · 音源两选一，见 params.toml 的 [music].source：
+       api   —— 运行时按 Meting 兼容接口拉歌单
+       local —— 歌单由 Hugo 构建时写进页面，文件放 assets/music/，一个请求都不发
+   · [music].id 可以写多个（逗号分隔），几张歌单会合并成一份并去重
+   · 读歌单与取音频可以分两家接口（[music].api 与 [music].listapi）：
+     injahow 把歌单结果缓存 24 小时，刚从歌单里加的歌要等一天才露头；
+     所以列表走不缓存的 i-meto，音频仍回到 injahow（i-meto 的直链取不到，实测 401/404）
+   · 先按语种筛（综合 / 中文 / 英文），再选播放模式
+   · 播放模式四种：随机 / 顺序 / 逆序 / 单曲循环，面板底部直接点选
 
    几个刻意的处理：
    · 列表不显示封面 —— 热歌榜 200 首就是 200 个图片请求，
@@ -340,8 +376,11 @@ function setupSiteRuntime() {
    · 旋转靠 animation-play-state 起停，不是自己算角度，
      所以暂停会停在当前角度，不会跳回 0°
    · 标签页切到后台就暂停，不在看不见的地方放歌
-   · 单曲取流失败自动跳下一首，但不无限跳（连错 3 次就停）
+   · 单曲取流失败自动跳下一首，但不无限跳（连错 8 次就停）
    ============================================================ */
+
+type PlayMode = 'shuffle' | 'order' | 'reverse' | 'single';
+type LangFilter = 'all' | 'zh' | 'en';
 
 interface MusicTrack {
     name: string;
@@ -361,6 +400,7 @@ function setupMusicPlayer() {
     const cover = pick<HTMLImageElement>('.mp__cover');
     const listEl = pick<HTMLUListElement>('.mp__list');
     const statusEl = pick<HTMLElement>('.mp__status');
+    const searchInput = pick<HTMLInputElement>('.mp__search-input');
     const nowTitle = pick<HTMLElement>('.mp__now-title');
     const nowArtist = pick<HTMLElement>('.mp__now-artist');
     const btnPlay = pick<HTMLButtonElement>('.mp__btn--play');
@@ -373,20 +413,119 @@ function setupMusicPlayer() {
 
     if (!disc || !panel || !listEl || !audio) return;
 
+    const source = root.dataset.source === 'local' ? 'local' : 'api';
     const { api = '', server = 'netease', type = 'playlist', id = '' } = root.dataset;
-    if (!api || !id) return;
+    // local 模式下歌单由 Hugo 构建时写好，既不需要接口，也不该因为没有 id 就不渲染
+    if (source === 'api' && (!api || !id)) return;
+
+    /* id 允许写多个，用逗号或空格分隔 —— 几张歌单会合并成一份列表。
+       这样「PIEEE」与「我喜欢的音乐」可以同时放进来。 */
+    const ids = id.split(/[\s,]+/).filter(Boolean);
 
     // :server / :type / :id 三个占位符由 Meting 接口约定，顺序不能动
-    const endpoint = api
-        .replace(':server', server)
-        .replace(':type', type)
-        .replace(':id', id);
+    const endpointFor = (playlistId: string) =>
+        api.replace(':server', server).replace(':type', type).replace(':id', playlistId);
 
-    const shuffling = root.dataset.order === 'random';
+    /* 读歌单与取音频分开走两家接口。
+       起因：injahow 服务端把歌单结果缓存 24 小时（源码 CACHE_TIME = 86400），
+       往歌单里新加的歌最长要等一天才会出现在播放器里 —— 列表于是改问 i-meto（不缓存）。
+       但 i-meto 的音频直链是废的（实测 401 / 404），所以拿到的列表要再「改挂」回 api：
+       只留 type 与 id 两个参数重新拼一遍，音频 / 封面就都回到能用的那家了。
+       listapi 没配或挂掉时，照旧直接用 api 拉列表。 */
+    const apiBase = api.split('?')[0];
+    const listApi = root.dataset.listapi ?? '';
+    const listEndpointFor = (playlistId: string) =>
+        listApi
+            ? listApi.replace(':server', server).replace(':type', type).replace(':id', playlistId)
+            : endpointFor(playlistId);
+
+    /* 把任意一条 Meting 链接改挂到 api 上。只认 type 与 id
+       （Meting 系接口的 url / pic / lrc 都靠这两个参数定位）。 */
+    const rebase = (raw?: string): string => {
+        if (!raw) return '';
+        try {
+            const q = new URL(raw, window.location.href).searchParams;
+            const kind = q.get('type');
+            const trackId = q.get('id');
+            if (!kind || !trackId) return '';
+            return `${apiBase}?server=${encodeURIComponent(server)}&type=${kind}&id=${encodeURIComponent(trackId)}`;
+        } catch {
+            return '';
+        }
+    };
+
+    /* 两家的字段名不一样：injahow 回 name / artist，i-meto 回 title / author。
+       统一成内部用的 name / artist，顺手把链接改挂回 api。 */
+    const normalizeTrack = (
+        raw: Partial<MusicTrack> & { title?: string; author?: string },
+    ): MusicTrack => ({
+        name: raw.name ?? raw.title ?? '',
+        artist: raw.artist ?? raw.author ?? '',
+        url: rebase(raw.url),
+        pic: rebase(raw.pic),
+    });
+
+    const fetchTracks = async (
+        endpoint: string,
+    ): Promise<MusicTrack[]> => {
+        try {
+            const res = await fetch(endpoint);
+            if (!res.ok) return [];
+            const data = (await res.json()) as Array<Partial<MusicTrack> & { title?: string; author?: string }>;
+            if (!Array.isArray(data)) return [];
+            return data.map(normalizeTrack).filter((t) => t.url);
+        } catch {
+            return [];
+        }
+    };
+
+    /* 播放模式：随机 / 顺序 / 逆序 / 单曲循环。
+       配置里的 order 只用来定初值（兼容旧的 random / list 写法），
+       运行时由面板底部那排按钮切，并记在 localStorage，下次打开还是上次那个。 */
+    const MODE_KEY = 'mp-mode';
+    const MODES: PlayMode[] = ['shuffle', 'order', 'reverse', 'single'];
+    const LEGACY: Record<string, PlayMode> = { random: 'shuffle', list: 'order' };
+
+    const readMode = (): PlayMode => {
+        try {
+            const saved = window.localStorage.getItem(MODE_KEY);
+            if (saved && (MODES as string[]).includes(saved)) return saved as PlayMode;
+        } catch { /* 隐私模式下 localStorage 会抛错，忽略 */ }
+        const fromConfig = LEGACY[root.dataset.order ?? ''] ?? (root.dataset.order ?? '');
+        return (MODES as string[]).includes(fromConfig) ? (fromConfig as PlayMode) : 'order';
+    };
+
+    let mode = readMode();
+
+    /* 语种筛选：综合 / 中文 / 英文。
+       刻意不靠人工给每首歌打标 —— 曲名里出现中日韩统一表意文字就算中文，否则算英文；
+       曲名是纯符号时退回看歌手名。网易云的中文歌名基本都有汉字，这个判得够准。 */
+    const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
+    const LANGS: LangFilter[] = ['all', 'zh', 'en'];
+    const LANG_KEY = 'mp-lang';
+
+    const trackLang = (t: MusicTrack): 'zh' | 'en' =>
+        CJK.test(t.name || t.artist || '') ? 'zh' : 'en';
+
+    const readLang = (): LangFilter => {
+        try {
+            const saved = window.localStorage.getItem(LANG_KEY);
+            if (saved && (LANGS as string[]).includes(saved)) return saved as LangFilter;
+        } catch { /* 忽略 */ }
+        return 'all';
+    };
+
+    let lang = readLang();
+
+    /* 歌单关键词。跟语种是两个维度，叠加生效：先按语种取子集，再按关键词过滤。
+       不写进 localStorage —— 搜索是个临时动作，下次打开应该看到完整歌单。 */
+    let keyword = '';
+
     const volume = Number(root.dataset.volume ?? 0.5);
     audio.volume = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 0.5;
 
-    let tracks: MusicTrack[] = [];
+    let allTracks: MusicTrack[] = [];   // 几张歌单合并后的全集
+    let tracks: MusicTrack[] = [];      // 当前语种下真正参与播放的子集
     let current = -1;
     let loading = false;
     let loaded = false;
@@ -474,41 +613,176 @@ function setupMusicPlayer() {
     const step = (delta: number) => {
         if (!tracks.length) return;
 
-        if (!shuffling || tracks.length < 2) {
-            playAt(current < 0 ? 0 : current + delta);
+        // 随机：从别的曲子里随便挑一首（只有一首时就原地循环）
+        if (mode === 'shuffle' && tracks.length > 1) {
+            let next = current;
+            while (next === current) next = Math.floor(Math.random() * tracks.length);
+            playAt(next);
             return;
         }
 
-        let next = current;
-        while (next === current) next = Math.floor(Math.random() * tracks.length);
-        playAt(next);
+        // 逆序：前进方向等于列表倒着走。单曲模式下手动上/下一首仍按列表顺序走，
+        // 只有「放完自动续」才原地重来（见 ended 事件）。
+        const dir = mode === 'reverse' ? -delta : delta;
+        playAt(current < 0 ? 0 : current + dir);
     };
 
+    /* ---------- 播放模式 ---------- */
+
+    const modeBtns = Array.from(root.querySelectorAll<HTMLButtonElement>('.mp__mode'));
+
+    const renderMode = () => {
+        modeBtns.forEach((btn) => {
+            const active = btn.dataset.mode === mode;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+    };
+
+    const setMode = (next: PlayMode) => {
+        mode = next;
+        renderMode();
+        try { window.localStorage.setItem(MODE_KEY, next); } catch { /* 忽略 */ }
+    };
+
+    modeBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const next = btn.dataset.mode as PlayMode;
+            if (MODES.includes(next)) setMode(next);
+        });
+    });
+
+    renderMode();
+
+    /* ---------- 语种筛选 ---------- */
+
+    const langBtns = Array.from(root.querySelectorAll<HTMLButtonElement>('.mp__filter'));
+
+    const renderLang = () => {
+        langBtns.forEach((btn) => {
+            const active = btn.dataset.lang === lang;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+    };
+
+    /* 重算参与播放的子集（语种 + 关键词），并尽量保住「正在播的那首」在列表里的位置。
+       被筛掉时 current 置 -1：歌继续放，只是列表里没有高亮项。 */
+    const applyFilters = () => {
+        const playingUrl = tracks[current]?.url ?? '';
+        const q = keyword.trim().toLowerCase();
+
+        tracks = allTracks.filter((t) => {
+            if (lang !== 'all' && trackLang(t) !== lang) return false;
+            if (!q) return true;
+            // 歌名与歌手任一命中即可，这样中英文混着搜都能找到
+            return (t.name || '').toLowerCase().includes(q)
+                || (t.artist || '').toLowerCase().includes(q);
+        });
+
+        if (playingUrl) {
+            current = tracks.findIndex((t) => t.url === playingUrl);
+        } else if (mode === 'shuffle' && tracks.length) {
+            current = Math.floor(Math.random() * tracks.length);
+        } else {
+            current = tracks.length ? 0 : -1;
+        }
+
+        renderList();
+        renderLang();
+
+        if (!tracks.length) {
+            if (statusEl) {
+                statusEl.textContent = q ? '没有找到匹配的歌' : '这一类暂时没有歌';
+                statusEl.hidden = false;
+            }
+            return;
+        }
+
+        if (statusEl) statusEl.hidden = true;
+        paintCurrent();
+    };
+
+    langBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const next = btn.dataset.lang as LangFilter;
+            if (!LANGS.includes(next) || next === lang) return;
+            lang = next;
+            try { window.localStorage.setItem(LANG_KEY, next); } catch { /* 忽略 */ }
+            applyFilters();
+        });
+    });
+
+    renderLang();
+
+    /* 关键词输入：边打边筛，不按回车也生效 */
+    searchInput?.addEventListener('input', () => {
+        keyword = searchInput.value;
+        applyFilters();
+    });
+
+    // 清空按钮（type=search 在 WebKit 下自带一个）会把 value 置空，但不会触发 input
+    searchInput?.addEventListener('search', () => {
+        keyword = searchInput.value;
+        applyFilters();
+    });
+
     /* ---------- 歌单加载 ---------- */
+
+    /* local 模式：歌单是构建时写死在页面里的那段 JSON，读它就行，不发请求 */
+    const readLocalTracks = (): MusicTrack[] => {
+        const holder = document.getElementById('mp-tracks');
+        if (!holder?.textContent) return [];
+        try {
+            const data = JSON.parse(holder.textContent) as MusicTrack[];
+            return Array.isArray(data) ? data : [];
+        } catch {
+            return [];
+        }
+    };
 
     const load = async () => {
         if (loaded || loading) return;
         loading = true;
 
         try {
-            const res = await fetch(endpoint);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            let list: MusicTrack[];
 
-            const data = (await res.json()) as MusicTrack[];
-            tracks = Array.isArray(data) ? data.filter((t) => t && t.url) : [];
-            if (!tracks.length) throw new Error('empty playlist');
+            if (source === 'local') {
+                list = readLocalTracks();
+            } else {
+                // 多张歌单并发拉。单张失败不该拖垮其余，所以逐条吞掉错误，
+                // 全空了再统一报「加载失败」。
+                // 每张都先问不缓存的那家，空手才退回 api。
+                const parts = await Promise.all(ids.map(async (playlistId) => {
+                    const fresh = await fetchTracks(listEndpointFor(playlistId));
+                    if (fresh.length) return fresh;
+                    return fetchTracks(endpointFor(playlistId));
+                }));
+                list = parts.reduce<MusicTrack[]>((acc, part) => acc.concat(part), []);
+            }
+
+            // 按 url 去重 —— 同一首歌同时出现在两张歌单里时只留一份
+            const seen = new Set<string>();
+            allTracks = list.filter((t) => {
+                if (!t || !t.url || seen.has(t.url)) return false;
+                seen.add(t.url);
+                return true;
+            });
+            if (!allTracks.length) throw new Error('empty');
 
             loaded = true;
-            if (statusEl) statusEl.hidden = true;
-
-            // 随机播放时先替用户选一首，但不动手播 —— 自动播放会被拦
-            current = shuffling ? Math.floor(Math.random() * tracks.length) : 0;
-            renderList();
-            paintCurrent();
+            // 挑子集、定位当前曲、渲染列表与筛选态，全都交给 applyFilters
+            applyFilters();
 
             if (root.dataset.autoplay === 'true') playAt(current);
         } catch {
-            if (statusEl) statusEl.textContent = '歌单加载失败，收起再点唱片重试';
+            if (statusEl) {
+                statusEl.textContent = source === 'local'
+                    ? '还没有音频，把文件放进 assets/music/ 再重新构建'
+                    : '歌单加载失败，收起再点唱片重试';
+            }
+            allTracks = [];
             tracks = [];
             current = -1;
         } finally {
@@ -589,7 +863,15 @@ function setupMusicPlayer() {
     audio.addEventListener('playing', () => { errorStreak = 0; });
     audio.addEventListener('timeupdate', paintProgress);
     audio.addEventListener('loadedmetadata', paintProgress);
-    audio.addEventListener('ended', () => step(1));
+    // 单曲循环：原地重来；其余模式按当前模式续下一首
+    audio.addEventListener('ended', () => {
+        if (mode === 'single') {
+            audio.currentTime = 0;
+            void audio.play().catch(() => undefined);
+            return;
+        }
+        step(1);
+    });
 
     audio.addEventListener('error', () => {
         if (!audio.error) return;
@@ -620,4 +902,5 @@ function setupMusicPlayer() {
 document.addEventListener('DOMContentLoaded', setupCodeGroups);
 document.addEventListener('DOMContentLoaded', setupParticleBackground);
 document.addEventListener('DOMContentLoaded', setupSiteRuntime);
+document.addEventListener('DOMContentLoaded', setupArchiveMenu);
 document.addEventListener('DOMContentLoaded', setupMusicPlayer);

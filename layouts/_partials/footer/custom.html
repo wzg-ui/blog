@@ -3,16 +3,58 @@
        样式在 assets/css/custom.css 的「右上角唱片播放器」一节
        配置在 config/_default/params.toml 的 [music]
 
-       这里只把配置翻译成 data-* 交给脚本，改歌单只动 params.toml，
-       不用回来碰 HTML。脚本读的是 URL 里的 :server / :type / :id 占位符。
+       两种音源：
+       · api   —— 只把配置翻成 data-*，歌单运行时按接口拉；
+                  脚本读的是 URL 里的 :server / :type / :id 占位符。
+                  data-api 管音频 / 封面，data-listapi 管列表（可以不是同一家）。
+       · local —— 构建时扫 assets/music/，歌单直接写进页面里的一段 JSON，
+                  运行时一个请求都不用发。文件名写成「歌手 - 歌名.mp3」，
+                  同名 .jpg 会被当作封面。
 
        图标一律用实心 path + fill:currentColor（见 custom.css），
        所以这里不写 stroke —— 线条和实心混用，颜色会飘。 */ -}}
 {{- with .Site.Params.music -}}
-{{- if and .enable .id -}}
+{{- $source := .source | default "api" -}}
+
+{{- /* local 模式：扫 assets/music/ 下的音频，从文件名拆出歌手与曲名。
+       按扩展名白名单筛，而不是写死 music/*.mp3 —— 从音乐客户端解密出来的
+       多半是 flac，只认 mp3 的话等于白放。 */ -}}
+{{- $audioExts := slice ".mp3" ".flac" ".m4a" ".ogg" ".wav" -}}
+{{- $coverExts := slice ".jpg" ".png" ".webp" -}}
+{{- $tracks := slice -}}
+{{- if eq $source "local" -}}
+    {{- range resources.Match "music/*" -}}
+        {{- $ext := path.Ext .Name | lower -}}
+        {{- if in $audioExts $ext -}}
+            {{- $url := .RelPermalink -}}
+            {{- $base := path.BaseName .Name -}}
+            {{- $parts := split $base " - " -}}
+            {{- $artist := "" -}}
+            {{- $title := $base -}}
+            {{- if eq (len $parts) 2 -}}
+                {{- $artist = index $parts 0 -}}
+                {{- $title = index $parts 1 -}}
+            {{- end -}}
+            {{- $pic := "" -}}
+            {{- range $coverExts -}}
+                {{- $coverExt := . -}}
+                {{- if not $pic -}}
+                    {{- with resources.Get (printf "music/%s%s" $base $coverExt) -}}
+                        {{- $pic = .RelPermalink -}}
+                    {{- end -}}
+                {{- end -}}
+            {{- end -}}
+            {{- $tracks = $tracks | append (dict "name" $title "artist" $artist "url" $url "pic" $pic) -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+{{- if and .enable (or (eq $source "local") .id) -}}
 <div id="music-player"
      class="mp"
+     data-source="{{ $source }}"
      data-api="{{ .api }}"
+     data-listapi="{{ .listapi }}"
      data-server="{{ .server }}"
      data-type="{{ index . "type" }}"
      data-id="{{ .id }}"
@@ -40,6 +82,25 @@
         </header>
 
         <p class="mp__status">正在加载歌单…</p>
+
+        {{- /* 语种筛选：综合 / 中文 / 英文，直接过滤下面的列表。
+               判定规则在 custom.ts（曲名含中日韩统一表意文字就算中文），
+               所以不用给每首歌手工打标；切到没歌的那一类会提示「暂时没有歌」。 */ -}}
+        <div class="mp__lang" role="group" aria-label="语种筛选">
+            <button class="mp__filter" type="button" data-lang="all" aria-pressed="true">综合</button>
+            <button class="mp__filter" type="button" data-lang="zh" aria-pressed="false">中文</button>
+            <button class="mp__filter" type="button" data-lang="en" aria-pressed="false">英文</button>
+        </div>
+
+        {{- /* 歌单搜索：边打边筛，跟上面的语种筛选叠加生效（先筛语种再筛关键词）。
+               过滤逻辑在 custom.ts 的 applyFilters()。 */ -}}
+        <label class="mp__search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.8l-.3-.3a6.5 6.5 0 1 0-.7.7l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+            <input class="mp__search-input" type="search"
+                   placeholder="搜索歌名或歌手" aria-label="搜索歌单"
+                   autocomplete="off" spellcheck="false">
+        </label>
+
         <ul class="mp__list"></ul>
 
         <footer class="mp__foot">
@@ -59,10 +120,26 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.6 5H18v14h-2.4zM6 5l9 7-9 7z"/></svg>
                 </button>
             </div>
+
+            {{- /* 播放模式：直接点选，不用循环切换 —— 四个选项一眼看全，省得猜
+                   当前是哪个。数据由脚本接管（custom.ts 的 setMode）。 */ -}}
+            <div class="mp__modes" role="group" aria-label="播放模式">
+                <button class="mp__mode" type="button" data-mode="shuffle" aria-pressed="false">随机</button>
+                <button class="mp__mode" type="button" data-mode="order" aria-pressed="false">顺序</button>
+                <button class="mp__mode" type="button" data-mode="reverse" aria-pressed="false">逆序</button>
+                <button class="mp__mode" type="button" data-mode="single" aria-pressed="false">单曲</button>
+            </div>
         </footer>
     </section>
 
     <audio class="mp__audio" preload="none"></audio>
 </div>
+{{- if eq $source "local" -}}
+{{- /* ⚠️ 必须带 safeJS：html/template 会认为 <script> 里是 JS 上下文，
+       把插值当 JS 值再编码一次，结果 JSON 外面多包一层引号、内部引号被转义，
+       JSON.parse 解出来是字符串而不是数组，歌单会变成空的。
+       （已实测：不加 safeJS 时输出 `"[{\"a\":1}]"`） */ -}}
+<script type="application/json" id="mp-tracks">{{ $tracks | jsonify | safeJS }}</script>
+{{- end -}}
 {{- end -}}
 {{- end -}}

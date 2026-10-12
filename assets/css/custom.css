@@ -315,6 +315,96 @@
     inset: 0;
 }
 
+/* ---------- 左侧导航：可展开的「归档」 ----------
+   主题的 #main-menu 只支持一层平铺，没有子菜单的概念。
+   「归档」那一项改成了折叠按钮（模板见 layouts/_partials/sidebar/left.html）：
+   点开就在下面列出全部文章标题，从标题直接进文章 ——
+   比「先跳到归档页、再点一次」少一步。
+
+   按钮长得跟旁边的 <a> 一样，所以它出现在导航里不会显得突兀；
+   子列表默认收起，展开时才撑开侧栏，不会顶掉下面的暗色模式开关。 */
+#main-menu .menu-folder {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--body-text-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#main-menu .menu-folder:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+/* 图标 + 文字：沿用主题那 40px 的图标间距，跟旁边的导航项对齐 */
+#main-menu .menu-folder__text {
+    flex: 1;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--menu-icon-separation);
+}
+
+#main-menu .menu-item--folder.current .menu-folder {
+    color: var(--accent-color);
+    font-weight: bold;
+}
+
+/* 展开箭头：贴在右边，展开时转半圈 */
+#main-menu .menu-caret {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin-left: 6px;
+    opacity: 0.5;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+#main-menu .menu-item--folder.is-open .menu-caret {
+    transform: rotate(180deg);
+    opacity: 0.8;
+}
+
+/* 子列表：一条竖线示意层级，不加底色 —— 灰阶配色下多一层色块反而脏。
+   缩进刻意对齐父项的文字列：主题是「图标 20px + --menu-icon-separation 40px」＝ 文字从 60px 起，
+   所以这里 46 + 14 = 60。改主题那个变量的话，这两个数要跟着调。 */
+#main-menu .menu-children {
+    display: none;
+    flex-direction: column;
+    gap: 0;
+    list-style: none;
+    margin: 6px 0 0 46px;
+    padding: 2px 0 2px 14px;
+    border-left: 1px solid rgba(128, 128, 128, 0.28);
+    max-height: 40vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+#main-menu .menu-item--folder.is-open .menu-children {
+    display: flex;
+}
+
+#main-menu .menu-children li a {
+    height: auto;
+    padding: 5px 0;
+    font-size: 0.84em;
+    line-height: 1.5;
+    color: var(--card-text-color-secondary);
+}
+
+#main-menu .menu-children li a:hover {
+    color: var(--card-text-color-main);
+}
+
 /* ---------- 背景装饰 ----------
    粒子层是夜间专属（见下一节），亮色下页面就是一片纯灰；深色的粒子
    也需要一点底光，才不至于像悬在纯黑里。所以这里按主题各给一层纹理。
@@ -617,6 +707,44 @@ body::before {
     color: var(--card-text-color-tertiary);
 }
 
+/* 歌单搜索：一块浅底胶囊，跟上面的语种筛选排在同一列。
+   底色用中性灰而不是卡片色 —— 面板本身已经是卡片色，再嵌套同色会看不出边界。 */
+.mp__search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 0;
+    padding: 0 8px;
+    border-radius: 8px;
+    background: rgba(128, 128, 128, 0.1);
+}
+
+.mp__search svg {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    opacity: 0.55;
+}
+
+.mp__search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 0;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--card-text-color-main);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.mp__search-input::placeholder {
+    color: var(--card-text-color-tertiary);
+}
+
 /* 列表只显示文字 —— 200 首就是 200 个图片请求，不值当 */
 .mp__list {
     list-style: none;
@@ -722,6 +850,61 @@ body::before {
     justify-content: center;
     gap: 14px;
     margin-top: 10px;
+}
+
+/* ---------- 胶囊按钮：语种筛选 + 播放模式 ----------
+   两排都是一组小胶囊、直接点选。故意不做成「循环切换」的单按钮：
+   选项一眼看全，不用猜当前是哪个、也不用点着试。
+   语种那排贴在列表上方（先筛歌），模式那排在最底（再定怎么放）。 */
+.mp__lang,
+.mp__modes {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.mp__lang {
+    margin: 10px 0 2px;
+}
+
+.mp__modes {
+    margin-top: 10px;
+}
+
+.mp__filter,
+.mp__mode {
+    padding: 3px 10px;
+    border: none;
+    border-radius: 999px;
+    background: none;
+    font-family: inherit;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--card-text-color-tertiary);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mp__filter:hover,
+.mp__mode:hover {
+    background: rgba(128, 128, 128, 0.14);
+    color: var(--card-text-color-main);
+}
+
+.mp__filter:focus-visible,
+.mp__mode:focus-visible {
+    outline: 2px solid var(--mp-accent, #5b7cfa);
+    outline-offset: 2px;
+}
+
+/* 选中态：主色胶囊。color-mix 前面先垫一层中性底色，老浏览器也有兜底 */
+.mp__filter.is-active,
+.mp__mode.is-active {
+    background: rgba(128, 128, 128, 0.16);
+    background: color-mix(in srgb, var(--mp-accent, #5b7cfa) 15%, transparent);
+    color: var(--mp-accent, #5b7cfa);
+    font-weight: 600;
 }
 
 .mp__btn {
