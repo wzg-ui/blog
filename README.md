@@ -23,8 +23,17 @@ blog/
 │   └── _partials/          覆盖主题默认行为（Mermaid 本地化、去 Google Fonts）
 ├── assets/                 custom.css 与 custom.ts（会被自动打包）
 ├── static/                 自托管资源：KaTeX / Mermaid / PhotoSwipe
+│   ├── _headers            Cloudflare Pages 缓存与安全响应头
+│   └── _redirects          日后改 URL 时用来接住旧链接
+├── deploy/                 ★ 服务器部署：评论与统计
+│   ├── docker-compose.yml  四个服务的编排（Caddy / Waline / Umami / PostgreSQL）
+│   ├── Caddyfile           反向代理与自动 HTTPS
+│   ├── setup.sh            一键初始化：换源装 Docker、开 swap、配防火墙
+│   ├── .env.example        配置模板（复制成 .env 后填，.env 已被 git 忽略）
+│   └── README.md           部署步骤、DNS 解析、备份、排错
 ├── themes/hugo-theme-stack 主题本体（内嵌，不用子模块）
-└── .github/workflows/      每次 push 自动构建检查
+├── .github/workflows/      每次 push 自动构建检查
+└── .gitattributes          统一换行符为 LF —— shell 脚本在 Linux 上必须
 ```
 
 ---
@@ -115,9 +124,9 @@ hugo server          # 然后浏览器打开 http://localhost:1313
 
 ---
 
-## 二、必须自己去做的三件事
+## 二、必须自己去做的事
 
-这三件我做不了，需要你的账号或身份：
+这几件我做不了，需要你的账号或身份。
 
 ### 1. 改域名
 
@@ -126,6 +135,8 @@ hugo server          # 然后浏览器打开 http://localhost:1313
 ```toml
 baseURL = "https://你的域名/"
 ```
+
+> 部署到 Cloudflare Pages 时可以不改这个文件，改用构建命令的 `-b` 参数动态指定（见下方第 3 节）。但本地预览和 RSS 的自洽性依赖它，建议正式域名确定后就填上。
 
 ### 2. 改站点信息
 
@@ -140,19 +151,46 @@ baseURL = "https://你的域名/"
 ### 3. 部署到 Cloudflare Pages
 
 1. 把本仓库推到 GitHub（私有仓库也可以）
+
+   ```bash
+   git remote add origin git@github.com:你的用户名/blog.git
+   git push -u origin main
+   ```
+
 2. 打开 Cloudflare 控制台 → Workers 和 Pages → 创建 → Pages → 连接到 Git
 3. 选择本仓库，构建配置填：
 
    | 字段 | 值 |
    | --- | --- |
    | 框架预设 | Hugo |
-   | 构建命令 | `hugo --gc --minify` |
+   | 构建命令 | `hugo --gc --minify -b "$CF_PAGES_URL"` |
    | 输出目录 | `public` |
    | 环境变量 | `HUGO_VERSION` = `0.167.0` |
 
 4. 保存后自动构建，一两分钟就能访问了
 
-`HUGO_VERSION` 这一项**一定要填**。Cloudflare 默认装的 Hugo 版本可能不满足本主题要求（需要 ≥ 0.157 且必须是 extended 版）。
+**两个参数都不能省：**
+
+- `HUGO_VERSION` —— Cloudflare 默认装的 Hugo 版本太老，认不出本项目用的 `layouts/_partials/`、`layouts/_shortcodes/` 新目录规范，会直接构建失败。本项目实测版本是 **0.167.0 extended**。
+- `-b "$CF_PAGES_URL"` —— 不加的话，构建出来的所有绝对链接都指向 `example.com`，分享卡片、RSS、站内跳转全是坏的。这个变量由 Cloudflare 自动注入，指向当前部署地址。
+
+> **域名备案下来后**，把构建命令里的 `-b` 换成正式域名：`hugo --gc --minify -b "https://你的域名"`。
+> 不改的话，用户从正式域名进来后，页面里所有链接又会跳回 `xxx.pages.dev`。
+
+### 4. 起评论和统计（可选）
+
+博客本身是静态的，不配这个也能正常写、正常读。想要评论和访问统计的话，部署配置都在 **`deploy/` 目录**：
+
+```bash
+cd deploy
+sudo bash setup.sh          # 装 Docker、开 swap、配防火墙
+cp .env.example .env && vi .env
+docker compose up -d
+```
+
+完整步骤、DNS 解析、备份和排错见 **`deploy/README.md`**。
+
+⚠️ 这一步的前提是**域名已经完成 ICP 备案** —— 你的服务器在大陆，评论服务和统计服务的子域名指向它，没备案会被拦截。
 
 ---
 
