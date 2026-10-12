@@ -532,6 +532,7 @@ body::before {
 
 .mp__disc {
     display: block;
+    position: relative;
     width: 62px;
     height: 62px;
     padding: 0;
@@ -551,6 +552,51 @@ body::before {
 .mp__disc:focus-visible {
     outline: 2px solid var(--mp-accent, #5b7cfa);
     outline-offset: 3px;
+}
+
+/* ---------- 自动播放在等「第一次交互」时的引导 ----------
+   浏览器不允许「没被点过就出声音」，所以进站那一下多半会被拦下来。
+   这时挂上 .is-armed：盘外一圈呼吸光圈 + 左边一颗「点一下播放」气泡，
+   讲的就是「你随便动一下，我就能唱」。访客一交互（或已能自动播）脚本就摘掉它。 */
+/* 气泡跟在唱片左手边 —— 1024px 以下唱片改挂右下角，这条依然成立 */
+.mp.is-armed .mp__disc::before {
+    content: "点一下播放";
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 12px);
+    transform: translateY(-50%);
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: var(--mp-accent, #5b7cfa);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+}
+
+.mp.is-armed .mp__disc::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    border: 2px solid var(--mp-accent, #5b7cfa);
+    pointer-events: none;
+    animation: mp-pulse 2.2s ease-out infinite;
+}
+
+@keyframes mp-pulse {
+    0%   { transform: scale(0.94); opacity: 0.9; }
+    70%  { transform: scale(1.24); opacity: 0; }
+    100% { transform: scale(1.24); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mp.is-armed .mp__disc::after {
+        animation: none;
+        opacity: 0.6;
+    }
 }
 
 /* 盘面：同心圆纹路 + 中心向外的黑胶渐晕 */

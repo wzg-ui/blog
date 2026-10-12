@@ -601,13 +601,110 @@ function setupMusicPlayer() {
 
     /* ---------- 播放控制 ---------- */
 
-    const playAt = (index: number) => {
-        if (!tracks.length) return;
+    /* playAt 返回 promise：true = 真的响了，false = 被浏览器拦下。
+       自动播放那条线要看这个返回值决定补不补手势兜底（见下面「进站自动播放」）。 */
+    const playAt = (index: number, startAt = 0): Promise<boolean> => {
+        if (!tracks.length) return Promise.resolve(false);
         current = (index + tracks.length) % tracks.length;
         paintCurrent();
         audio.src = tracks[current].url;
-        // 浏览器没给交互权限时 play() 会 reject，静默吞掉即可
-        void audio.play().catch(() => undefined);
+
+        // 跨页续播用：src 刚换好时 metadata 还没到，直接写 currentTime 会被丢掉，
+        // 得等 loadedmetadata。已经在播的（readyState >= 1）就直接设。
+        if (startAt > 0) {
+            const seek = () => { audio.currentTime = startAt; };
+            if (audio.readyState >= 1) seek();
+            else audio.addEventListener('loadedmetadata', seek, { once: true });
+        }
+
+        return audio.play().then(() => true).catch(() => false);
+    };
+
+    /* ---------- 进站自动播放 ----------
+       浏览器的自动播放策略是硬限制：没有用户手势时，带声音的 play() 一律被拒
+       （Chrome / Safari / Firefox 都一样，静音才放行），前端没有写法能真绕过去。
+       所以这里做的是「尽量早 + 兜底」两件事：
+
+         ① 页面一加载就试播 —— 访客之前在本站交互过、或刚从文章链接点进来时，
+            这一次多半直接就成了，进门即有声音；
+         ② 被拦下就挂一组一次性监听，等他第一次点击 / 按键 / 滚动 / 触摸时补播。
+            不用去右上角找播放按钮，随便动一下就行。
+
+       等待期间唱片带一圈呼吸光圈 +「点一下播放」气泡（.mp.is-armed），播起来即撤。 */
+    const autoplayOn = root.dataset.autoplay === 'true';
+    const resumeOn = root.dataset.resume === 'true';
+    const GESTURES = ['pointerdown', 'keydown', 'touchstart', 'wheel'];
+    let armed = false;
+
+    // 这三个互相调用，用函数声明（会被提升），别改成 const
+    function unarm() {
+        if (!armed) return;
+        armed = false;
+        root.classList.remove('is-armed');
+        GESTURES.forEach((type) => window.removeEventListener(type, onGesture, true));
+    }
+
+    function onGesture() {
+        unarm();
+        // 手势到手，这一次 play() 必定放行
+        void playAt(current < 0 ? 0 : current).then((ok) => { if (!ok) arm(); });
+    }
+
+    function arm() {
+        if (armed || !tracks.length) return;
+        armed = true;
+        root.classList.add('is-armed');
+        GESTURES.forEach((type) =>
+            window.addEventListener(type, onGesture, { capture: true, once: true, passive: true }));
+    }
+
+    /* ---------- 跨页续播 ----------
+       Hugo 是多页站点，点进文章会整页刷新，音频本来每次都得从第一首重来。
+       把「播到哪了」记在 sessionStorage（关掉标签页即失效），新页面接着放。 */
+    const RESUME_KEY = 'mp-resume';
+
+    let lastResumeSave = 0;      // timeupdate 落盘的节流时间戳
+    let pausedByHidden = false;  // 标记这次暂停是「切走了」还是「他按了暂停」
+
+    const clearResume = () => {
+        try { window.sessionStorage.removeItem(RESUME_KEY); } catch { /* 隐私模式，忽略 */ }
+    };
+
+    const readResume = (): { url: string; time: number } | null => {
+        if (!resumeOn) return null;
+        try {
+            const raw = window.sessionStorage.getItem(RESUME_KEY);
+            if (!raw) return null;
+            const data = JSON.parse(raw) as { url?: string; time?: number };
+            if (!data || !data.url) return null;
+            return { url: data.url, time: Number(data.time) || 0 };
+        } catch {
+            return null;
+        }
+    };
+
+    const saveResume = () => {
+        try {
+            const track = tracks[current];
+            // 没在播就不动原记录 —— 手动暂停由 pause 事件显式清掉
+            if (!track || audio.paused) return;
+            window.sessionStorage.setItem(RESUME_KEY, JSON.stringify({
+                url: track.url,
+                time: audio.currentTime,
+            }));
+        } catch { /* 忽略 */ }
+    };
+
+    const startAutoplay = () => {
+        if (!autoplayOn || armed || !tracks.length) return;
+
+        const saved = readResume();
+        const at = saved ? tracks.findIndex((t) => t.url === saved.url) : -1;
+        // 命中上次那首就接上进度，否则按当前模式挑好的 current 从头放
+        const target = at >= 0 ? at : (current < 0 ? 0 : current);
+        const offset = at >= 0 && saved ? saved.time : 0;
+
+        void playAt(target, offset).then((ok) => { if (!ok) arm(); });
     };
 
     const step = (delta: number) => {
@@ -617,14 +714,14 @@ function setupMusicPlayer() {
         if (mode === 'shuffle' && tracks.length > 1) {
             let next = current;
             while (next === current) next = Math.floor(Math.random() * tracks.length);
-            playAt(next);
+            void playAt(next);
             return;
         }
 
         // 逆序：前进方向等于列表倒着走。单曲模式下手动上/下一首仍按列表顺序走，
         // 只有「放完自动续」才原地重来（见 ended 事件）。
         const dir = mode === 'reverse' ? -delta : delta;
-        playAt(current < 0 ? 0 : current + dir);
+        void playAt(current < 0 ? 0 : current + dir);
     };
 
     /* ---------- 播放模式 ---------- */
@@ -775,7 +872,7 @@ function setupMusicPlayer() {
             // 挑子集、定位当前曲、渲染列表与筛选态，全都交给 applyFilters
             applyFilters();
 
-            if (root.dataset.autoplay === 'true') playAt(current);
+            if (root.dataset.autoplay === 'true') startAutoplay();
         } catch {
             if (statusEl) {
                 statusEl.textContent = source === 'local'
@@ -815,7 +912,7 @@ function setupMusicPlayer() {
     listEl.addEventListener('click', (event) => {
         const item = (event.target as HTMLElement).closest<HTMLElement>('.mp__item');
         if (!item) return;
-        playAt(Number(item.dataset.index));
+        void playAt(Number(item.dataset.index));
     });
 
     btnPlay?.addEventListener('click', () => {
@@ -824,7 +921,7 @@ function setupMusicPlayer() {
             return;
         }
         if (audio.src) void audio.play().catch(() => undefined);
-        else playAt(current < 0 ? 0 : current);
+        else void playAt(current < 0 ? 0 : current);
     });
 
     btnPrev?.addEventListener('click', () => {
@@ -859,9 +956,21 @@ function setupMusicPlayer() {
     /* ---------- 音频事件 ---------- */
 
     audio.addEventListener('play', () => root.classList.add('is-playing'));
-    audio.addEventListener('pause', () => root.classList.remove('is-playing'));
+    audio.addEventListener('pause', () => {
+        root.classList.remove('is-playing');
+        // 「他按了暂停」= 不想听了，跨页续播的进度一并丢掉；切标签页引起的暂停保留
+        if (!pausedByHidden) clearResume();
+    });
     audio.addEventListener('playing', () => { errorStreak = 0; });
-    audio.addEventListener('timeupdate', paintProgress);
+    audio.addEventListener('timeupdate', () => {
+        paintProgress();
+        // 一秒落一次盘就够 —— timeupdate 一秒能来四次
+        const now = Date.now();
+        if (now - lastResumeSave > 1000) {
+            lastResumeSave = now;
+            saveResume();
+        }
+    });
     audio.addEventListener('loadedmetadata', paintProgress);
     // 单曲循环：原地重来；其余模式按当前模式续下一首
     audio.addEventListener('ended', () => {
@@ -885,9 +994,25 @@ function setupMusicPlayer() {
         }
     });
 
+    /* 切走标签页先停、回来接着放 —— 访客的预期是「一直在放」，
+       而不是切一次就没了。手动按的暂停不算（那才是他真要停）。 */
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden && !audio.paused) audio.pause();
+        if (document.hidden) {
+            if (!audio.paused) {
+                pausedByHidden = true;
+                saveResume();       // 隐藏前先把进度落盘，免得这期间翻页丢了位置
+                audio.pause();
+            }
+            return;
+        }
+        if (pausedByHidden) {
+            pausedByHidden = false;
+            void audio.play().catch(() => undefined);
+        }
     });
+
+    // 翻页 / 关标签前再落一次盘，比 beforeunload 在移动端可靠
+    window.addEventListener('pagehide', saveResume);
 
     /* ---------- 空闲预取 ---------- */
 
@@ -895,7 +1020,9 @@ function setupMusicPlayer() {
         requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
     }).requestIdleCallback;
 
-    if (typeof idle === 'function') idle(() => void load(), { timeout: 3000 });
+    // 自动播放开着就别等空闲了 —— 访客进站第一秒就该有声音
+    if (autoplayOn) void load();
+    else if (typeof idle === 'function') idle(() => void load(), { timeout: 3000 });
     else window.setTimeout(() => void load(), 1500);
 }
 
