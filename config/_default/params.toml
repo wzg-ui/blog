@@ -29,7 +29,7 @@ SortBy         = "default"
     headingAnchor = true   # 标题带锚点，方便引用某一小节
     math          = true   # ★ 全局开启 KaTeX —— 不必每篇写 math: true
     toc           = true
-    readingTime   = true
+    readingTime   = false  # 不显示「X 分钟阅读」—— 短文多，这个估算没意义
 
     [article.list]
         # 站里不打标签，列表页就不必留标签的位置
@@ -140,7 +140,8 @@ SortBy         = "default"
 #
 #  逻辑在 assets/ts/custom.ts 的 setupMusicPlayer()
 #  样式在 assets/css/custom.css 的「右上角唱片播放器」一节
-#  api 那一行也别随手换：实测只有 injahow 这家能取到真音频。
+#  api 那一行也别随手换：公共实例里只有 qijieya 给完整版（不带 CORS 的
+#  GD Studio 也给整首，但浏览器跨域取不到，白搭）。
 # ============================================================
 [music]
     enable   = true
@@ -153,11 +154,11 @@ SortBy         = "default"
     id       = "18480725633,18480699721"   # PIEEE + 我喜欢的音乐（合并去重）
     server   = "netease"       # netease / tencent / kugou
     type     = "playlist"      # playlist / album / artist / song
-    api      = "https://api.injahow.cn/meting/?server=:server&type=:type&id=:id"
+    api      = "https://api.qijieya.cn/meting/?server=:server&type=:type&id=:id"
 
     # ★ 专门用来「读歌单」的第二家接口 —— 音频仍然只走上面的 api。
-    #   为什么需要它：injahow 那台服务器把歌单结果**缓存 24 小时**
-    #   （源码里 CACHE_TIME = 86400），你刚往歌单里加的歌最长要等一天才出现。
+    #   为什么需要它：Meting 系公共实例普遍把歌单结果**缓存 24 小时**
+    #   （injahow 源码里 CACHE_TIME = 86400），你刚往歌单里加的歌最长要等一天才出现。
     #   i-meto 不缓存，实测加完立刻能读到；它的直链取不到音频（回 401 / 404），
     #   所以脚本把列表里每首歌重新接到 api 上取流。
     #   留空字符串 = 关掉这个优化，只用 api 读列表（会慢一天）。

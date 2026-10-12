@@ -364,9 +364,9 @@ function setupArchiveMenu() {
        local —— 歌单由 Hugo 构建时写进页面，文件放 assets/music/，一个请求都不发
    · [music].id 可以写多个（逗号分隔），几张歌单会合并成一份并去重
    · 读歌单与取音频可以分两家接口（[music].api 与 [music].listapi）：
-     injahow 把歌单结果缓存 24 小时，刚从歌单里加的歌要等一天才露头；
-     所以列表走不缓存的 i-meto，音频仍回到 injahow（i-meto 的直链取不到，实测 401/404）
-   · 先按语种筛（综合 / 中文 / 英文），再选播放模式
+     qijieya 给完整版音频但缓存歌单 24 小时，刚从歌单里加的歌要等一天才露头；
+     所以列表走不缓存的 i-meto，音频仍回到 qijieya（i-meto 的直链取不到，实测 401/404）
+   · 先按语种筛（全部 / 中文 / 英文），再选播放模式
    · 播放模式四种：随机 / 顺序 / 逆序 / 单曲循环，面板底部直接点选
 
    几个刻意的处理：
@@ -427,7 +427,7 @@ function setupMusicPlayer() {
         api.replace(':server', server).replace(':type', type).replace(':id', playlistId);
 
     /* 读歌单与取音频分开走两家接口。
-       起因：injahow 服务端把歌单结果缓存 24 小时（源码 CACHE_TIME = 86400），
+       起因：Meting 系公共实例普遍把歌单结果缓存 24 小时（injahow 源码 CACHE_TIME = 86400），
        往歌单里新加的歌最长要等一天才会出现在播放器里 —— 列表于是改问 i-meto（不缓存）。
        但 i-meto 的音频直链是废的（实测 401 / 404），所以拿到的列表要再「改挂」回 api：
        只留 type 与 id 两个参数重新拼一遍，音频 / 封面就都回到能用的那家了。
@@ -497,7 +497,7 @@ function setupMusicPlayer() {
 
     let mode = readMode();
 
-    /* 语种筛选：综合 / 中文 / 英文。
+    /* 语种筛选：全部 / 中文 / 英文。
        刻意不靠人工给每首歌打标 —— 曲名里出现中日韩统一表意文字就算中文，否则算英文；
        曲名是纯符号时退回看歌手名。网易云的中文歌名基本都有汉字，这个判得够准。 */
     const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;

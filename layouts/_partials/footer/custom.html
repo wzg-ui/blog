@@ -84,11 +84,11 @@
 
         <p class="mp__status">正在加载歌单…</p>
 
-        {{- /* 语种筛选：综合 / 中文 / 英文，直接过滤下面的列表。
+        {{- /* 语种筛选：全部 / 中文 / 英文，直接过滤下面的列表。
                判定规则在 custom.ts（曲名含中日韩统一表意文字就算中文），
                所以不用给每首歌手工打标；切到没歌的那一类会提示「暂时没有歌」。 */ -}}
         <div class="mp__lang" role="group" aria-label="语种筛选">
-            <button class="mp__filter" type="button" data-lang="all" aria-pressed="true">综合</button>
+            <button class="mp__filter" type="button" data-lang="all" aria-pressed="true">全部</button>
             <button class="mp__filter" type="button" data-lang="zh" aria-pressed="false">中文</button>
             <button class="mp__filter" type="button" data-lang="en" aria-pressed="false">英文</button>
         </div>
