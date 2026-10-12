@@ -1,0 +1,43 @@
+# Cloudflare Pages 响应头配置
+# ------------------------------------------------------------
+# 这个文件会被 Pages 原样读取，Hugo 只是把它复制到 public/ 根目录。
+# 语法：<匹配规则> 换行缩进 <Header 名>: <值>
+#
+# 作用有两个：安全加固 + 让大体积静态资源长时间缓存。
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+
+# ------------------------------------------------------------
+# 自托管的大体积资源，内容变了文件名也会变，可以放心缓存一年
+# ------------------------------------------------------------
+/katex/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/mermaid/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/photoswipe/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Hugo 打包出来的资源带内容指纹（如 main.abc123.css）
+/css/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/js/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# ------------------------------------------------------------
+# 搜索索引：必须每次校验，否则新发的文章搜不到
+# ------------------------------------------------------------
+/search/index.json
+  Cache-Control: public, max-age=0, must-revalidate
+
+# ------------------------------------------------------------
+# HTML 页面同样不缓存，保证发完文刷新就能看到
+# ------------------------------------------------------------
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate

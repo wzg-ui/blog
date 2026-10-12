@@ -1,0 +1,13 @@
+{{- /* 代码块渲染钩子：给带 title 属性的代码块加一条文件名栏 */ -}}
+{{- $result := transform.HighlightCodeBlock . -}}
+{{- with .Attributes.title -}}
+<div class="codeblock">
+    <div class="codeblock__bar">
+        <span class="codeblock__title">{{ . }}</span>
+        <span class="codeblock__lang">{{ $.Type }}</span>
+    </div>
+    {{ $result.Wrapped }}
+</div>
+{{- else -}}
+{{ $result.Wrapped }}
+{{- end -}}

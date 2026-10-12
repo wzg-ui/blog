@@ -1,0 +1,110 @@
+# ============================================================
+#  主题参数（Stack）
+# ============================================================
+
+# 主页 / 搜索索引要收录哪些内容区
+# ← 你的六个领域，全部列入；新增领域记得加在这里
+mainSections   = ["algorithm", "lowlevel", "ai", "rust", "math", "notes"]
+rssFullContent = true
+SortBy         = "default"
+
+[footer]
+    since      = 2026
+    customText = ""
+
+[dateFormat]
+    published   = "2006-01-02"
+    lastUpdated = "2006-01-02"
+
+[sidebar]
+    compact  = false
+    avatar   = ""
+    subtitle = "算法竞赛 · C 底层 · AI · Rust · 数学"
+
+[article]
+    headingAnchor = true   # 标题带锚点，方便引用某一小节
+    math          = true   # ★ 全局开启 KaTeX —— 不必每篇写 math: true
+    toc           = true
+    readingTime   = true
+
+    [article.list]
+        showTags = true
+
+    [article.license]
+        enabled = false
+        default = ""
+
+    # Mermaid 图表：直接写 ```mermaid 代码块即可，无需短代码
+    [article.mermaid]
+        look                  = "classic"
+        lightTheme            = "default"
+        darkTheme             = "dark"
+        securityLevel         = "loose"   # 允许在标签里用 <br/> 换行
+        htmlLabels            = true
+        transparentBackground = true
+
+    [article.alertIcon]
+        note      = "📝"
+        tip       = "💡"
+        important = "📌"
+        warning   = "⚠️"
+        caution   = "🚨"
+
+# 侧边栏部件
+# 注意：必须是带 type 字段的对象，不能写成字符串数组
+[[widgets.homepage]]
+    type = "search"
+
+[[widgets.homepage]]
+    type = "categories"
+    [widgets.homepage.params]
+        limit = 12
+
+[[widgets.homepage]]
+    type = "archives"
+
+[[widgets.homepage]]
+    type = "tag-cloud"
+    [widgets.homepage.params]
+        limit = 40
+
+[[widgets.page]]
+    type = "toc"
+
+[opengraph.twitter]
+    site = ""
+    card = "summary_large_image"
+
+[colorScheme]
+    toggle  = true
+    default = "auto"
+
+[imageProcessing]
+    autoOrient = false
+
+    [imageProcessing.content]
+        widths  = [800, 1600, 2400]
+        enabled = true
+
+    [imageProcessing.thumbnail]
+        enabled = true
+
+[cookies]
+    enabled = false
+
+# 评论：先用 Waline（自建，数据在自己服务器上）
+# 服务器搭好之前保持 enabled = false，否则前台会报错
+[comments]
+    enabled  = false
+    provider = "waline"
+
+    [comments.waline]
+        serverURL    = ""   # 搭好后填 https://comments.你的域名/
+        lang         = "zh-CN"
+        pageview     = false
+        emoji        = ["https://unpkg.com/@waline/emojis@1.0.1/weibo"]
+        requiredMeta = ["nick"]
+
+        [comments.waline.locale]
+            admin       = "博主"
+            placeholder = "说点什么…"

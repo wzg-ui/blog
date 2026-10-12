@@ -1,0 +1,26 @@
+# ---------- Hugo 构建产物 ----------
+/public/
+/resources/_gen/
+.hugo_build.lock
+
+# ---------- 编辑器 / 系统 ----------
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# ---------- Obsidian ----------
+# 整个配置目录不入库：插件体积不小，且换机器重装一遍很快。
+# 需要安装哪些插件写在 README 里。
+.obsidian/
+
+# ---------- 临时文件 ----------
+*.log
+*.tmp
+
+# ---------- 服务器部署 ----------
+# .env 里有数据库密码和会话密钥，绝对不能提交
+deploy/.env
+# 若走「路线二」把构建产物挂给 Caddy，这个目录是 public/ 的副本，不需要入库
+deploy/site/

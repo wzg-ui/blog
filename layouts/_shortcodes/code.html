@@ -1,0 +1,20 @@
+{{- /* 代码分组：内层。只负责把代码塞进父级的数据口袋里，不直接输出 */ -}}
+{{- $lang  := .Get "lang" | default (.Get 0) -}}
+{{- $label := .Get "label" | default $lang | default "code" -}}
+
+{{- $opts := dict -}}
+{{- with .Get "linenos" -}}
+    {{- if eq . "true" -}}
+        {{- $opts = merge $opts (dict "lineNos" "table" "lineNumbersInTable" true) -}}
+    {{- end -}}
+{{- end -}}
+{{- with .Get "hl" -}}
+    {{- $opts = merge $opts (dict "hl_lines" (split . ",")) -}}
+{{- end -}}
+
+{{- .Page.Store.Add "codegroup" (slice (dict
+    "lang"  $lang
+    "label" $label
+    "code"  .Inner
+    "opts"  $opts
+)) -}}

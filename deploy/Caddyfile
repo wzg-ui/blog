@@ -1,0 +1,84 @@
+# ============================================================
+#  Caddy 反代配置
+# ------------------------------------------------------------
+#  你的最终架构（推荐，也是选了「先 Pages 后服务器」后的默认）：
+#
+#    example.com              →  Cloudflare Pages（博客静态站，全球 CDN）
+#    comments.example.com     →  本机 Waline（评论）
+#    stats.example.com        →  本机 Umami（统计）
+#
+#  但如果你想「全部放自己服务器」，把下面「场景 A」打开即可。
+#
+#  Caddy 会自动为每个域名申请 Let's Encrypt 证书并在到期前续期，
+#  不需要手动跑 certbot，也不需要写 cron。
+#
+#  ⚠️ 前提：所有域名必须已完成 ICP 备案，且阿里云安全组已放行 80/443
+# ============================================================
+
+{
+	email {$ACME_EMAIL}
+	# 关掉管理接口对外的可能（默认只监听 localhost，这里再明确一次）
+	admin off
+}
+
+# ============================================================
+#  场景 A：博客静态站也放这台服务器
+#  ------------------------------------------------------------
+#  打开方法：
+#    1. 取消下面整段的注释
+#    2. 把构建好的 public/ 拷到 deploy/site/（见 README「路线二」）
+#    3. docker compose restart caddy
+#
+#  如果走 Cloudflare Pages，就保持注释状态 —— 域名直接解析到 Pages，
+#  流量根本不经过这台机器，更快也更省带宽。
+# ============================================================
+# {$BLOG_DOMAIN} {
+# 	root * /srv/blog
+# 	encode zstd gzip
+# 	file_server
+#
+# 	# Hugo 生成的是 /404.html，用它兜底
+# 	handle_errors {
+# 		@404 expression {err.status_code} == 404
+# 		rewrite @404 /404.html
+# 		file_server
+# 	}
+#
+# 	# 自托管的大体积静态资源：一年不过期
+# 	header /katex/* Cache-Control "public, max-age=31536000, immutable"
+# 	header /mermaid/* Cache-Control "public, max-age=31536000, immutable"
+# 	header /photoswipe/* Cache-Control "public, max-age=31536000, immutable"
+#
+# 	# HTML 不缓存，保证发文后立刻能刷出来
+# 	@html path *.html /
+# 	header @html Cache-Control "public, max-age=0, must-revalidate"
+# }
+
+# ============================================================
+#  www 跳转到裸域，避免搜索引擎判重
+#  （若你更想用 www 作为主域名，把这里和目标域名对调）
+# ============================================================
+www.{$BLOG_DOMAIN} {
+	redir https://{$BLOG_DOMAIN}{uri} permanent
+}
+
+# ============================================================
+#  评论服务
+# ============================================================
+comments.{$BLOG_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy waline:8360
+
+	# 管理后台不需要被搜索引擎收录
+	header /ui/* X-Robots-Tag "noindex, nofollow"
+}
+
+# ============================================================
+#  访问统计
+# ============================================================
+stats.{$BLOG_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy umami:3000
+
+	header / X-Robots-Tag "noindex, nofollow"
+}

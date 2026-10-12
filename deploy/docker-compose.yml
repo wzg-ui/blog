@@ -1,0 +1,176 @@
+# ============================================================
+#  博客的「有状态服务」：Waline 评论 + Umami 统计
+# ------------------------------------------------------------
+#  为什么静态博客还需要这些？
+#    博客正文是静态的，放 Cloudflare Pages 全球 CDN 最快；
+#    但「评论」和「访问统计」必须有数据库和常驻进程，
+#     这类服务放你自己的 ECS 正合适 —— 2 核 2G 完全够用。
+#
+#  内存预算（宿主机总 2GB）：
+#    postgres 320M + waline 192M + umami 192M + caddy 128M ≈ 832M
+#    剩余约 1.1GB 留给系统自身；实际驻留通常远低于上限。
+#    ⚠️ 即便如此也**必须开 swap** —— 见 setup.sh，不开会出现
+#       「偶尔 502、重启就好」这种最难查的间歇故障。
+#
+#  用法：
+#    cd /srv/blog/deploy
+#    cp .env.example .env && vi .env     # 填域名和密码
+#    docker compose up -d
+# ============================================================
+
+name: blog-services
+
+services:
+  # ----------------------------------------------------------
+  # PostgreSQL —— Waline 和 Umami 共用一个实例，各用独立库
+  # 2G 内存的机器绝对不要起两个数据库进程
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: blog-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      # 这两个是给 initdb 脚本用的（Postgres 官方镜像不会自动传业务变量）
+      WALINE_DB: ${WALINE_DB}
+      UMAMI_DB: ${UMAMI_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 首次启动自动建两个库，省得手动 createdb
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    # 只在内网暴露，不映射到宿主机端口 —— 数据库永远不要对公网开放
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 320M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ----------------------------------------------------------
+  # Waline —— 评论系统（轻量、支持 Markdown、有邮件通知）
+  # 后台地址：https://comments.你的域名/ui/register
+  # 第一个注册的账号自动成为管理员
+  # ----------------------------------------------------------
+  waline:
+    image: lizheming/waline:latest
+    container_name: blog-waline
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # ---- 数据库（PostgreSQL 模式）----
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PG_DB: ${WALINE_DB}
+      PG_SSL: "false"
+      # ---- 站点信息 ----
+      SITE_NAME: ${SITE_NAME}
+      SITE_URL: https://${BLOG_DOMAIN}
+      # 只允许来自你自己站点的请求，防止被别人白嫖评论接口
+      SECURE_DOMAINS: ${BLOG_DOMAIN},www.${BLOG_DOMAIN}
+      # 管理员邮箱：用这个邮箱注册即成为管理员
+      AUTHOR_EMAIL: ${ADMIN_EMAIL}
+      # ---- 防刷 ----
+      # 关闭注册，只允许管理员在后台加人（个人博客够用且最安全）
+      DISABLE_USER_REGISTER: "true"
+      # 单 IP 每 60 秒最多 5 条评论
+      LIMIT: "5"
+      # ---- 时区 ----
+      TZ: Asia/Shanghai
+    expose:
+      - "8360"
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ----------------------------------------------------------
+  # Umami —— 访问统计（隐私友好、自托管、比 GA 轻得多）
+  # 后台地址：https://stats.你的域名   默认账号 admin / umami
+  #           **登录后第一件事就是改密码**
+  # ----------------------------------------------------------
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: blog-umami
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # 连到刚才那个 PG 实例，但用独立的库
+      DATABASE_URL: postgresql://${PG_USER}:${PG_PASSWORD}@postgres:5432/${UMAMI_DB}
+      DATABASE_TYPE: postgresql
+      # 用于加密会话的随机串，务必改掉
+      APP_SECRET: ${UMAMI_APP_SECRET}
+      TZ: Asia/Shanghai
+    expose:
+      - "3000"
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ----------------------------------------------------------
+  # Caddy —— 反向代理 + 自动 HTTPS
+  # 两个子域名自动申请并续期 Let's Encrypt 证书，无需手动配
+  # 额外好处：吃掉的资源比 Nginx 少，配置还短
+  # ----------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: blog-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      BLOG_DOMAIN: ${BLOG_DOMAIN}
+      ACME_EMAIL: ${ADMIN_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 如果你打算把静态站也放服务器，把构建产物挂进来（见 Caddyfile 场景 A）
+      - ./site:/srv/blog:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - waline
+      - umami
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

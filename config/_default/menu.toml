@@ -1,0 +1,55 @@
+# ============================================================
+#  导航菜单
+#  六个领域统一放在顶部导航，保证任何一个领域都能被点进去
+#  （空领域不会出现在主页列表里，只能靠导航进入）
+# ============================================================
+
+[[main]]
+    identifier = "algorithm"
+    name       = "算法竞赛"
+    url        = "/algorithm/"
+    weight     = 10
+
+[[main]]
+    identifier = "lowlevel"
+    name       = "C 与底层"
+    url        = "/lowlevel/"
+    weight     = 20
+
+[[main]]
+    identifier = "ai"
+    name       = "AI"
+    url        = "/ai/"
+    weight     = 30
+
+[[main]]
+    identifier = "rust"
+    name       = "Rust"
+    url        = "/rust/"
+    weight     = 40
+
+[[main]]
+    identifier = "math"
+    name       = "数学"
+    url        = "/math/"
+    weight     = 50
+
+[[main]]
+    identifier = "notes"
+    name       = "随笔"
+    url        = "/notes/"
+    weight     = 60
+
+[[main]]
+    identifier = "about"
+    name       = "关于"
+    url        = "/about/"
+    weight     = 70
+
+[[social]]
+    identifier = "github"
+    name       = "GitHub"
+    url        = "https://github.com/你的用户名"
+
+    [social.params]
+        icon = "brand-github"

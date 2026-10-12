@@ -1,0 +1,28 @@
+# ============================================================
+#  外部资源地址（覆盖主题默认值）
+#
+#  主题默认从 cdn.jsdelivr.net 加载 KaTeX，但该 CDN 在
+#  国内网络经常不可达（本机实测 SSL 握手失败），会导致
+#  公式完全不渲染。因此这里全部改为自托管，文件在 static/ 下。
+# ============================================================
+
+KaTeX = [
+    { src = "/katex/katex.min.css", type = "style" },
+    { src = "/katex/katex.min.js", type = "script", defer = true },
+    { src = "/katex/contrib/auto-render.min.js", type = "script", defer = true },
+]
+
+[PhotoSwipe]
+    Style    = "/photoswipe/photoswipe.css"
+    Core     = "/photoswipe/photoswipe.esm.min.js"
+    Lightbox = "/photoswipe/photoswipe-lightbox.esm.min.js"
+
+# 以下两项当前未启用，保持主题原值即可
+Cactus = [
+    { src = "https://latest.cactus.chat/cactus.js", type = "script" },
+    { src = "https://latest.cactus.chat/style.css", type = "style" },
+]
+
+[Artalk]
+    Style  = "https://cdn.jsdelivr.net/npm/artalk@2.9.1/dist/Artalk.css"
+    Script = "https://cdn.jsdelivr.net/npm/artalk@2.9.1/+esm"

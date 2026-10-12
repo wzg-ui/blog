@@ -1,0 +1,41 @@
+# ============================================================
+#  站点主配置
+#  Hugo 0.167.0 extended  +  Stack 4.0.3
+# ============================================================
+
+# ↓↓↓ 上线前必须改：换成你的域名，结尾要带斜杠 ↓↓↓
+baseURL = "https://example.com/"
+title   = "BLZRW"
+
+locale                 = "zh-cn"
+defaultContentLanguage = "zh"
+# 中文站必须开：影响 .Summary 截断与 .WordCount 的统计口径
+hasCJKLanguage         = true
+timeZone               = "Asia/Shanghai"
+
+theme           = "hugo-theme-stack"
+enableRobotsTXT = true
+enableEmoji     = true
+summaryLength   = 120
+
+[pagination]
+    pagerSize = 10
+
+# 内容目录即 URL。page 目录（关于/搜索）用 slug 作一级路径，
+# 其余内容保持 content/ 下的目录层级，例如：
+#   content/math/linear-algebra/eigenvalue.md
+#     -> /math/linear-algebra/eigenvalue/
+[permalinks]
+    page = "/:slug/"
+
+# 关掉不需要的输出格式，减少构建产物
+[outputs]
+    section = ["HTML"]
+
+[services]
+    [services.googleAnalytics]
+        ID = ""
+
+[privacy]
+    [privacy.googleAnalytics]
+        disable = true

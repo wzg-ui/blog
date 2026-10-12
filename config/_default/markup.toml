@@ -1,0 +1,39 @@
+# ============================================================
+#  标记渲染：数学公式 / 代码高亮 / 目录
+# ============================================================
+
+[goldmark]
+    [goldmark.parser]
+        [goldmark.parser.attribute]
+            block = true
+            title = true   # 允许 ```cpp {title="main.cpp"} 写法
+
+    [goldmark.extensions]
+        typographer = false
+
+        # ★ 关键：让 $$...$$、\(...\)、\[...\] 原样传给 KaTeX，
+        #   否则 Goldmark 会把下划线、星号当成 Markdown 语法吃掉
+        [goldmark.extensions.passthrough]
+            enable = true
+
+            [goldmark.extensions.passthrough.delimiters]
+                block  = [["\\[", "\\]"], ["$$", "$$"]]
+                inline = [["\\(", "\\)"]]
+
+    [goldmark.renderer]
+        # 允许正文里直接写 HTML（Mermaid、<details> 折叠等都依赖它）
+        unsafe = true
+
+[tableOfContents]
+    startLevel = 2
+    endLevel   = 3
+    ordered    = false
+
+[highlight]
+    codeFences         = true
+    guessSyntax        = true
+    noClasses          = false   # 必须 false：主题的暗色代码配色靠 CSS 类
+    lineNos            = false   # 默认不显示行号，需要时在代码块上单独开
+    lineNoStart        = 1
+    lineNumbersInTable = true    # 单独开行号时用表格排版，选中复制不会带上行号
+    tabWidth           = 4

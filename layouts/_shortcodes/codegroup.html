@@ -1,0 +1,37 @@
+{{- /* 代码分组：外层。把内部多个 code 块渲染成标签页或并排两栏 */ -}}
+{{- $mode := .Get "mode" | default "tabs" -}}
+
+{{- /* 内层 code 块通过 .Page.Store 传递数据，这里读取即可；
+       Hugo 要求带闭合标签的短代码必须引用 .Inner，故显式取一次后丢弃 */ -}}
+{{- $_ := .Inner -}}
+
+{{- $items := .Page.Store.Get "codegroup" -}}
+{{- .Page.Store.Set "codegroup" slice -}}
+
+{{- if not $items -}}
+    {{- errorf "短代码 codegroup 里没有任何 code 块（位置：%s）" .Position -}}
+{{- end -}}
+
+{{- $id := printf "cg-%d" .Ordinal -}}
+<div class="codegroup codegroup--{{ $mode }}" id="{{ $id }}">
+    {{- if eq $mode "tabs" }}
+    <div class="codegroup__tabs" role="tablist">
+        {{- range $i, $it := $items }}
+        <button type="button" role="tab"
+                class="codegroup__tab{{ if eq $i 0 }} is-active{{ end }}"
+                data-codegroup-target="{{ $id }}-{{ $i }}"
+                aria-selected="{{ if eq $i 0 }}true{{ else }}false{{ end }}"
+                tabindex="{{ if eq $i 0 }}0{{ else }}-1{{ end }}">{{ $it.label }}</button>
+        {{- end }}
+    </div>
+    {{- end }}
+    <div class="codegroup__panels">
+        {{- range $i, $it := $items }}
+        <div class="codegroup__panel{{ if eq $i 0 }} is-active{{ end }}"
+             id="{{ $id }}-{{ $i }}" role="tabpanel">
+            <div class="codegroup__label">{{ $it.label }}</div>
+            {{ transform.Highlight $it.code $it.lang $it.opts }}
+        </div>
+        {{- end }}
+    </div>
+</div>
