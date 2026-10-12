@@ -254,11 +254,11 @@ docker compose up -d
 | `content/posts/_index.md` | `build: render never` | 不再输出 `/posts/` 栏目页 —— 首页已经是文章入口，导航里也没有「文章」 |
 | `content/page/_index.md` | `build: render never` | 同理，`content/page/` 只是归档/搜索的容器，不该有自己那个空壳列表页 |
 | `layouts/_shortcodes/codegroup.html` 等 | 新增 | 主题没有代码分组，这是自己加的 |
-| `static/aplayer/` | 新增 | APlayer + MetingJS 自托管，理由同上；API 选型见该目录的 README |
-| `layouts/_partials/footer/custom.html` | 新增 | 音乐播放器 + 页脚「本站已运行」的挂载点。属性必须写 kebab-case，原因写在文件注释里 |
-| `layouts/_partials/head/custom.html` | 追加播放器样式与脚本 | APlayer 必须先于 MetingJS 执行，两个都用 defer |
-| `assets/ts/custom.ts` | 追加粒子点阵背景与运行时长计时器 | canvas 由脚本自己插进 body，模板不用改 |
-| `assets/css/custom.css` | 追加整套灰阶配色、背景装饰、卡片整块可点 | 覆盖主题的 `:root` / `[data-scheme="dark"]` 变量 |
+| `static/aplayer/` | 已弃用（留档） | 上一版 APlayer + MetingJS 的自托管资源。2026-10-12 换成自研播放器后**不再加载**，留着备查与许可证 |
+| `layouts/_partials/footer/custom.html` | 新增 | 「右上角唱片播放器」+ 页脚「本站已运行」的挂载点，只把 `params.toml` 的 `[music]` 翻成 `data-*` |
+| `layouts/_partials/head/custom.html` | 追加统计骨架 | 已撤下 APlayer / MetingJS 的样式与脚本，现在只负责输出 Cloudflare 统计的 beacon |
+| `assets/ts/custom.ts` | 追加粒子点阵背景、运行时长计时器、右上角唱片播放器 | canvas 由脚本自己插进 body，模板不用改 |
+| `assets/css/custom.css` | 追加整套灰阶配色、背景装饰、卡片整块可点、唱片播放器样式 | 覆盖主题的 `:root` / `[data-scheme="dark"]` 变量 |
 
 **升级主题的正确姿势**：把新版本解压到 `themes/hugo-theme-stack`，然后逐个确认上表这些文件是否还需要保留（尤其 mermaid 那个），跑一次 `hugo` 看有没有报错。
 
