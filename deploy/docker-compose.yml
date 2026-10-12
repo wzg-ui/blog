@@ -152,8 +152,11 @@ services:
       BLOG_DOMAIN: ${BLOG_DOMAIN}
       ACME_EMAIL: ${ADMIN_EMAIL}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # 如果你打算把静态站也放服务器，把构建产物挂进来（见 Caddyfile 场景 A）
+      # 用哪份配置由 .env 里的 CADDYFILE 决定：
+      #   不设 / Caddyfile  → 域名 + 自动 HTTPS（正式状态）
+      #   Caddyfile.ip      → 纯 http 服务（还没有域名或还没备案时的过渡）
+      - ./${CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
+      # 静态站产物挂进来。用 deploy/publish.sh 构建时会写到 deploy/site
       - ./site:/srv/blog:ro
       - caddy_data:/data
       - caddy_config:/config

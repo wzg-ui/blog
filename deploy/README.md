@@ -9,6 +9,7 @@
 | 阶段 | 耗时 | 做什么 | 卡在哪 |
 |---|---|---|---|
 | ① 今天 | ~30 min | 推 GitHub → Cloudflare Pages 上线，**拿到能分享的链接** | 无 |
+| ①′ 今天 | +15 min | 可选：服务器也直接出站，`http://118.31.174.108` 立刻能访问（见 1.3 节） | 无 |
 | ② 今天 | ~20 min | 阿里云买 `.com` 域名 + 实名认证 + **ECS 续费** | 无 |
 | ③ 今天 | ~15 min | 重置服务器，跑 `setup.sh` | 无 |
 | ④ 今天 | ~30 min | 申请备案服务码 → 提交 ICP 备案 | 无 |
@@ -50,6 +51,39 @@ Cloudflare Dashboard → Workers & Pages → Create → Pages → Connect to Git
 > 不改的话，用户访问 `你的域名` 时页面里所有链接都会跳到 `xxx.pages.dev`，体验很怪。
 
 推送后约 1 分钟就能拿到 `https://你的项目名.pages.dev`，这个链接**现在就可以发给别人**。
+
+### 3. 备选：让服务器直接用 IP 提供博客
+
+如果你更想让东西跑在自己的机器上、不想依赖 Cloudflare，备案之前也能做到 —— **备案规范的是「域名」，不是「IP」。用纯 IP 访问不需要备案。**
+
+代价只有一个，但很实在：**没有 HTTPS**。Let's Encrypt 不给纯 IP 地址签证书，所以只能是 http，浏览器地址栏会标「不安全」，内容也是明文传输。
+
+```bash
+# 1. 装 Hugo（重跑一次 setup.sh 即可，它会顺便装好）
+sudo bash deploy/setup.sh
+
+# 2. 切到 IP 模式
+echo 'CADDYFILE=Caddyfile.ip' >> deploy/.env
+docker compose -f deploy/docker-compose.yml up -d caddy
+
+# 3. 构建并发布
+bash deploy/publish.sh http://118.31.174.108/
+```
+
+之后 `http://118.31.174.108/` 就是你的博客。`publish.sh` 之后每次都能直接跑，会自动拉代码、构建、重启 Caddy，并自检返回码。
+
+**备案下来后怎么升级到域名：**
+
+```bash
+# 1. 在 deploy/.env 里把 BLOG_DOMAIN 填成正式域名，并注释掉 CADDYFILE 那行
+# 2. 域名解析到 118.31.174.108
+docker compose -f deploy/docker-compose.yml up -d caddy
+bash deploy/publish.sh          # 不传参数，自动读 .env 里的域名
+```
+
+Caddy 会在几秒内自动申请好证书，之后就是 https 了。同一份内容、同一个目录，只是入口从 IP 换成域名。
+
+**这个模式只服务静态博客，不跑评论和统计。** 那两个服务需要域名才体面（Waline 前端要填绝对地址、Umami 挂子路径还得改 `BASE_PATH`），所以留到域名阶段 —— `Caddyfile.ip` 里没有它们。
 
 ---
 

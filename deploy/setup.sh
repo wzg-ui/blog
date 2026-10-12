@@ -144,7 +144,36 @@ ufw --force enable >/dev/null
 ufw status verbose | sed 's/^/    /'
 
 # ============================================================
-# 5. 目录准备
+# 5. Hugo —— 用于在服务器上直接构建博客
+# ============================================================
+# 为什么要装在服务器上：这样更新流程就是「git pull → 构建」，
+# 不用在本地构建完再往上传，也避开了本地网络问题。
+# 不想装也行，本地构建后上传 public/ 一样能用。
+HUGO_VERSION=0.167.0
+
+if command -v hugo >/dev/null 2>&1; then
+	log "Hugo 已安装：$(hugo version | head -1)"
+else
+	log "安装 Hugo extended ${HUGO_VERSION}"
+	TMPD=$(mktemp -d)
+	if curl -fsSL --connect-timeout 15 --max-time 180 \
+		-o "$TMPD/hugo.tar.gz" \
+		"https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz"; then
+		tar -xzf "$TMPD/hugo.tar.gz" -C /usr/local/bin hugo
+		chmod +x /usr/local/bin/hugo
+		hugo version | sed 's/^/    /'
+	else
+		warn "Hugo 下载失败 —— GitHub 在国内经常连不上，这是常见情况，不是你的问题。"
+		warn "两个替代方案："
+		warn "  a) 本地构建后把 public/ 传上来，见 deploy/README.md「路线三」"
+		warn "  b) 手动下载 hugo_extended_${HUGO_VERSION}_linux-amd64.tar.gz"
+		warn "     传到服务器，再执行：tar -xzf hugo_extended_*.tar.gz -C /usr/local/bin hugo"
+	fi
+	rm -rf "$TMPD"
+fi
+
+# ============================================================
+# 6. 目录准备
 # ============================================================
 log "创建站点目录 /srv/blog"
 mkdir -p /srv/blog
