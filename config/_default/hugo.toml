@@ -3,9 +3,11 @@
 #  Hugo 0.167.0 extended  +  Stack 4.0.3
 # ============================================================
 
-# ↓↓↓ 上线前必须改：换成你的域名，结尾要带斜杠 ↓↓↓
-baseURL = "https://example.com/"
-title   = "BLZRW"
+# baseURL 用根相对路径：这样无论挂到 Cloudflare Pages、自有域名还是本地预览，
+# 都不会出现「站内链接全指向 example.com」这个经典事故。
+# Cloudflare Pages 构建时用 -b "$CF_PAGES_URL" 覆盖它，canonical 与 RSS 便成为绝对地址。
+baseURL = "/"
+title   = "BLZRW's Blog"
 
 locale                 = "zh-cn"
 defaultContentLanguage = "zh"
