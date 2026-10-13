@@ -1036,3 +1036,29 @@ body::before {
         transition: none;
     }
 }
+
+/* ============================================================
+    投稿入口
+   ============================================================
+   页脚那行投稿链接原来混在版权信息里（跟「使用 Hugo 构建」并列），
+   视觉权重一样，根本没人会注意到。给它加个胶囊样式单独成行。
+
+   真正的入口在侧栏主菜单（menu.toml 的 [[main]] contribute），
+   这里只是多留一个出口，给看完文章顺手想投的人。 */
+.footer-contribute {
+    display: inline-block;
+    margin-top: .35rem;
+    padding: .25rem .7rem;
+    border: 1px solid var(--accent-color);
+    border-radius: 999px;
+    color: var(--accent-color) !important;
+    font-size: .8rem;
+    line-height: 1.4;
+    text-decoration: none;
+    transition: background-color .2s ease, color .2s ease;
+}
+
+.footer-contribute:hover {
+    background-color: var(--accent-color);
+    color: var(--body-background-color) !important;
+}

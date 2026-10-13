@@ -6,7 +6,7 @@
 #     content/page/search/index.md     搜索   weight -60
 #     content/page/archives/index.md   归档   weight -50
 #
-#  最终顺序（按 weight 升序）：主页 → 搜索 → 归档
+#  最终顺序（按 weight 升序）：主页 → 搜索 → 归档 → 投稿
 #
 #  曾经的 [[main]] posts（「文章」）已删除：/posts/ 栏目页不再生成
 #  （见 content/posts/_index.md 的 build 设置），首页就是文章入口。
@@ -23,6 +23,18 @@
 
     [main.params]
         icon = "home"
+
+# 投稿入口。放主菜单而不是只放页脚 —— 页脚那行小字跟版权信息混在一起，
+# 没人会注意到，而这才是别人想写东西时唯一要找的地方。
+[[main]]
+    identifier = "contribute"
+    name       = "投稿"
+    url        = "https://github.com/wzg-ui/blog/issues/new/choose"
+    weight     = -40
+
+    [main.params]
+        icon   = "messages"
+        newTab = true
 
 # 侧边栏底部的小图标。外链一律新标签页打开（newTab）。
 [[social]]
