@@ -2,6 +2,8 @@
 /public/
 /resources/_gen/
 .hugo_build.lock
+# 上传 Cloudflare Pages 用的打包文件，每次构建都会重新生成，等同 public/ 的副本
+/public.zip
 
 # ---------- 编辑器 / 系统 ----------
 .DS_Store
