@@ -8,7 +8,7 @@
 # 本地预览不受影响 —— hugo server 会自动把它覆盖成 http://localhost:1313/。
 # 换域名时只改这一行。
 baseURL = "https://blog.piemm.net/"
-title   = "BLZRW's Blog"
+title   = "PIEMM's Blog"
 
 locale                 = "zh-cn"
 defaultContentLanguage = "zh"
