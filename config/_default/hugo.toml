@@ -7,7 +7,7 @@
 # 否则 sitemap / RSS / og:url 全是相对路径，分享卡片和搜索引擎拿不到真实地址。
 # 本地预览不受影响 —— hugo server 会自动把它覆盖成 http://localhost:1313/。
 # 换域名时只改这一行。
-baseURL = "https://blog.pieee.net/"
+baseURL = "https://blog.piemm.net/"
 title   = "BLZRW's Blog"
 
 locale                 = "zh-cn"
