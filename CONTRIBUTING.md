@@ -141,6 +141,22 @@ hugo new posts/your-slug.md --kind notes  # 随笔骨架
 2. **别只写结论**，写你怎么想到的、卡在哪、后来怎么解决的。
 3. **不确定的就说不确定**，标出来。博客不是文档，不需要装作什么都知道。
 4. 代码块标明语言（```cpp / ```py），不然不高亮。
+5. **插图用短代码 `img`，不要用 markdown 的 `![]()`**：
+
+   ```markdown
+   {{< img src="/images/xxx.png" >}}
+   {{< img src="/images/xxx.png" caption="图注" >}}
+   {{< img src="xxx.png" >}}
+   ```
+
+   图片丢在 `static/images/` 下，文件名用英文小写连字符（`stack-paginator-bug.png`），
+   别用中文和空格。`src` 不带前导斜杠会自动补成 `/images/`。
+
+   ⚠️ **图片不能放在 `content/posts/` 里**。Stack 主题的 `content.html` 原样输出
+   `.Content`，不走 Hugo 图片处理链 —— 实测 `Processed images` 恒为 0，
+   图片被当独立内容复制到 `public/posts/`，正文里的相对路径在 `/posts/<slug>/`
+   下解析成 `/posts/<slug>/xxx.png` → **404，图片裂**。
+   这就是本项目专门加 `img` 短代码的原因（`layouts/_shortcodes/img.html`）。
 
 ---
 

@@ -1,0 +1,50 @@
+{{- /* 图片
+       ------------------------------------------------------------
+       用法（正文里）：
+
+           {{< img src="路径" >}}
+           {{< img src="路径" alt="替代文字" >}}
+           {{< img src="路径" caption="图注" >}}
+
+       src 支持两种：
+         · /images/xxx.png   —— static 目录下的图，推荐
+         · xxx.png           —— **static 下以文章名或通用名命名的图**
+
+       为什么要有这个短代码：Stack 主题把 .Content 原样输出，
+       不走 Hugo 的图片处理链。实测把图片放在 content/posts/ 里当页面资源时
+       （Processed images 恒为 0）：
+         · 图片被当独立内容复制到 public/posts/xxx.png，不跟随文章；
+         · 正文里的相对路径在 /posts/<slug>/ 下解析成 /posts/<slug>/xxx.png → 404，图片裂；
+         · 也不缩放、不出 srcset、没有宽高占位，页面会因图片加载而跳动。
+       所以本项目统一走 static 目录 + 本短代码，稳定且一条路径走到底。
+
+       为什么不直接写 markdown 的 ![](x.png)：
+       markdown 写法会把 src 原样注入，无法统一做懒加载、
+       失败兜底和 caption 的 figure 语义。这个短代码把这些收在一处。
+
+       ⚠️ 图片放static/images/ 下，文件名用英文小写连字符，别用中文与空格。 */ -}}
+
+{{- $src := .Get "src" | default (.Get 0) -}}
+{{- if not $src -}}
+    {{- errorf "短代码 img 缺少 src 参数（位置：%s）" .Position -}}
+{{- end -}}
+
+{{- /* 站内路径一律补上前导斜杠：/foo.jpg 走绝对，foo.jpg 视为 static 下资源 */ -}}
+{{- $url := $src -}}
+{{- if not (hasPrefix $src "http") -}}
+    {{- if not (hasPrefix $src "/") -}}
+        {{- $url = printf "/images/%s" $src -}}
+    {{- end -}}
+{{- end -}}
+
+{{- $alt := .Get "alt" | default "" -}}
+{{- $caption := .Get "caption" | default (.Get "title") | default "" -}}
+
+{{- if $caption -}}
+<figure class="article-figure">
+    <img src="{{ $url }}" alt="{{ $alt }}" loading="lazy" decoding="async">
+    <figcaption>{{ $caption }}</figcaption>
+</figure>
+{{- else -}}
+<img src="{{ $url }}" alt="{{ $alt }}" loading="lazy" decoding="async">
+{{- end -}}

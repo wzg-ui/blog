@@ -1085,3 +1085,39 @@ body::before {
     vertical-align: middle;
     cursor: help;
 }
+
+/* ============================================================
+   正文插图
+   ------------------------------------------------------------
+   插图统一走 shortcode `img`（layouts/_shortcodes/img.html），
+   不用 markdown 的 ![](x.png) —— 后者在 Stack 主题下不触发 Hugo 图片处理，
+   图片既不缩放也没有 srcset。
+
+   图注（caption）会被渲染成 <figure> + <figcaption>，这里给它留出间距与
+   稍小一号的字号；深浅色下都只用 --secondary-color，不引入别的颜色。 */
+.article-content figure.article-figure {
+    margin: 1.6rem 0;
+}
+
+.article-content figure.article-figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+}
+
+.article-content figure.article-figure figcaption {
+    margin-top: .6rem;
+    color: var(--secondary-color);
+    font-size: .82rem;
+    line-height: 1.6;
+    text-align: center;
+}
+
+/* 裸图（没写 caption 的）同样撑满正文宽度，但要收掉自带的行内基线间隙 */
+.article-content > p > img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+}
