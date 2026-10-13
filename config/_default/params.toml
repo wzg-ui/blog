@@ -115,9 +115,14 @@ SortBy         = "default"
 
     [comments.giscus]
         repo             = "wzg-ui/blog"
-        repoID= "R_kgDOVGK5_g"
-        category         = "Comments"
-        categoryID       = "TODO"      # ← Discussions 开了之后我来填，别手改
+        repoID           = "R_kgDOVGK5_g"
+        # 分类 ID 对应仓库里现有的 General 分类（DIC_kwDOVGK5_s4DIUJG）。
+        # GitHub 的改名接口不开放、也不能用 API 建分类，所以先用默认的 General。
+        # ⚠️ 以后在网页上把它改名成 Comments 就行 —— 改分类名不会改 ID，
+        #    老评论不会失联，这里也不用改。
+        # ⚠️ ID 一旦定下就别换分类，否则老评论全都失联。
+        category         = "General"
+        categoryID       = "DIC_kwDOVGK5_s4DIUJG"
         mapping          = "pathname"  # 按 URL 路径对应讨论：一篇文章=一个话题
         strict           = 0           # 不强制按路径匹配，标题改过也能找回讨论
         reactionsEnabled = 1
@@ -222,17 +227,17 @@ SortBy         = "default"
     token  = ""                # ★ 粘贴 Cloudflare 给你的 token
 
 # ============================================================
-#  如何拿到 comments.giscus.categoryID
+#  comments.giscus 的 ID 从哪来（已经填好，这里只作记录）
 # ------------------------------------------------------------
-#  1. 先在 GitHub 仓库 Settings → General 最下方打开 Discussions
-#     （giscus 和评论功能都依赖它，关着的话评论框一直转圈）
-#  2. 进Discussions 标签，新建一个分类，就叫 Comments（大小写随意，
-#     但要和上面category 字段写的一致）
-#  3. 打开 https://giscus.app → 右上角 Configure → 按提示填 repo
-#     wzg-ui/blog 和分类名 Comments
-#  4. 页面上会给出一段 script，其中的 data-category-id 就是填进来的值
-#  5. 把它填到上面 comments.giscus.categoryID，再重新部署
+#  repoID    = 仓库的 node_id，查 api.github.com/repos/wzg-ui/blog 得到，
+#              固定值不会变。
 #
-#  repoID 是固定的（R_kgDOVGK5_g），已经填好了，不用再查。
-#  categoryID 一旦定下来就别改 —— 改了老讨论全都失联。
+#  categoryID = 讨论分类的 node_id。GitHub **不开放创建/改名分类的 API**
+#              （GraphQL 里没有 createDiscussionCategory / updateDiscussionCategory，
+#              REST 的 POST /discussions/categories 返 404），
+#              只能用现成分类的 ID。本仓库现成可用的是 General：
+#              DIC_kwDOVGK5_s4DIUJG
+#
+#  ⚠️ 以后在网页上把 General 改名成 Comments 更好看，但**这里一个字都不用改**
+#     —— 改分类名不改 ID，老评论不会失联。唯一要守住的是别把 ID 换成别的分类。
 # ============================================================
