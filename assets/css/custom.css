@@ -1062,3 +1062,26 @@ body::before {
     background-color: var(--accent-color);
     color: var(--body-background-color) !important;
 }
+
+/* ============================================================
+   投稿作者标记
+   ------------------------------------------------------------
+   文章 front matter 里写 contributed: true 就会在作者旁边多一个「投稿」小徽章，
+   让读者一眼看出这篇是站外投来的，不是站主自己写的。
+
+   作者名的显示逻辑在 layouts/_partials/article/components/details.html
+   （覆盖了主题的同名模板），样式就是这里这两条。 */ */
+
+.article-author .contributed-badge {
+    display: inline-block;
+    margin-left: .1rem;
+    padding: .05rem .4rem;
+    border: 1px solid var(--accent-color);
+    border-radius: 999px;
+    color: var(--accent-color);
+    font-size: .68rem;
+    line-height: 1.5;
+    letter-spacing: .02em;
+    vertical-align: middle;
+    cursor: help;
+}

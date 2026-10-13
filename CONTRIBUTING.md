@@ -36,9 +36,11 @@
 
 几点说明：
 
+- **署名**：文章头部会显示作者名，带 `authorURL` 的话点名字跳你 GitHub。投稿文章还会多一个蓝色「投稿」徽章，读者能看出这不是站主自己写的。
+  - 你只要在 Issue 里写清** GitHub 用户名**，落文件的事我来做，不用你碰 front matter。
+  - commit 里也会带 `Co-authored-by`，GitHub 会把你的头像挂在那次提交上。
 - **只提 Issue 的话，第 2 到 5 步都是我来做**，你不用碰 git。代价是上线时间由我决定，一般当天。
 - **PR 方式你能自己看到构建结果**（本地 `hugo server`），改起来快，但 merge 和发布还是我。
-- **署名**：commit 的 `Co-authored-by` 会带上你的 GitHub 账号，文章页脚作者统一是 PIEMM，如果你想署自己的名字，Issue 里说一声。
 - **撤稿**：提 Issue 说一声，我把文章挪到 `.workbuddy/trash/` 并清构建缓存，线上消失。
 - **没通过不会被删**，Issue 保留着，可以接着改完再提。
 
@@ -98,6 +100,9 @@ title: "你的标题"
 date: 2026-10-14T15:30:00+08:00
 slug: "your-slug"
 description: "一句话简介，30 字以内"
+author: "你的 GitHub 用户名"        # 站主的文章不用写这行
+authorURL: "https://github.com/你的用户名"
+contributed: true                   # 投稿文章加这个，页面上会多个「投稿」徽章
 ---
 ```
 
@@ -107,6 +112,8 @@ description: "一句话简介，30 字以内"
 - **`date` 写定稿时刻**，精确到分钟，不是创建草稿的时间
 - **标题不写日期**，显示日期由 `date` 字段决定
 - 新文章默认 `draft: true`，定稿了改成 `false` 或直接提 Issue 让我改
+- **`date` 别写未来的时间** —— Hugo 默认不输出未来日期的文章，「本地写得出来、线上却没有」十有八九是这个原因
+- **站主自己的文章 `author` 不用写**，缺省就是 PIEMM（配置在 `params.toml` 的 `defaultAuthor`）
 
 ### 现成的骨架
 

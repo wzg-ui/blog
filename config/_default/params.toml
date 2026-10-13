@@ -9,6 +9,13 @@ mainSections   = ["posts"]
 rssFullContent = true
 SortBy         = "default"
 
+# 站主自己的名字。文章 front matter 里不写 author 时就显示这个。
+# 投稿文章的作者写在文章自己的 front matter 里（author / authorURL / contributed），
+# 显示逻辑在 layouts/_partials/article/components/details.html（覆盖了主题的）。
+# ⚠️ 顶层键必须写在所有 [表头] 之前，放到 [footer] 后面会被解析成 footer.xxx。
+defaultAuthor     = "PIEMM"
+defaultAuthorURL  = "https://github.com/wzg-ui"
+
 [footer]
     since      = 2026
     # 站点的起始时刻，「本站已运行」计时器读的是这里的 data-since。

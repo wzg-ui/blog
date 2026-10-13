@@ -1,0 +1,111 @@
+{{- /* 覆盖主题的 article/components/details.html —— 只为多显示一行「作者」。
+       整体结构照抄自 themes/hugo-theme-stack/layouts/_partials/article/components/details.html，
+       改动只有两处：
+         ① meta 里加一个 inline-meta，显示作者（有 authorURL 就做成链接）
+         ② 顶部算 $ShowAuthor / $ShowContributed，并塞进最外层 if 的条件里 ——
+            主题原来只在 $ShowTime / $ShowTranslations / $ShowTags 时才输出
+            <footer class="article-meta">，不加这两项的话「作者」会被整段吞掉。
+
+       作者取值顺序：文章 front matter 的 author → 站点缺省 defaultAuthor（PIEMM）。
+       所以站主自己的文章不写 author 也没关系，缺省就是 PIEMM。
+
+       front matter 可选字段：
+         author:     "显示名"，留空 = 用站点缺省
+         authorURL:  "https://github.com/xxx"，留空 = 不做成链接
+         contributed: true，投稿文章标记（页面上多一个「投稿」小徽章） */ -}}
+{{- $IsList := .IsList -}}
+{{- $Page := .Page -}}
+{{- $Author := $Page.Params.author | default $Page.Site.Params.defaultAuthor -}}
+{{- $AuthorURL := $Page.Params.authorURL | default "" -}}
+{{- $Contributed := $Page.Params.contributed | default false -}}
+{{- $ShowAuthor := ne $Author "" -}}
+{{- $ShowContributed := and $Contributed $ShowAuthor -}}
+<div class="article-details">
+    {{ if $Page.Params.categories }}
+    <header class="article-category">
+        {{ range ($Page.GetTerms "categories") }}
+            {{ $color := partial "helper/color-from-str" .LinkTitle }}
+            {{ $BackgroundColor := default $color.BackgroundColor .Params.style.background }}
+            {{ $TextColor := default $color.TextColor .Params.style.color }}
+            <a href="{{ .RelPermalink }}" style="background-color: {{ $BackgroundColor | safeCSS }}; color: {{ $TextColor | safeCSS }};">
+                {{ .LinkTitle }}
+            </a>
+        {{ end }}
+    </header>
+    {{ end }}
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="{{ $Page.RelPermalink }}">
+                {{- $Page.Title -}}
+            </a>
+        </h2>
+
+        {{ with $Page.Params.description }}
+        <h3 class="article-subtitle">
+            {{ . }}
+        </h3>
+        {{ end }}
+    </div>
+
+    {{ $showReadingTime := $Page.Params.readingTime | default ($Page.Site.Params.article.readingTime) }}
+    {{ $showDate := not $Page.Date.IsZero }}
+    {{ $showTime := or $showDate $showReadingTime }}
+    {{ $showTranslations := $Page.IsTranslated }}
+    {{ $showTags := and $Page.Site.Params.Article.List.ShowTags ($Page.GetTerms "tags") $IsList }}
+
+    {{ if or $showTime $showTranslations $showTags $ShowAuthor }}
+    <footer class="article-meta">
+        {{ if $showTime }}
+            <div class="inline-meta">
+                {{ if $showDate }}
+                    {{ partial "helper/icon" "date" }}
+                    <time class="article-time--published" datetime='{{ $Page.Date.Format "2006-01-02T15:04:05Z07:00" }}'>
+                        {{- $Page.Date | time.Format $Page.Site.Params.dateFormat.published -}}
+                    </time>
+                {{ end }}
+
+                {{ if $showReadingTime }}
+                    {{ partial "helper/icon" "clock" }}
+                    <time class="article-time--reading">
+                        {{ T "article.readingTime" $Page.ReadingTime }}
+                    </time>
+                {{ end }}
+            </div>
+        {{ end }}
+
+        {{- /* 作者 + 投稿徽章 */ -}}
+        {{ if $ShowAuthor }}
+            <div class="inline-meta article-author">
+                {{ partial "helper/icon" "user" }}
+                {{- if $AuthorURL }}
+                <a class="link" href="{{ $AuthorURL }}" target="_blank" rel="noopener">{{ $Author }}</a>
+                {{- else }}
+                <span>{{ $Author }}</span>
+                {{- end }}
+                {{- if $ShowContributed }}
+                <span class="contributed-badge" title="经站主审核后收录的投稿">投稿</span>
+                {{- end }}
+            </div>
+        {{ end }}
+
+        {{ if $showTranslations }}
+            <div class="inline-meta">
+                {{ partial "helper/icon" "language" }}
+                {{ range $Page.Translations }}
+                    <a href="{{ .RelPermalink }}" class="link">{{ .Language.Label }}</a>
+                {{ end }}
+            </div>
+        {{ end }}
+
+        {{ if $showTags }}
+            <div class="article-tags inline-meta">
+                {{ partial "helper/icon" "tag" }}
+                {{ range ($Page.GetTerms "tags") }}
+                    <a href="{{ .RelPermalink }}" class="link">{{ .LinkTitle }}</a>
+                {{ end }}
+            </div>
+        {{ end }}
+    </footer>
+    {{ end }}
+</div>
