@@ -1,0 +1,72 @@
+{{- with .Site.Params.comments.giscus -}}
+<script
+    src="https://giscus.app/client.js"
+    data-repo="{{- .repo -}}"
+    data-repo-id="{{- .repoID -}}"
+    data-category="{{- .category -}}"
+    data-category-id="{{- .categoryID -}}"
+    data-mapping="{{- .mapping -}}"
+    data-strict="{{- .strict -}}"
+    data-reactions-enabled="{{- .reactionsEnabled -}}"
+    data-emit-metadata="{{- .emitMetadata -}}"
+    data-input-position="{{- .inputPosition -}}"
+    data-theme="{{- .lightTheme -}}"
+    data-lang="{{- .lang -}}"
+    data-loading="{{- .loading -}}"
+    crossorigin="anonymous"
+    async
+></script>
+<script>
+    /*深浅色联动。
+      主题模板（comments/provider/giscus.html）这段逻辑有两个问题，这里一并修掉：
+        1. 它只在收到 onColorSchemeChange 时才推一次，而该事件在 main.ts 初始化时
+           就派发了 —— 那时 giscus 的 iframe 还没建好，postMessage 打空，
+           深色站里评论框就一直是白底。
+        2. 监听 message 时写的是 event.origin（隐式全局）而不是 e.origin。
+      改成：iframe 出现后主动推一次，并轮询兜底 + 监听配色变化。*/
+    (function () {
+        var LIGHT = "{{- .lightTheme -}}";
+        var DARK  = "{{- .darkTheme -}}";
+
+        function currentTheme() {
+            return document.documentElement.dataset.scheme === "light" ? LIGHT : DARK;
+        }
+
+        function setGiscusTheme() {
+            var frame = document.querySelector("iframe.giscus-frame");
+            if (!frame) return false;
+            try {
+                frame.contentWindow.postMessage(
+                    { giscus: { setConfig: { theme: currentTheme() } } },
+                    "https://giscus.app"
+                );
+                return true;
+            } catch (err) {
+                return false;
+            }
+        }
+
+        // iframe 是懒加载的，建好之前推都没意义，所以轮询到它出现为止
+        var tries = 0;
+        var timer = setInterval(function () {
+            if (setGiscusTheme()) {
+                clearInterval(timer);
+                // 建好后再补一次，确保拿到最终配色
+                setTimeout(setGiscusTheme, 300);
+                setTimeout(setGiscusTheme, 1200);
+            } else if (++tries > 60) {
+                clearInterval(timer);
+            }
+        }, 250);
+
+        // 用户手动切换配色时同步
+        window.addEventListener("onColorSchemeChange", setGiscusTheme);
+
+        // giscus 自己发来的消息（iframe 首次就绪时会发），收到就再推一次
+        window.addEventListener("message", function (e) {
+            if (e.origin !== "https://giscus.app") return;
+            setGiscusTheme();
+        });
+    })();
+</script>
+{{- end -}}
