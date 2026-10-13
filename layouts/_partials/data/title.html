@@ -1,0 +1,25 @@
+{{- /* 覆盖主题版本（themes/hugo-theme-stack/layouts/_partials/data/title.html）
+
+       ⚠️ 这个文件里**绝对不能出现 .Paginate 或 .Paginator**，连读取都不行。
+
+       原因：baseof.html 先渲染 <head>（第 4 行），算标题就发生在
+       main 区块（第 23 行）之前。而 Hugo 的 .Paginate / .Paginator 都是
+       **首次调用即锁定**（.Paginator 这个读取器在没锁过时也会顺手新建一份）。
+       于是标题这一步就把分页器按「helper/pages.html 给的全部文章」定死，
+       main 里再调 .Paginate 想分自己的集合就拿不到结果了。
+
+       后果：首页「置顶」的文章会在下面的常规列表里原样再列一遍。
+       这个 bug 一直没暴露，是因为此前站里两篇都是置顶、$rest 为空，
+       被 home.html 的 {{ if $rest }} 挡掉了 —— 第一篇非置顶文章才引爆。
+
+       代价：列表页第 2 页起，<title> 里不再有「Page N」前缀。
+       Hugo 没有暴露读取 ?page=N 的接口，要保留就得重新引入这个 bug，
+       不值得。其余逻辑（站点名 + 页面标题、用「 - 」连接）与主题版一致。
+*/ -}}
+{{- $pageTitle := .Title -}}
+{{- $siteTitle := .Site.Title -}}
+
+{{- $title := slice -}}
+{{- $title = $title | append (default $siteTitle $pageTitle) -}}
+
+{{- return delimit $title " - " -}}
