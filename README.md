@@ -135,6 +135,22 @@ fn add(a: i32, b: i32) -> i32 { a + b }
 hugo server          # 然后浏览器打开 http://localhost:1313
 ```
 
+### 生产构建
+
+要生成可上传到 Cloudflare 的 `public/`，在仓库根执行：
+
+```bash
+tools/hugo/hugo.exe --minify --gc --cleanDestinationDir --destination public
+```
+
+> ⚠️ **`--cleanDestinationDir` 不能省**。本项目的 JS / CSS 都带内容哈希（`custom.<sha>.js`），
+> 改一次代码就换一个文件名。不清空目录的话，旧版本会一直躺在 `public/` 里 ——
+> HTML 引用的是新的，目录里却有一堆没人引用的旧文件。传到 Cloudflare 就是线上多出一堆
+> 永远不会有人访问的垃圾，还会把文件总数越堆越多。实测踩过：72 个文件里 2 个是陈旧版本。
+>
+> ⚠️ **换了 slug 或删了文章，也必须带这个参数** —— 旧路径的产物不会被自动删掉，
+> 线上会留着已经「删掉」的文章。
+
 ---
 
 ## 二、必须自己去做的事
