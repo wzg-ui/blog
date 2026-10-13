@@ -1,0 +1,22 @@
+name: Bug report
+description: 报一个站点问题，或提一条改进建议
+title: ""
+labels: ["反馈"]
+body:
+  - type: textarea
+    attributes:
+      label: 出了什么问题
+      description: 哪个页面、什么操作、预期是什么、实际是什么
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 怎么复现
+      description: 点的哪个按钮、在哪个浏览器上
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: 截图或其他说明
+    validations:
+      required: false

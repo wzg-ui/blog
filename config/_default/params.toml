@@ -15,6 +15,10 @@ SortBy         = "default"
     # 改时间只改这一处，脚本不用动。
     customText = '本站已运行 <span id="site-runtime" data-since="2026-10-12T21:00:00+08:00">—</span>'
 
+    # 投稿入口（放在页脚，不占导航 —— 投稿是低频动作，不值得占侧栏位置）
+    # ⚠️ 仓库改地址时这里要跟着改
+    contributeURL = "https://github.com/wzg-ui/blog/issues/new/choose"
+
 [dateFormat]
     # 精确到分钟：文章什么时候写的，列表页一眼能看到
     published   = "2006-01-02 15:04"
@@ -97,22 +101,34 @@ SortBy         = "default"
 [cookies]
     enabled = false
 
-# 评论：先用 Waline（自建，数据在自己服务器上）
-# 服务器搭好之前保持 enabled = false，否则前台会报错
+# 评论：giscus（数据存在 GitHub Discussions，零成本零运维）
+#
+# 为什么不是 Waline：Waline 要自己搭服务器，等于把「不用服务器」这个前提推翻。
+# giscus 只要仓库开了Discussions 就能用，评论落在自己的仓库里，不依赖任何第三方数据库。
+#
+# ⚠️ 生效前提：仓库 Settings → General 最下方把 Discussions 打开。
+#    没开的话评论框会一直转圈。
+# 拿到分类ID 的方法见本文件末尾注释。
 [comments]
-    enabled  = false
-    provider = "waline"
+    enabled  = true
+    provider = "giscus"
 
-    [comments.waline]
-        serverURL    = ""   # 搭好后填 https://comments.你的域名/
-        lang         = "zh-CN"
-        pageview     = false
-        emoji        = ["https://unpkg.com/@waline/emojis@1.0.1/weibo"]
-        requiredMeta = ["nick"]
+    [comments.giscus]
+        repo             = "wzg-ui/blog"
+        repoID= "R_kgDOVGK5_g"
+        category         = "Comments"
+        categoryID       = "TODO"      # ← Discussions 开了之后我来填，别手改
+        mapping          = "pathname"  # 按 URL 路径对应讨论：一篇文章=一个话题
+        strict           = 0           # 不强制按路径匹配，标题改过也能找回讨论
+        reactionsEnabled = 1
+        emitMetadata     = 0           # 不把评论数显示到页面上
+        inputPosition    = "top"       # 输入框在上方，先写后看
+        lang             = "zh-CN"
 
-        [comments.waline.locale]
-            admin       = "博主"
-            placeholder = "说点什么…"
+        # 主题跟着站内的深浅色开关切（模板里已写好联动逻辑）
+        lightTheme       = "light"
+        darkTheme        = "dark_dimmed"
+        loading          = "lazy"
 
 # ============================================================
 #  背景音乐（右上角黑胶唱片，自研组件）
@@ -204,3 +220,19 @@ SortBy         = "default"
 [analytics]
     enable = false             # ★ 拿到 token 后改成 true
     token  = ""                # ★ 粘贴 Cloudflare 给你的 token
+
+# ============================================================
+#  如何拿到 comments.giscus.categoryID
+# ------------------------------------------------------------
+#  1. 先在 GitHub 仓库 Settings → General 最下方打开 Discussions
+#     （giscus 和评论功能都依赖它，关着的话评论框一直转圈）
+#  2. 进Discussions 标签，新建一个分类，就叫 Comments（大小写随意，
+#     但要和上面category 字段写的一致）
+#  3. 打开 https://giscus.app → 右上角 Configure → 按提示填 repo
+#     wzg-ui/blog 和分类名 Comments
+#  4. 页面上会给出一段 script，其中的 data-category-id 就是填进来的值
+#  5. 把它填到上面 comments.giscus.categoryID，再重新部署
+#
+#  repoID 是固定的（R_kgDOVGK5_g），已经填好了，不用再查。
+#  categoryID 一旦定下来就别改 —— 改了老讨论全都失联。
+# ============================================================

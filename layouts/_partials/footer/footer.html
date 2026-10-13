@@ -1,0 +1,38 @@
+{{- /* 覆盖主题的 footer/footer.html —— 只为在页脚加一行「投稿」入口。
+       结构照抄自 themes/hugo-theme-stack/layouts/_partials/footer/footer.html，
+       **两段 section 都要保留**（copyright 放年份与站名，powerby 放计时器与署名），
+       改动只是往 powerby 里插一行投稿链接。
+
+       ⚠️ 这几处局部变量是主题在文件里现定义的，照抄即可，不要改成 partial 传参：
+       $Generator / $Theme / $ThemeVersion / $DesignedBy。
+
+       投稿走 GitHub Issues（流程见仓库根的 CONTRIBUTING.md），入口是一个外链。
+       地址读 params.toml 的 footer.contributeURL —— 换仓库改配置就行，模板不用动。 */ -}}
+{{- $ThemeVersion := "4.0.3" -}}
+<footer class="site-footer">
+    <section class="copyright">
+        &copy;
+        {{ if and (.Site.Params.footer.since) (ne (.Site.Params.footer.since) (int (now.Format "2006"))) }}
+            {{ .Site.Params.footer.since }} -
+        {{ end }}
+        {{ now.Format "2006" }} {{ default .Site.Title .Site.Copyright }}
+    </section>
+
+    <section class="powerby">
+        {{ with .Site.Params.footer.customText }}
+            {{ . | safeHTML }} <br/>
+        {{ end }}
+
+        {{- $Generator := `<a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a>` -}}
+        {{- $Theme := printf `<b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="%s">Stack</a></b>` $ThemeVersion -}}
+        {{- $DesignedBy := `<a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>` -}}
+
+        {{ T "footer.builtWith" (dict "Generator" $Generator) | safeHTML }} <br />
+        {{ T "footer.designedBy" (dict "Theme" $Theme "DesignedBy" $DesignedBy) | safeHTML }}
+
+        {{- with .Site.Params.footer.contributeURL }}
+        <br />
+        <a href="{{ . }}" target="_blank" rel="noopener">想写点什么？给我投稿</a>
+        {{- end }}
+    </section>
+</footer>
