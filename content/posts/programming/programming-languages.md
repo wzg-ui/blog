@@ -1,6 +1,6 @@
 ---
 title: "重新理解编程语言"          
-date: 2026-10-13T10:11:51+08:00  
+date: 2026-10-13T15:40:42+08:00  
 draft: false                      
 slug: "programming-languages"  
 description: "从 C++ 出发，重新认识 C、Python 与编程语言背后的设计思想"            
