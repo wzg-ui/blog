@@ -1636,6 +1636,8 @@ body.gift-page {
     text-align: center;
 }
 
+/* eyebrow 这一项已被 .gift-letter__happy（Happy Birthday 大字）取代，
+   但保留选择器不动 —— 万一以后还要一行小字标签，直接能用。 */
 .gift-letter__eyebrow {
     margin: 0 0 1rem;
     color: var(--gift-rose-deep);
@@ -1644,6 +1646,126 @@ body.gift-page {
     font-weight: 600;
     letter-spacing: 0.4em;
     text-indent: 0.4em;
+}
+
+/* ---------- Happy Birthday 大字 ----------
+   信纸上最显眼的一行。手写体栈 + 渐变描边，
+   不用图片 —— 图片要等加载，蛋糕和这行字都是纯 CSS/文本，秒出。 */
+.gift-letter__happy {
+    margin: 0 0 1.2rem;
+    font-family: "Snell Roundhand", "Brush Script MT", "Segoe Script",
+        "Hiragino Sans GB", cursive;
+    font-size: 4.6rem;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    background: linear-gradient(100deg, #d1417c 0%, #ff8fb8 38%, #b8459b 72%, #d1417c 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    /* background-clip:text 在部分浏览器上会掉字，补一层同色阴影兜底 */
+    filter: drop-shadow(0 0.2rem 0.6rem rgba(209, 65, 124, 0.22));
+    animation: gift-happy-in 1200ms cubic-bezier(0.2, 0.9, 0.3, 1) both 200ms;
+}
+
+@keyframes gift-happy-in {
+    from {
+        opacity: 0;
+        transform: translateY(1.6rem) scale(0.94);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* ---------- 生日蛋糕（纯 CSS） ----------
+   四个 span 叠出来的：盘子 → 蛋糕体 → 蜡烛 → 火焰。
+   火焰靠两层 box-shadow 做辉光 + 一个呼吸动画。 */
+.gift-cake {
+    position: relative;
+    width: 12rem;
+    height: 15rem;
+    margin: 0 auto 3.2rem;
+}
+
+/* 盘子 */
+.gift-cake__plate {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 12rem;
+    height: 1.4rem;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: linear-gradient(180deg, #e8d3d6 0%, #c9aab0 100%);
+    box-shadow: 0 0.3rem 0.8rem rgba(74, 47, 60, 0.22);
+}
+
+/* 蛋糕体 */
+.gift-cake__body {
+    position: absolute;
+    left: 50%;
+    bottom: 1.1rem;
+    width: 9.6rem;
+    height: 5.6rem;
+    transform: translateX(-50%);
+    border-radius: 0.8rem 0.8rem 1.2rem 1.2rem;
+    background: linear-gradient(170deg, #ffe6ec 0%, #ffc2d6 42%, #f79ab8 100%);
+    box-shadow: inset 0 -0.6rem 1rem rgba(180, 70, 110, 0.18);
+}
+
+/* 蛋糕顶上的奶油（用 body 的 ::before 切一个半圆） */
+.gift-cake__body::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: -0.9rem;
+    width: 100%;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 30% 40%, #fff 0%, #ffe3ec 60%, #ffc9dc 100%);
+}
+
+/* 蜡烛 */
+.gift-cake__candle {
+    position: absolute;
+    left: 50%;
+    bottom: 6.4rem;
+    width: 1.2rem;
+    height: 4rem;
+    transform: translateX(-50%);
+    border-radius: 0.3rem;
+    background: repeating-linear-gradient(
+        180deg,
+        #fff 0 0.8rem,
+        #ff8fb8 0.8rem 1.6rem
+    );
+    box-shadow: 0 0.2rem 0.5rem rgba(74, 47, 60, 0.2);
+}
+
+/* 火焰：主体 + 两层辉光 */
+.gift-cake__flame {
+    position: absolute;
+    left: 50%;
+    bottom: 10.4rem;
+    width: 1.1rem;
+    height: 1.8rem;
+    transform: translateX(-50%);
+    border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
+    background: radial-gradient(ellipse at 50% 72%, #fff6c9 0%, #ffb347 45%, #ff7043 100%);
+    box-shadow:
+        0 0 1.2rem 0.6rem rgba(255, 168, 76, 0.55),
+        0 0 3rem 1.4rem rgba(255, 120, 60, 0.28);
+    animation: gift-flame 1.4s ease-in-out infinite;
+    transform-origin: 50% 100%;
+}
+
+@keyframes gift-flame {
+    0%, 100% { transform: translateX(-50%) scaleY(1) scaleX(1); opacity: 1; }
+    28%      { transform: translateX(-52%) scaleY(1.16) scaleX(0.92); opacity: 0.92; }
+    52%      { transform: translateX(-48%) scaleY(0.9) scaleX(1.06); opacity: 1; }
+    76%      { transform: translateX(-51%) scaleY(1.1) scaleX(0.95); opacity: 0.95; }
 }
 
 .gift-letter__title {
@@ -1980,6 +2102,30 @@ body.gift-page {
     line-height: 1.8;
 }
 
+/* ---------- 「五个答案都是英文」这行提示 ----------
+   做成一枚小胶囊挂在题干上方，位置显眼但不抢戏 ——
+   她扫一眼就能注意到，不用逐字读题干。 */
+.gift-quiz__note {
+    display: inline-block;
+    margin: 0 0 2.4rem;
+    padding: 0.6rem 1.4rem;
+    border: 1px solid var(--gift-rose);
+    border-radius: 999px;
+    background: var(--gift-rose-wash);
+    color: var(--gift-rose-deep);
+    font-size: 1.3rem;
+    line-height: 1.6;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* 深色模式下这两个变量偏浅，胶囊会看不清 —— 手动压一下 */
+[data-scheme="dark"] .gift-quiz__note {
+    border-color: rgba(255, 143, 184, 0.5);
+    background: rgba(255, 143, 184, 0.12);
+    color: #ffb6d0;
+}
+
 /* 有序列表但不要默认序号 —— 序号在 .gift-q__no 里画 */
 .gift-questions {
     margin: 0;
@@ -2170,5 +2316,19 @@ body.gift-page {
     .gift-submit,
     .gift-fallback__back {
         transition: none;
+    }
+
+    /* Happy Birthday 入场与烛火闪烁 —— 火焰必须停，
+       持续闪烁对前庭功能障碍的人是真会难受的。
+       停掉后火焰会停在 scale(1) 的静态形状，仍然看得出是支蜡烛。 */
+    .gift-letter__happy,
+    .gift-cake__flame {
+        animation: none;
+    }
+
+    .gift-letter__happy {
+        /* 入场动画停掉后 opacity 会卡在 0，必须显式写回 1 */
+        opacity: 1;
+        transform: none;
     }
 }

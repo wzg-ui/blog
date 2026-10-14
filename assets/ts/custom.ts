@@ -1256,30 +1256,25 @@ document.addEventListener('DOMContentLoaded', setupSiteRuntime);
 document.addEventListener('DOMContentLoaded', setupArchiveMenu);
 document.addEventListener('DOMContentLoaded', setupMusicPlayer);
 /* ============================================================
-   Gift 流程：五道题 → 密码中转 → 粒子表演 → 信封 → 正文
+   Gift 流程：五道题 → 粒子表演 → 信封 → 正文
    ------------------------------------------------------------
    两个页面各管一段：
 
      /gift/          setupGiftQuiz()  收五个答案 → 拼串 → SHA-256
-                     比对 front matter 里的 answersHash。对上了就把
-                     **那个串本身**（它就是密码）存 sessionStorage，跳走。
+                     比对 front matter 里的 answersHash，对上了就跳走。
 
-     /gift/letter/   setupGiftShow()  从 sessionStorage 取密码，
-                     播粒子 + 烟花，弹出信封，点开才解密正文。
+     /gift/letter/   setupGiftShow()  播粒子 + 烟花，弹出信封，点开显示正文。
 
-   为什么密码要中转而不是表演页自己再问一遍：
-     表演页一上来就是满屏 canvas，前面插个密码框会把气氛全毁掉。
-   为什么用 sessionStorage 而不是 localStorage：
-     关掉标签页就没了 —— 她必须一口气答对才能看完，
-     不能分两次、不能第二天再来偷看。
+   ⚠️ 正文**不加密** —— 明文写在 gift-letter.md 里，由 Hugo 正常渲染。
+      所以五道题就是唯一的门：校验过不去，表演根本不会开始；
+      校验过去了，表演页直接就能读，不需要任何密码、密钥、中转。
+      （早期版本在表演页做过 AES-GCM 解密，靠 sessionStorage 传密码 ——
+        那层已经撤掉了，改字直接改 md，不用重跑任何脚本。）
 
-   ⚠️ 仓库公开，所以页面里只有 answersHash 和密文。
+   ⚠️ 仓库公开，所以页面里只有 answersHash。
       整体判定，不提示哪一题错了 —— 逐题提示就得存五个单独哈希，
       等于把每题的可搜索空间砍到 1/5，白送爆破面。
    ============================================================ */
-
-/** 答题页和表演页之间传密码用的 sessionStorage 键 */
-const GIFT_PASSPHRASE_KEY = 'gift-passphrase';
 
 /** 表演阶段的时间线（毫秒）。加在这里方便整体调节奏。 */
 const GIFT_SHOW = {
@@ -1452,16 +1447,11 @@ function setupGiftQuiz() {
                     return;
                 }
 
-                // 对上了 —— 这个串就是密码，中转给表演页
-                try {
-                    sessionStorage.setItem(GIFT_PASSPHRASE_KEY, phrase);
-                } catch {
-                    // 隐私模式下 sessionStorage 可能写不进去。那就没法中转，
-                    // 直接跳过去，表演页会退回到「回到第一页」的兜底。
-                }
+                // 对上了。正文是明文写在 gift-letter.md 里的，
+                // 表演页不需要密码 —— 直接跳过去。
                 say('对了，正在打开…');
-                // 换成 location 而不是 <a>，避免密码在 referrer 里外流
-                window.location.replace('/gift/letter/');
+                // 延时一下让这句话被看见，不然跳得太快像是没反应
+                window.setTimeout(() => window.location.replace('/gift/letter/'), 400);
             } catch {
                 say('核对失败，稍后再试', 'error');
             } finally {
@@ -1515,39 +1505,106 @@ function setupGiftQuiz() {
 
 /* ============================================================
    表演页：粒子聚心 + 烟花 + 信封
+   ------------------------------------------------------------
+   ⚠️ 关于「这段动效用 Python 写」
+
+   静态站没有后端，浏览器也不认 Python —— 所以**整段**动画不可能用 Python 跑在
+   访客机器上。能用 Python 的是它的**数学部分**：粒子目标点、烟花初速度、
+   配色、错峰延迟，全部由 .workbuddy/scripts/gift_fx.py 用 numpy 算好，
+   导出成 assets/gift/fx.json。这里按那份数据逐帧画。
+
+   分工：Python 负责「算什么」，浏览器负责「画出来」。
+   改粒子数、改配色、改心形大小 → 改 Python 重跑一次；
+   改动画节奏、改发光强度 → 改这里。
+
+   好处：物理与配色用 numpy 写比 JS 好调（调参不用来回切浏览器看），
+   数据只有 170 KB，换分辨率不用重新生成（坐标全是归一化的）。
+
+   正文**没有加密** —— 答案答对就能读，跟普通文章一样直接写在 md 里。
+   所以这里也没有解密、没有 sessionStorage 中转、没有兜底解密失败那一套。
    ============================================================ */
 
 interface GiftParticle {
     x: number;
     y: number;
-    /** 目标点（心形上的位置） */
+    /** 目标点（已乘上当前视口尺寸） */
     tx: number;
     ty: number;
-    /** 当前颜色 */
+    /** 色相 */
     hue: number;
     size: number;
-    /** 汇聚进度 0→1，各粒子错峰，所以起点是随机小数 */
+    /** 汇聚进度 0→1 */
     t: number;
-    /** 汇聚速度（越大越快追上） */
+    /** 汇聚速度 */
     speed: number;
-    /** 烟花爆发后的速度向量 */
+    /** 错峰延迟，来自 Python 算好的 delay */
+    delay: number;
+    /** 烟花初速度 */
     vx: number;
     vy: number;
     life: number;
-    /** 是否已爆发（进入烟花阶段） */
+    /** 该粒子爆发时的初始寿命（Python 给的，有差异，炸完有先后） */
+    life0: number;
     fired: boolean;
 }
 
-/** 心形参数方程取点。t ∈ [0, 2π) */
-function giftHeartPoint(theta: number, scale: number): [number, number] {
-    const x = 16 * Math.pow(Math.sin(theta), 3);
-    const y =
-        13 * Math.cos(theta) -
-        5 * Math.cos(2 * theta) -
-        2 * Math.cos(3 * theta) -
-        Math.cos(4 * theta);
-    // y 轴翻转：数学里 y 向上，canvas 里向下
-    return [x * scale, -y * scale];
+/** fx.json 的形状（见 gift_fx.py 的产出说明） */
+interface GiftFx {
+    version: number;
+    meta: {
+        count: number;
+        /** 心形方程的 x 振幅。Python 那边归一化时除的就是它 */
+        heartAmp: number;
+        /** 心形半宽 ÷ 视口短边 */
+        heartRatio: number;
+        gravity: number;
+        damping: number;
+        lifeDecay: number;
+    };
+    /** 每条 [归一化x, 归一化y, 尺寸, 色相, 错峰延迟] */
+    heart: number[][];
+    /** 每条 [vx, vy, 色相, 初始寿命]，速度单位是「心形半宽」 */
+    burst: number[][];
+}
+
+/** fx.json 拿不到时的兜底。用同一套坐标系，心形大小才对得上。 */
+function giftFallbackFx(count = 1400): GiftFx {
+    const heart: number[][] = [];
+    const burst: number[][] = [];
+    const AMP = 16.0;
+    for (let i = 0; i < count; i++) {
+        const t = (i / count) * Math.PI * 2;
+        const x = 16 * Math.pow(Math.sin(t), 3) / AMP;
+        const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / AMP;
+        const hue = 330 + Math.random() * 40;
+        heart.push([x, y, 0.7 + Math.random() * 1.9, hue, Math.random() * 0.45]);
+        const len = Math.hypot(x, y) || 1;
+        burst.push([
+            (x / len) * (0.55 + Math.random() * 0.75) + (Math.random() - 0.5) * 0.3,
+            (y / len) * (0.55 + Math.random() * 0.75) + (Math.random() - 0.5) * 0.3,
+            320 + Math.random() * 60,
+            0.75 + Math.random() * 0.25,
+        ]);
+    }
+    return {
+        version: 2,
+        meta: { count, heartAmp: AMP, heartRatio: 0.017, gravity: 26, damping: 0.97, lifeDecay: 0.011 },
+        heart,
+        burst,
+    };
+}
+
+async function giftLoadFx(url: string): Promise<GiftFx> {
+    try {
+        const res = await fetch(url, { cache: 'force-cache' });
+        if (!res.ok) throw new Error(String(res.status));
+        const data = (await res.json()) as GiftFx;
+        if (!data?.heart?.length || !data?.burst?.length) throw new Error('数据结构不对');
+        return data;
+    } catch {
+        // 拿不到就用内置的 —— 表演照样能看，只是没有 Python 算的随机错峰
+        return giftFallbackFx();
+    }
 }
 
 function setupGiftShow() {
@@ -1565,14 +1622,11 @@ function setupGiftShow() {
 
     if (!canvas || !envelopeWrap || !envelopeBtn || !letter || !body) return;
 
-    const cipherRaw = root.dataset.cipher ?? '';
-    const iterations = Number(root.dataset.iterations ?? 120000);
+    const fxUrl = root.dataset.fx ?? '';
     const unlockAt = giftTime(root.dataset.unlock);
     const expireAt = giftTime(root.dataset.expire);
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    /* ---------- 兜底 ---------- */
 
     const bail = (text: string) => {
         if (fallback && fallbackText) {
@@ -1595,76 +1649,15 @@ function setupGiftShow() {
         return;
     }
 
-    // 取密码：答题页校验通过后中转过来的
-    let phrase: string | null = null;
-    try {
-        phrase = sessionStorage.getItem(GIFT_PASSPHRASE_KEY);
-    } catch {
-        phrase = null;
-    }
-    if (!phrase) {
-        bail('要先答对上面五道题才能看这个。');
-        return;
-    }
-    if (!cipherRaw) {
-        bail('正文密文没加载出来，刷新一下试试。');
-        return;
-    }
-
-    // ⚠️ 一路走到这里说明她在同一个标签页里答对了题。
-    //    顺手把过期的表演也挡掉：到点后页面会自己收回正文。
+    // 过了时间就把正文收回去 —— 已经看过了也收
     const expireGuard = window.setInterval(() => {
         if (Number.isFinite(expireAt) && Date.now() >= expireAt) {
             window.clearInterval(expireGuard);
-            body.innerHTML = '';
             letter.hidden = true;
             envelopeWrap.hidden = true;
             bail('已经结束啦。');
         }
     }, 30_000);
-
-    /* ---------- 解密 ---------- */
-
-    const decryptGift = async (password: string): Promise<string> => {
-        const packed = giftB64ToBytes(cipherRaw);
-        if (packed.length < 44) throw new Error('密文长度不对');
-
-        const salt = packed.slice(0, 16);
-        const iv = packed.slice(16, 28);
-        const data = packed.slice(28); // ct || tag 必须拼一起，WebCrypto 不接受分开传
-
-        const te = new TextEncoder();
-        const material = await crypto.subtle.importKey(
-            'raw', te.encode(password), 'PBKDF2', false, ['deriveKey']
-        );
-        const key = await crypto.subtle.deriveKey(
-            { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
-            material,
-            { name: 'AES-GCM', length: 256 },
-            false,
-            ['decrypt']
-        );
-        const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
-        return new TextDecoder().decode(plain);
-    };
-
-    /** 先解密码，正文到手后才允许点信封 —— 免得点了半天还在转圈 */
-    let ready: Promise<void> | null = decryptGift(phrase)
-        .then((html) => {
-            body.innerHTML = html;
-            // 解密出来的正文里可能有懒加载图片，属性要重新触发计算
-            body.querySelectorAll('img[data-src]').forEach((img) => {
-                const lazy = img as HTMLImageElement & { dataSrc?: string };
-                if (lazy.dataset.src) img.src = lazy.dataset.src;
-            });
-            ready = null;
-        })
-        .catch(() => {
-            // 走到这里说明哈希对上了但解不开 —— 只可能是 sessionStorage 被清过
-            try { sessionStorage.removeItem(GIFT_PASSPHRASE_KEY); } catch { /* 忽略 */ }
-            bail('密码没对上，回上一页重新答一次吧。');
-            throw new Error('decrypt failed');
-        });
 
     /* ---------- 开信封 ---------- */
 
@@ -1680,28 +1673,23 @@ function setupGiftShow() {
             envelopeWrap.hidden = true;
             letter.hidden = false;
         }, reduced ? 60 : 900);
-
-        if (!ready) return;
-        void ready.catch(() => { /* 已经在 bail 里提示过了 */ });
     });
 
-    // 键盘可达：信封是 button，Enter / Space 原生能触发，这里只补焦点可见
     envelopeBtn.focus({ preventScroll: true });
 
-    /* ---------- canvas：粒子聚心 + 烟花 ---------- */
+    /* ---------- canvas ---------- */
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let width = 0;
     let height = 0;
-    let dpr = 1;
-
-    // 屏幕小 / 核少就减半，手机上 1400 个粒子会掉帧
-    const COUNT = window.innerWidth < 640 ? 900 : 2600;
 
     const particles: GiftParticle[] = [];
-    /** 阶段起始时间戳 */
+    let fx: GiftFx | null = null;
+    /** 心形短边系数 */
+    let heartScale = 0;
+
     let startedAt = 0;
     let phase: 'scatter' | 'gather' | 'hold' | 'burst' | 'done' = 'scatter';
     let rafId = 0;
@@ -1709,65 +1697,65 @@ function setupGiftShow() {
 
     const resize = () => {
         // 移动端 dpr 压到 2，再高纯属浪费（粒子本身是模糊光点，看不出差别）
-        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         width = canvas.clientWidth || window.innerWidth;
         height = canvas.clientHeight || window.innerHeight;
         canvas.width = Math.round(width * dpr);
         canvas.height = Math.round(height * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // 心形半宽（像素）：视口短边 × ratio。
+        // ⚠️ ratio 必须跟 gift_fx.py 写进 fx.json 的 heartRatio 一致，
+        //    两边对不上心就会缩成一个小点或撑爆屏幕。
+        heartScale = Math.min(width, height) * (fx?.meta.heartRatio ?? 0.017) *
+            (fx?.meta.heartAmp ?? 16.0);
     };
 
-    /** 心形整体大小：取视口的较小边，别让心撑出屏幕 */
-    const heartScale = () => Math.min(width, height) * 0.017;
-
+    /** 把 Python 给的归一化数据铺成实际粒子 */
     const seed = () => {
-        particles.length = 0;
-        const scale = heartScale();
+        if (!fx) return;
         const cx = width / 2;
         const cy = height / 2;
+        particles.length = 0;
 
-        for (let i = 0; i < COUNT; i++) {
-            // 目标点：沿心形周长均匀取，再叠一点随机抖动填出体积感
-            const theta = (i / COUNT) * Math.PI * 2 + Math.random() * 0.05;
-            const [hx, hy] = giftHeartPoint(theta, scale);
-            const jitter = Math.random() * scale * 0.16;
-
+        for (let i = 0; i < fx.heart.length; i++) {
+            const [nx, ny, size, hue, delay] = fx.heart[i];
+            const b = fx.burst[i] ?? [0, 0, hue, 1];
             particles.push({
-                // 起点撒在视口四周之外，飞进来才有「聚拢」的感觉
+                // 起点撒满视口，飞进来才有「聚拢」的感觉
                 x: Math.random() * width,
                 y: Math.random() * height,
-                tx: cx + hx + (Math.random() - 0.5) * jitter,
-                ty: cy + hy + (Math.random() - 0.5) * jitter,
-                hue: 330 + Math.random() * 40, // 玫红 → 紫
-                size: 0.7 + Math.random() * 1.9,
+                tx: cx + nx * heartScale,
+                ty: cy + ny * heartScale,
+                hue,
+                size,
                 t: 0,
-                speed: 0.55 + Math.random() * 0.75,
-                vx: 0,
-                vy: 0,
-                life: 1,
+                speed: 1,
+                delay,
+                vx: b[0] ?? 0,
+                vy: b[1] ?? 0,
+                life: b[3] ?? 1,
+                life0: b[3] ?? 1,
                 fired: false,
             });
         }
     };
 
-    /** 心形炸开：给每个粒子一个朝外的初速度 */
     const fire = () => {
-        const scale = heartScale();
         const cx = width / 2;
         const cy = height / 2;
-        const maxR = scale * 20;
-
         for (const p of particles) {
+            // 炸开的方向是从心形中心指向该粒子 —— 炸出来是个心形的花，
+            // 比纯随机四处乱飞好看得多。
+            // Python 给的初速度单位是「心形半宽」，这里乘回去。
             const dx = p.tx - cx;
             const dy = p.ty - cy;
             const len = Math.hypot(dx, dy) || 1;
-            // 稍微夹一点随机，散得太整齐反而假
-            const kick = maxR * (0.55 + Math.random() * 0.75);
-            p.vx = (dx / len) * kick + (Math.random() - 0.5) * maxR * 0.3;
-            p.vy = (dy / len) * kick + (Math.random() - 0.5) * maxR * 0.3;
-            p.life = 1;
+            const radial = 0.55 + (p.size / 2.6) * 0.45; // 尺寸大的炸得更远
+            p.vx = (dx / len) * heartScale * radial + p.vx * heartScale;
+            p.vy = (dy / len) * heartScale * radial + p.vy * heartScale;
+            p.life = p.life0;
             p.fired = true;
-            p.hue = 320 + Math.random() * 60; // 爆发时往紫蓝偏一点，跟聚心时区分开
         }
     };
 
@@ -1780,7 +1768,6 @@ function setupGiftShow() {
 
     const step = (now: number) => {
         const elapsed = now - startedAt;
-        let scale = heartScale();
 
         /* ---- 阶段推进 ---- */
         if (phase === 'scatter' && elapsed > GIFT_SHOW.scatter) phase = 'gather';
@@ -1794,17 +1781,19 @@ function setupGiftShow() {
         }
 
         // 心跳：hold 阶段一下一下地缩放
+        let scaleMul = 1;
         if (phase === 'hold' || phase === 'gather') {
             const since = elapsed - GIFT_SHOW.scatter - (phase === 'hold' ? GIFT_SHOW.gather : 0);
             const beat = Math.max(0, Math.sin((since / 1000) * Math.PI * 2.2));
-            scale *= 1 + beat * 0.045;
+            scaleMul = 1 + beat * 0.045;
         }
 
         /* ---- 画 ---- */
-        // burst 尾段整体压暗，给信封让位
-        const darken = phase === 'done'
-            ? Math.max(0, 1 - (elapsed - (GIFT_SHOW.scatter + GIFT_SHOW.gather + GIFT_SHOW.hold + GIFT_SHOW.burst)) / GIFT_SHOW.fade)
-            : 1;
+        const burstEnd = GIFT_SHOW.scatter + GIFT_SHOW.gather + GIFT_SHOW.hold + GIFT_SHOW.burst;
+        const darken =
+            phase === 'done'
+                ? Math.max(0, 1 - (elapsed - burstEnd) / GIFT_SHOW.fade)
+                : 1;
 
         ctx.clearRect(0, 0, width, height);
         if (darken <= 0.02) {
@@ -1821,27 +1810,29 @@ function setupGiftShow() {
 
         for (const p of particles) {
             if (!p.fired) {
-                // 汇聚：各粒子错峰，用 easeOutCubic 减速接近目标
-                const delay = (p.t % 1) * 0.45;
+                // 汇聚：各粒子错峰（delay 来自 Python），easeOutCubic 减速接近目标
+                const delay = p.delay;
                 p.t = Math.min(1, p.t + 0.008 * p.speed);
                 const local = Math.max(0, Math.min(1, (p.t - delay) / (1 - delay)));
                 const eased = 1 - Math.pow(1 - local, 3);
 
-                p.x += (p.tx - p.x) * eased * 0.14;
-                p.y += (p.ty - p.y) * eased * 0.14;
+                // 心跳时目标点整体缩放
+                const gx = cx + (p.tx - cx) * scaleMul;
+                const gy = cy + (p.ty - cy) * scaleMul;
+                p.x += (gx - p.x) * eased * 0.14;
+                p.y += (gy - p.y) * eased * 0.14;
             } else {
                 p.x += p.vx * 0.016;
                 p.y += p.vy * 0.016;
-                // 阻尼：速度每帧衰减 3%，看起来像被空气拖住
-                p.vx *= 0.97;
-                p.vy *= 0.97;
-                p.vy += 26; // 重力
-                p.life -= 0.011;
+                p.vx *= fx!.meta.damping;
+                p.vy *= fx!.meta.damping;
+                p.vy += fx!.meta.gravity; // 重力
+                p.life -= fx!.meta.lifeDecay;
             }
 
             if (p.life <= 0) continue;
 
-            const alpha = (p.fired ? p.life : 0.42 + p.t * 0.58) * darken;
+            const alpha = (p.fired ? p.life / p.life0 : 0.42 + p.t * 0.58) * darken;
             if (alpha <= 0.01) continue;
 
             ctx.fillStyle = `hsla(${p.hue}, 92%, ${58 + p.t * 12}%, ${alpha})`;
@@ -1850,27 +1841,23 @@ function setupGiftShow() {
             ctx.fill();
         }
 
-        ctx.globalCompositeOperation = 'source-over';
-
-        // burst 阶段让粒子聚成几簇「烟花」：把心形整体放慢旋转，
-        // 再叠一层大尺寸低透明度的光点当辉光
+        // 烟花阶段叠一层大尺寸低透明度的光点当辉光
         if (phase === 'burst') {
-            ctx.globalCompositeOperation = 'lighter';
             for (let i = 0; i < 40; i++) {
                 const p = particles[(i * 37) % particles.length];
                 if (!p.fired || p.life <= 0) continue;
-                ctx.fillStyle = `hsla(${p.hue}, 95%, 72%, ${0.10 * p.life * darken})`;
+                ctx.fillStyle = `hsla(${p.hue}, 95%, 72%, ${0.10 * (p.life / p.life0) * darken})`;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size * 5, 0, Math.PI * 2);
                 ctx.fill();
             }
-            ctx.globalCompositeOperation = 'source-over';
         }
+
+        ctx.globalCompositeOperation = 'source-over';
 
         /* ---- 收尾 ---- */
         if (phase === 'done') {
-            const sinceDone = elapsed - (GIFT_SHOW.scatter + GIFT_SHOW.gather + GIFT_SHOW.hold + GIFT_SHOW.burst);
-            if (sinceDone > GIFT_SHOW.fade * 0.55) showEnvelope();
+            if (elapsed - burstEnd > GIFT_SHOW.fade * 0.55) showEnvelope();
             rafId = window.requestAnimationFrame(step);
             return;
         }
@@ -1886,18 +1873,26 @@ function setupGiftShow() {
     };
 
     const start = () => {
+        // ⚠️ 顺序不能换：resize() 要先算出 heartScale，
+        //    seed() 才拿得到位置系数把粒子铺开。反了的话所有粒子会叠在正中一点。
         resize();
         seed();
-        startedAt = performance.now();
         if (reduced) {
-            // 降级：直接跳到信封，不放粒子
             showEnvelope();
             return;
         }
+        startedAt = performance.now();
         rafId = window.requestAnimationFrame(step);
     };
 
-    start();
+    /* ---------- 装载数据 → 起播 ---------- */
+
+    void giftLoadFx(fxUrl).then((data) => {
+        fx = data;
+        // ⚠️ 顺序：start() 里先 resize() 算出 heartScale，再 seed() 把粒子
+        //    铺到位置上。先 seed 的话 heartScale 还是 0，所有粒子会叠在正中一点。
+        start();
+    });
 
     window.addEventListener('resize', () => {
         if (phase === 'done' || envelopeShown) return;

@@ -1,23 +1,19 @@
 {{- /*
   Gift 第一页：五道题
   ============================================================
-  由 content/page/gift/index.md 的 `layout: gift` 触发。
+  由 content/page/gift.md 的 `layout: gift` 触发。
 
   这一页只干一件事：收五个答案，拼成一个字符串，
   拿 SHA-256 跟 front matter 里的 `gift.answersHash` 对一下。
-  对上了 → 把**拼好的那个串**（也就是密码本身）存 sessionStorage，
-  跳到表演页；表演页拿它去解密正文。
+  对上了 → 跳到表演页。
 
-  为什么密码要中转一次而不是让表演页自己问一遍：
-    表演页要放粒子 + 烟花 + 信封，前面不能插一个密码框破坏气氛。
-    sessionStorage 只活在当前标签页，关掉就没了 —— 正好，
-    她必须一口气答对才能看完，不想让她分两次偷看。
+  ⚠️ 这里**不存**密码、表演页也**不读**密码：
+     正文没有加密，是明文写在 gift-letter.md 里由 Hugo 正常渲染的。
+     所以这道题就是唯一的门 —— 校验过不去，表演页根本不会开始。
 
   ⚠️ 仓库公开，所以 front matter 里只有 answersHash（SHA-256），
-     答案明文和密码都不入库。整体判定，不提示哪一题错了 ——
-     逐题提示就得存五个单独哈希，等于把每题的可搜索空间缩到 1/N。
-
-  时间锁：unlockAt 之前只显示倒计时，expireAt 之后整个入口下线。
+     答案明文不入库。整体判定，不提示哪一题错了 ——
+     逐题提示就得存五个单独哈希，等于把每题的可搜索空间缩到 1/5。
 */ -}}
 
 {{ define "main" }}
@@ -47,6 +43,7 @@
         {{- /* ---------- 五道题 ---------- */ -}}
         <form class="gift-quiz" data-gift-form hidden autocomplete="off" novalidate>
             <p class="gift-quiz__lead">{{ .Params.lead | default "来看看能不能 Get 到我的问题" }}</p>
+            {{- with .Params.note }}<p class="gift-quiz__note">{{ . }}</p>{{ end }}
 
             <ol class="gift-questions">
                 {{- range $i, $q := .Params.questions }}

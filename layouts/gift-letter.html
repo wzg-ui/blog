@@ -1,39 +1,34 @@
 {{- /*
   Gift 第二页：表演 + 信封 + 正文
   ============================================================
-  由 content/page/gift/letter/index.md 的 `layout: gift-letter` 触发。
+  由 content/page/gift-letter.md 的 `layout: gift-letter` 触发。
 
-  三个阶段（全部由 assets/ts/custom.ts 的 setupGiftShow() 驱动）：
+  三个阶段（由 assets/ts/custom.ts 的 setupGiftShow() 驱动）：
 
     ① SHOW   canvas 满屏。粒子从四周汇聚成一个会心跳的心形，
                    心跳一下就炸成烟花。
+                   ⚠️ 粒子目标点 / 初速度 / 配色 / 错峰都由
+                   .workbuddy/scripts/gift_fx.py 算好，导成 assets/gift/fx.json，
+                   这里只负责按那份数据画 —— 改特效参数请改 Python 再重跑。
     ② ENVELOPE  烟花散尽，一个信封从暗处浮上来，轻轻晃。
-    ③ OPEN   点信封 → 封盖翻开 → 信纸升起 → 正文解密并淡入。
+    ③ OPEN   点信封 → 封盖翻开 → 信纸升起 → 正文淡入。
 
-  密码不在这一页问 —— 答题页校验通过后已经把拼好的串
-  存进 sessionStorage（键 `gift-passphrase`），这里取出来直接解密。
-  取不到就说明没答对题 / 刷新了标签页，退回第一页重答。
-
-  ⚠️ 密文放 data-cipher 属性，**不要**放 <script>：
-     Hugo 会把 base64 里的 `+` 转成 `&#43;`，而 <script> 内是原始文本，
-     浏览器不解码 HTML 实体 → atob() 拿到坏串 → 永远报「解密失败」。
-     属性值走 HTML 属性解码，能拿到原始 base64（同 secret 文章的坑）。
+  ⚠️ 正文**不加密**，直接写在 content/page/gift-letter.md 的正文里，
+     由 Hugo 正常渲染。门只有一道 —— 就是第一页那五道题。
 */ -}}
 
 {{ define "main" }}
-    {{- $gift := .Params.gift -}}
     {{- /* 整页铺满：Stack 的 main 容器有 max-width 和左右留白，
-           这里全部清掉，否则 canvas 撑不满、粒子会被裁掉 */ -}}
+           这里全部由 custom.css 的 body.gift-page 清掉 */ -}}
     <div class="gift-stage" data-gift-show
-        data-unlock="{{ $gift.unlockAt }}"
-        data-expire="{{ $gift.expireAt }}"
-        data-iterations="{{ $gift.pbkdf2Iterations | default 120000 }}"
-        data-cipher="{{ $gift.cipher }}">
+        data-unlock="{{ .Params.unlockAt }}"
+        data-expire="{{ .Params.expireAt }}"
+        data-fx="{{ "/gift/fx.json" | relURL }}">
 
         {{- /* ---------- ① 粒子 / 烟花 ---------- */ -}}
         <canvas class="gift-canvas" data-gift-canvas aria-hidden="true"></canvas>
 
-        {{- /* 阶段提示：给不跑 canvas 的环境一个兜底，也是听力/低视力用户的字幕 */ -}}
+        {{- /* 阶段提示：给不跑 canvas 的环境一个兜底，也是读屏用户的字幕 */ -}}
         <p class="gift-stage__caption" data-gift-caption aria-live="polite"></p>
 
         {{- /* ---------- ② 信封 ---------- */ -}}
@@ -54,17 +49,28 @@
         {{- /* ---------- ③ 正文 ---------- */ -}}
         <div class="gift-letter" data-gift-letter hidden>
             <article class="gift-letter__paper">
+
+                {{- /* Happy Birthday —— 蛋糕蜡烛的 CSS 画法见 custom.css */ -}}
+                {{- with .Params.cake }}
+                <div class="gift-cake" role="img" aria-label="一支插着蜡烛的生日蛋糕">
+                    <span class="gift-cake__flame"></span>
+                    <span class="gift-cake__candle"></span>
+                    <span class="gift-cake__body"></span>
+                    <span class="gift-cake__plate"></span>
+                </div>
+                {{ end }}
+
                 <header class="gift-letter__head">
-                    <p class="gift-letter__eyebrow">给你的</p>
+                    <p class="gift-letter__happy">{{ .Params.happy | default "Happy Birthday" }}</p>
                     <h1 class="gift-letter__title">{{ .Title }}</h1>
                     {{- with .Params.subtitle }}<p class="gift-letter__sub">{{ . }}</p>{{ end }}
                 </header>
 
-                {{- /* 密文解开后填在这里。
-                       ⚠️ 正文 Markdown 里不要再写一级标题 —— 上面已经有
-                       front matter 的 title 当 H1 了，再写一个就是两个 H1，
-                       读屏软件会当成两篇不同的文章。正文从 ## 起步。 */ -}}
-                <div class="article-content gift-letter__body" data-gift-body></div>
+                {{- /* ⚠️ 正文直接从 md 渲染。这里不要再写一级标题 ——
+                       上面已经有 title 当 H1 了，再写一个就是两个 H1。 */ -}}
+                <div class="article-content gift-letter__body" data-gift-body>
+                    {{- .Content -}}
+                </div>
 
                 <footer class="gift-letter__foot">
                     <p class="gift-letter__sign">{{ .Params.signature | default "PIEMM" }}</p>
@@ -80,13 +86,10 @@
     </div>
 {{ end }}
 
-{{- /* 满屏 canvas，左侧栏在这里是干扰 —— 连汉堡菜单一起收掉，
-       只留一个返回首页的最小出口在 fallback 里。 */ -}}
+{{- /* 满屏 canvas，左侧栏在这里是干扰 —— 模板里清空，
+       music 播放器/页脚由 custom.css 的 body.gift-page 一并藏掉 */ -}}
 {{ define "left-sidebar" }}{{ end }}
 
 {{ define "right-sidebar" }}{{ end }}
 
-{{- /* body-class 是关键：music 播放器、页脚这些在满屏 canvas 上全是干扰，
-       custom.css 里用 `body.gift-page` 选择器一并藏掉。
-       （baseof 没有 footer block，footer 是直接 partial 调的，定义它没用） */ -}}
 {{ define "body-class" }}gift-page{{ end }}
