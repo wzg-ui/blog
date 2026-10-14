@@ -1026,8 +1026,233 @@ function setupMusicPlayer() {
     else window.setTimeout(() => void load(), 1500);
 }
 
+/* ============================================================
+   私密文章：时间锁 + 密码锁
+   ------------------------------------------------------------
+   页面模板 layouts/_default/secret.html。正文在构建期被 AES-256-GCM
+   加密（.workbuddy/scripts/seal.mjs），这里只负责：
+     ① 未到 unlockAt —— 只显示倒计时，密码框不给提交
+     ② 到了 unlockAt —— 放出密码框，输对就解密填进正文
+     ③ 过了 expireAt —— 收回正文，重新锁上
+
+   ⚠️ 仓库公开，所以密码只存在于「她敲进去的那一瞬间」，
+   页面里只有密文。这里不做任何形式的密码比对——PBKDF2 之后
+   直接拿密文去 AES-GCM 解，解不开就是密码错。
+   ============================================================ */
+
+const SECRET_TICK_MS = 1000;
+
+function setupSecretPost() {
+    const root = document.querySelector<HTMLElement>('[data-secret]');
+    if (!root) return;
+
+    const gate = root.querySelector<HTMLElement>('[data-secret-gate]');
+    const state = root.querySelector<HTMLElement>('[data-secret-state]');
+    const form = root.querySelector<HTMLFormElement>('[data-secret-form]');
+    const input = root.querySelector<HTMLInputElement>('[data-secret-input]');
+    const submit = root.querySelector<HTMLButtonElement>('[data-secret-submit]');
+    const msg = root.querySelector<HTMLElement>('[data-secret-msg]');
+    const body = root.querySelector<HTMLElement>('[data-secret-body]');
+    const cipherRaw = root.dataset.cipher ?? '';
+
+    if (!gate || !state || !form || !input || !body || !cipherRaw) return;
+
+    const unlockAt = new Date(root.dataset.unlock ?? '').getTime();
+    const expireRaw = root.dataset.expire ?? '';
+    const expireAt = expireRaw ? new Date(expireRaw).getTime() : NaN;
+    const iterations = Number(root.dataset.iterations ?? 120000);
+
+    const hasExpire = Number.isFinite(expireAt);
+    const hasUnlock = Number.isFinite(unlockAt);
+
+    /* ---------- 到期倒计时文案 ---------- */
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+
+    const countdown = (ms: number): string => {
+        const total = Math.max(0, Math.floor(ms / 1000));
+        const d = Math.floor(total / 86400);
+        const h = Math.floor((total % 86400) / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const s = total % 60;
+
+        const clock = `${pad(h)}:${pad(m)}:${pad(s)}`;
+        return d > 0 ? `${d} 天 ${clock}` : clock;
+    };
+
+    const fmtDate = (t: number): string => {
+        const d = new Date(t);
+        return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日 ` +
+            `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    /* ---------- 解锁 ---------- */
+
+    const te = new TextEncoder();
+    const td = new TextDecoder();
+
+    let unlocked = false;
+    let busy = false;
+    let formShown = false;
+
+    const decrypt = async (password: string): Promise<string> => {
+        // base64 →  salt(16B) || iv(12B) || ciphertext+tag
+        // ⚠️ 密文来自 data-cipher 属性。若改回 <script> 承载，务必小心：
+        //    <script> 内是原始文本，Hugo 转义出的 &#43; 不会被解码，
+        //    atob() 拿到的是坏串，解密必然失败（表现为「密码不对」）。
+        const raw = atob(cipherRaw.trim());
+        const packed = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) packed[i] = raw.charCodeAt(i);
+
+        if (packed.length < 44) throw new Error('密文长度不对');
+
+        const salt = packed.slice(0, 16);
+        const iv = packed.slice(16, 28);
+        const data = packed.slice(28); // ct || tag 必须拼在一起，WebCrypto 不接受分开传
+
+        const material = await crypto.subtle.importKey(
+            'raw', te.encode(password), 'PBKDF2', false, ['deriveKey']
+        );
+        const key = await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+            material,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['decrypt']
+        );
+
+        const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+        return td.decode(plain);
+    };
+
+    const showBody = (html: string) => {
+        body.innerHTML = html;
+        body.hidden = false;
+        gate.hidden = true;
+        // 解密后正文里可能有图片，懒加载属性要重新触发计算
+        body.querySelectorAll('img[data-src]').forEach((img) => {
+            const lazy = img as HTMLImageElement & { dataSrc?: string };
+            if (lazy.dataset.src) img.src = lazy.dataset.src;
+        });
+    };
+
+    const say = (text: string, kind: 'info' | 'error' = 'info') => {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.classList.toggle('is-error', kind === 'error');
+    };
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (busy || unlocked) return;
+
+        const password = input.value;
+        if (!password) {
+            say('先输一下密码', 'error');
+            input.focus();
+            return;
+        }
+
+        busy = true;
+        if (submit) {
+            submit.disabled = true;
+            submit.textContent = '解锁中';
+        }
+        say('正在解密…');
+
+        try {
+            const html = await decrypt(password);
+            unlocked = true;
+            showBody(html);
+            // 不留在 history 里 —— 刷新会回到锁着的样子
+            try {
+                history.replaceState(null, '', location.pathname + location.hash);
+            } catch { /* file:// 下可能失败，不影响 */ }
+        } catch {
+            say('密码不对，再想想', 'error');
+            input.select();
+        } finally {
+            busy = false;
+            if (submit && !unlocked) {
+                submit.disabled = false;
+                submit.textContent = '解锁';
+            }
+        }
+    });
+
+    /* ---------- 时间锁 ---------- */
+
+    let timer = 0;
+
+    const openForm = () => {
+        form.hidden = false;
+        say('');
+        input.focus({ preventScroll: true });
+    };
+
+    const lock = (reason: string) => {
+        form.hidden = true;
+        formShown = false;
+        state.hidden = false;
+        state.innerHTML = reason;
+        input.value = '';
+    };
+
+    const tick = () => {
+        const now = Date.now();
+
+        if (hasExpire && now >= expireAt) {
+            window.clearInterval(timer);
+            timer = 0;
+            if (unlocked) {
+                // 已经解开了也要收回去：正文先清空，再显示已过期
+                unlocked = false;
+                body.innerHTML = '';
+                body.hidden = true;
+                gate.hidden = false;
+            }
+            lock(
+                `<p class="secret-gate__title">这一篇已经过期了</p>` +
+                `<p class="secret-gate__hint">开放时间到 ${fmtDate(expireAt)} 为止。</p>`
+            );
+            return;
+        }
+
+        if (hasUnlock && now < unlockAt) {
+            lock(
+                `<p class="secret-gate__title">还没到时间</p>` +
+                `<p class="secret-gate__count" data-secret-count>${countdown(unlockAt - now)}</p>` +
+                `<p class="secret-gate__hint">${fmtDate(unlockAt)} 准时打开。</p>`
+            );
+            return;
+        }
+
+        // 到点了：放密码框。如果已经解开或正在显示，就别重复处理。
+        if (unlocked || formShown) return;
+
+        state.hidden = true;
+        state.innerHTML = '';
+        openForm();
+        formShown = true;
+    };
+
+    const start = () => {
+        if (timer) return;
+        timer = window.setInterval(tick, SECRET_TICK_MS);
+        tick();
+    };
+
+    // 标签页在后台时秒级倒计时没必要跑，回来时 tick() 会立刻校正
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') tick();
+    });
+
+    start();
+}
+
 document.addEventListener('DOMContentLoaded', setupCodeGroups);
 document.addEventListener('DOMContentLoaded', setupParticleBackground);
 document.addEventListener('DOMContentLoaded', setupSiteRuntime);
 document.addEventListener('DOMContentLoaded', setupArchiveMenu);
 document.addEventListener('DOMContentLoaded', setupMusicPlayer);
+document.addEventListener('DOMContentLoaded', setupSecretPost);

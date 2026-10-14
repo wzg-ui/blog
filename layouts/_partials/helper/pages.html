@@ -1,0 +1,36 @@
+{{- /*
+  列表页取文章集合
+  ============================================================
+  覆盖主题的同名 partial（主题版只做分区 + 排序）。
+
+  相比主题只多了一件事：**把私密文章摘出去**。
+
+  为什么必须在这里挡：
+    这一份 partial 被 首页 / 归档页 / 搜索索引 / RSS 四处共用，
+    在这里过滤一次，四处一起干净 —— 不然漏一处就等于提前曝光。
+    sitemap 走的是另一条路（`.RegularPages`），由模板 front matter 的
+    `sitemap.disable` 单独处理。
+
+  判定条件：`secret` 字段存在即私密。
+    带 secret 的文章本身照常生成独立页面（它需要一个能被直接访问的 URL），
+    只是不进任何列表 —— 对外看起来像不存在，只有拿到链接的人才打得开。
+*/ -}}
+{{- $pages := .Pages -}}
+
+{{- if .IsHome -}}
+    {{- $pages = where .Site.RegularPages "Type" "in" .Site.Params.mainSections -}}
+{{- else if or (eq .Kind "section") (eq .Kind "taxonomy") (eq .Kind "term") -}}
+    {{- $subsections := .Sections -}}
+    {{- $pages = .Pages | complement $subsections -}}
+
+    {{- if eq (len $pages) 0 -}}
+        {{- $pages = $subsections -}}
+    {{- end -}}
+{{- end -}}
+
+{{- /* 私密文章不进列表：四类列表共用这一份，摘干净 */ -}}
+{{- $pages = where $pages "Params.secret" "!=" "<no-value>" -}}
+
+{{- $pages = partial "helper/pages-sort.html" (dict "Pages" $pages "Context" .) -}}
+
+{{- return $pages -}}

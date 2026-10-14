@@ -1094,7 +1094,7 @@ body::before {
    图片既不缩放也没有 srcset。
 
    图注（caption）会被渲染成 <figure> + <figcaption>，这里给它留出间距与
-   稍小一号的字号；深浅色下都只用 --secondary-color，不引入别的颜色。 */
+   稍小一号的字号；深浅色下都只用 --card-text-color-secondary，不引入别的颜色。 */
 .article-content figure.article-figure {
     margin: 1.6rem 0;
 }
@@ -1108,7 +1108,7 @@ body::before {
 
 .article-content figure.article-figure figcaption {
     margin-top: .6rem;
-    color: var(--secondary-color);
+    color: var(--card-text-color-secondary);
     font-size: .82rem;
     line-height: 1.6;
     text-align: center;
@@ -1120,4 +1120,142 @@ body::before {
     width: 100%;
     height: auto;
     border-radius: 6px;
+}
+
+/* ============================================================
+   私密文章
+   ------------------------------------------------------------
+   对应 layouts/_default/secret.html 与 custom.ts 的 setupSecretPost()。
+
+   三种状态：
+     未到时间 → .secret-gate__title + .secret-gate__count（倒计时）
+     已到时间 → .secret-unlock（密码框）
+     已过期   → 同第一种，但文案不同
+
+   倒计时用等宽数字：位数每秒变化，不等宽的话整行会左右抖。 */
+
+.secret-gate {
+    margin: 2rem 0;
+    padding: 2.2rem 1.6rem;
+    border: 1px solid var(--card-text-color-secondary);
+    border-radius: 10px;
+    background: var(--card-background);
+    text-align: center;
+}
+
+/* ⚠️ 本主题 html{font-size:62.5%} ⇒ **1rem = 10px**，不是 16px。
+   写 rem 时按 10px 换算，否则字号会小到跟正文一个量级。
+   下面的 1.15rem = 11.5px 太小，跟 2.4rem 的倒计时叠在一起。 */
+.secret-gate__title {
+    margin: 0 0 .6rem;
+    font-size: 1.6rem;
+    line-height: 1.4;
+    font-weight: 600;
+    color: var(--accent-color);
+}
+
+.secret-gate__count {
+    margin: .6rem 0 1rem;
+    font-family: var(--code-font-family);
+    font-size: 3.4rem;
+    font-weight: 600;
+    line-height: 1.25;
+    /* 每秒进位，位数变化会让整行左右抖 */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+    color: var(--accent-color);
+    letter-spacing: .02em;
+}
+
+.secret-gate__hint {
+    margin: .4rem 0 0;
+    color: var(--card-text-color-secondary);
+    font-size: 1.2rem;
+    line-height: 1.6;
+}
+
+/* ---------- 密码框 ---------- */
+
+.secret-unlock {
+    margin-top: 1.4rem;
+}
+
+.secret-unlock__label {
+    display: block;
+    margin-bottom: .5rem;
+    font-size: 1.3rem;
+    color: var(--card-text-color-secondary);
+}
+
+.secret-unlock__row {
+    display: flex;
+    gap: .6rem;
+    align-items: stretch;
+    max-width: 26rem;
+    margin: 0 auto;
+}
+
+.secret-unlock__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: .7rem .9rem;
+    border: 1px solid var(--card-text-color-secondary);
+    border-radius: 6px;
+    background: var(--body-background);
+    color: var(--card-text-color-primary);
+    font-size: 1.5rem;
+    font-family: var(--code-font-family);
+    /* 站点是暗色主题，浏览器默认的浅灰掩码点几乎看不见 */
+    caret-color: var(--accent-color);
+    outline: none;
+    transition: border-color .2s ease;
+}
+
+.secret-unlock__input:focus {
+    border-color: var(--accent-color);
+}
+
+.secret-unlock__btn {
+    flex: 0 0 auto;
+    padding: .6rem 1.2rem;
+    /* 文字色必须用 --accent-color-text（深浅色各有一套），
+       用 --body-background 会在深色站点下变成白底白字。 */
+    background: var(--accent-color);
+    color: var(--accent-color-text);
+    border: 1px solid var(--accent-color);
+    border-radius: 6px;
+    font-size: 1.4rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background-color .2s ease, box-shadow .2s ease;
+}
+
+.secret-unlock__btn:disabled {
+    opacity: .55;
+    cursor: progress;
+}
+
+.secret-unlock__msg {
+    min-height: 1.4em;
+    margin: .7rem 0 0;
+    font-size: 1.3rem;
+    color: var(--card-text-color-secondary);
+}
+
+.secret-unlock__msg.is-error {
+    color: #d9534f;
+}
+
+/* ---------- 解锁后的正文 ---------- */
+
+.secret-content[hidden] {
+    display: none;
+}
+
+/* 窄屏：密码框改成上下排列，避免输入框被挤没 */
+@media (max-width: 480px) {
+    .secret-unlock__row {
+        flex-direction: column;
+    }
 }

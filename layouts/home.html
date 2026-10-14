@@ -12,6 +12,9 @@
            ============================================================ */ -}}
 
     {{- $pages  := where .Site.RegularPages "Type" "in" .Site.Params.mainSections -}}
+    {{- /* 私密文章不进列表（helper/pages.html 里也滤了一次，这里是首页自己的集合，
+           绕不过去 —— 漏掉的话生日惊喜会在首页提前露出来）。 */ -}}
+    {{- $pages  := where $pages "Params.secret" "!=" "<no-value>" -}}
     {{- $pinned := where $pages "Params.pinned" true -}}
     {{- /* 用 where 反选，不要用 complement —— 实测 complement 对 page 集合
            不生效，$rest 会把置顶那几篇也带进来，首页直接重复一遍。 */ -}}
