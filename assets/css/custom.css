@@ -1373,6 +1373,13 @@ body.gift-page {
     background: var(--gift-night-0);
 }
 
+/* Stack reserves a scrollbar on html; the letter has its own scrolling container. */
+html:has(body.gift-page) {
+    overflow: hidden;
+    scrollbar-gutter: auto;
+    background: #0b0613;
+}
+
 /* ============================================================
    ② 表演页：舞台
    ============================================================ */
@@ -1393,160 +1400,49 @@ body.gift-page {
     font-family: var(--base-font-family);
 }
 
-/* 粒子 / 烟花画布 */
-.gift-canvas {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    display: block;
-    width: 100%;
-    height: 100%;
+/* The cake is drawn on the same canvas as the background stars. */
+.gift-canvas { position: absolute; inset: 0; z-index: 1; display: block; width: 100%; height: 100%; }
+.gift-heart, .gift-wishes {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    transform-origin: center; will-change: opacity, transform;
+}
+.gift-wishes { z-index: 3; }
+.gift-popup {
+    position: absolute; width: var(--popup-width, 124px); height: var(--popup-height, 49px);
+    visibility: hidden; overflow: hidden; border: 1px solid #ffffff80; border-radius: 5px;
+    background: var(--popup-color); color: #352c40;
+    box-shadow: 0 3px 10px #0004; font-family: "Microsoft YaHei", sans-serif;
+}
+.gift-popup__bar {
+    display: flex; align-items: center; justify-content: space-between; height: 17px;
+    padding: 0 6px; background: #f8f7faf2; color: #817986;
+    font-size: 8px; line-height: 1;
+}
+.gift-popup__bar > :last-child { font-size: 12px; }
+.gift-popup__message {
+    display: flex; align-items: center; justify-content: center;
+    height: calc(100% - 17px); padding: 0 3px; white-space: nowrap;
+    font-size: 13px; font-weight: 500;
+}
+.gift-controls {
+    position: absolute; top: max(18px, env(safe-area-inset-top));
+    right: max(18px, env(safe-area-inset-right)); z-index: 8;
+    display: flex; gap: 8px;
+}
+.gift-controls button {
+    padding: 9px 15px; border: 1px solid #c5c8e333; border-radius: 24px;
+    background: #101327b3; color: #d2d4e5; font: inherit; font-size: 12px; cursor: pointer;
+    backdrop-filter: blur(12px);
+}
+.gift-controls button:hover { background: #2b2b46; color: #fff; }
+.gift-controls button:focus-visible { outline: 2px solid #edc98b; outline-offset: 4px; }
+.gift-controls [hidden], .gift-heart[hidden], .gift-wishes[hidden],
+.gift-stage[hidden], .gift-article[hidden] { display: none; }
+@media (max-width: 600px) {
+    .gift-popup__bar { height: 14px; font-size: 7px; padding: 0 4px; }
+    .gift-popup__message { height: calc(100% - 14px); font-size: 10px; }
 }
 
-/* ============================================================
-   ② 祝福卡片（参考视频后半段：心散开后满屏的小便签）
-   ------------------------------------------------------------
-   ⚠️ 为什么是 DOM 不是 canvas 粒子：
-   参考视频里那些是**带圆角、带阴影、写着字**的彩色便签纸。
-   canvas 画不出阴影，硬画只是一堆彩色圆点，完全没有「纸」的质感。
-
-   为什么不用 JS 逐张 setTimeout 塞：
-   那样 fade 阶段不好统一回收（页面切走还会留悬空定时器）。
-   现在是**一次性全建好 + CSS animation-delay 错峰出现** ——
-   JS 只在 wish 阶段开始时 buildWishes() 一次，fade 时 clearWishes() 一次。
-
-   ⚠️ 位置用**百分比**而不是像素 ⇒ 手机上自动跟着缩放，不用重建 DOM。
-   ⚠️ 字号走 --w-size（JS 传 px）而不是 rem —— 主题 html 是 62.5%，
-      1rem = 10px，写 rem 极易算错。
-   ============================================================ */
-.gift-wishes {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    /* ⚠️ 整层默认不可见：JS 在 wish 阶段才加 .is-wishing，
-       没加之前（心在描边/定格）屏幕上不能有任何卡片。
-       ⚠️ 选择器必须跟 custom.ts 里加 class 的元素**同一个**：
-       JS 是在 [data-gift-show]（.gift-stage）上加 .is-wishing，
-       不是 body.gift-page。写成 .gift-page.is-wishing 会永远匹配不上 ——
-       图层 opacity 停在 0，探针却能数到 56 张卡片（它们在 DOM 里，只是全透明），
-       看起来像「卡片没生成」，实际是选择器写错了元素。 */
-    opacity: 0;
-    transition: opacity 0.6s ease;
-}
-
-/* ⚠️ 选择器必须跟 custom.ts 里加 class 的元素**同一个**：
-   JS 是在 `[data-gift-show]`（.gift-stage）上加 .is-wishing，
-   不是 body.gift-page。写成 .gift-page.is-wishing 会永远匹配不上 ——
-   图层 opacity 停在 0，探针却能数到 56 张卡片（它们在 DOM 里，只是全透明），
-   看起来像「卡片没生成」，实际是选择器写错了元素。 */
-.gift-stage.is-wishing .gift-wishes {
-    opacity: 1;
-}
-
-.gift-wish {
-    position: absolute;
-    /* ⚠️ 中心对齐 + 缩放都放在 transform 的**前两段**，
-       后面预留 --w-shiftX / --w-shiftY 给竖屏修正用（见 @media 段）。
-       transform 的顺序有讲究：先 translate(-50%,-50%) 是「把元素中心挪到定位点」，
-       任何额外的位移都必须在它**之后**，否则会被中心对齐抵消掉。 */
-    transform: translate(-50%, -50%) translate(var(--w-shiftX, 0), var(--w-shiftY, 0))
-        rotate(var(--w-rot, 0deg)) scale(var(--w-scale, 1));
-    padding: 0.55em 0.95em;
-    border-radius: 0.7em;
-    /* 便签纸质感的关键：柔和的彩色底 + 一层薄阴影。
-       不用 border —— 参考视频里卡片是无边框的。 */
-    background: hsl(var(--w-hue) var(--w-sat) var(--w-light));
-    color: #2b1c26;
-    font-size: var(--w-size, 15.5px);
-    font-weight: 600;
-    line-height: 1.35;
-    white-space: nowrap;
-    box-shadow:
-        0 0.25em 0.9em rgba(0, 0, 0, 0.38),
-        0 0.05em 0.2em rgba(0, 0, 0, 0.25);
-    pointer-events: none;
-    /* ⚠️ 两个动画串联：淡入 → 停留（期间轻微漂浮）→ 淡出。
-       animation-delay / stay 都由 JS 写成 CSS 变量，
-       节奏全在样式里，JS 不参与调度。
-       ⚠️ 两个 keyframes 里的 transform 都必须写出**完全相同的前缀**，
-       否则动画结束的一瞬位置会跳一下（from/to 之间前缀不一致）。 */
-    animation:
-        gift-wish-in 0.55s cubic-bezier(0.22, 1.4, 0.4, 1) var(--w-delay, 0ms) both,
-        gift-wish-out 0.85s ease-in
-            calc(var(--w-delay, 0ms) + var(--w-stay, 4000ms)) both;
-}
-
-/* ⚠️⚠️ 竖屏专用修正（这是最容易被忽略的一处）
-   ------------------------------------------------------------
-   Python 那边按「10 行 × 8 列」铺位置，y 从 7% 到 90% —— 那是照着
-   **桌面 900px 高**的视口算的。手机上视口是 390×844，比例完全不同：
-
-     · 左右方向：8 列 × 15.5% 间距，竖屏宽度只有 390px，
-       一张「万事如意」就有 ~90px 宽（3.4rem），8 列根本放不下
-       ⇒ 实测左右各有一批卡片被切掉 11~18 张。
-     · 上下方向：卡片按 10 行铺，但手机上 844px 高 / 390px 宽，
-       纵向空间相对更富裕，所以行距偏大 ⇒ 上半屏空一大片。
-
-   修法：**CSS 媒体查询压扁网格 + 缩窄卡片**，不改 Python 数据。
-   这样桌面效果不动，手机自动收进安全区。
-
-   ⚠️ 为什么不在 Python 里按视口算两套坐标：fx.json 是一份静态文件，
-      浏览器不知道视口尺寸，而且同一份数据要同时服务 1440×900 和 390×844。
-      CSS 媒体查询是唯一正确的分层位置。 */
-@media (max-width: 768px) {
-    .gift-wish {
-        /* ⚠️ 网格重排（8 列 → 4 列）和整体缩放（--w-scale: 0.86）
-           都在 custom.ts 的 buildWishes() 里做了 —— 那是唯一知道
-           视口尺寸的地方。CSS 这边只补两件 CSS 能做的事：
-           ① 字号再压一档（4 个字的中文在 390px 宽里仍偏挤）
-           ② 左右两侧的列内缩，防止边缘卡片被切 */
-        font-size: calc(var(--w-size, 15.5px) * 0.86);
-        padding: 0.5em 0.72em;
-        border-radius: 0.6em;
-    }
-
-    /* 左右两侧的列内缩 —— 4 列布局下最左/最右的列中心在 12.5% / 87.5%，
-       一张四字卡片约 60px（15% 屏宽），不内缩就有 1~2 张被切掉。 */
-    .gift-wish:nth-child(4n + 1) { --w-shiftX: 9%; }
-    .gift-wish:nth-child(4n + 4) { --w-shiftX: -9%; }
-}
-
-/* ⚠️ 三个 keyframes（in / out / 基础态）的 transform 前缀必须**逐字一致** ——
-   竖屏的 --w-shiftX / --w-shiftY 也必须在每一处都带上。
-   少带一处 ⇒ 动画切换的那一帧卡片会「跳」回没有修正的位置，
-   表现为卡片闪一下然后挪到屏幕边缘外。 */
-@keyframes gift-wish-in {
-    from {
-        opacity: 0;
-        transform: translate(-50%, -50%) translate(var(--w-shiftX, 0), var(--w-shiftY, 0))
-            rotate(var(--w-rot, 0deg)) scale(calc(var(--w-scale, 1) * 0.72));
-    }
-    to {
-        opacity: 1;
-        transform: translate(-50%, -50%) translate(var(--w-shiftX, 0), var(--w-shiftY, 0))
-            rotate(var(--w-rot, 0deg)) scale(var(--w-scale, 1));
-    }
-}
-
-@keyframes gift-wish-out {
-    from {
-        opacity: 1;
-        transform: translate(-50%, -50%) translate(var(--w-shiftX, 0), var(--w-shiftY, 0))
-            rotate(var(--w-rot, 0deg)) scale(var(--w-scale, 1));
-    }
-    to {
-        opacity: 0;
-        transform: translate(-50%, -50%) translate(var(--w-shiftX, 0), var(--w-shiftY, 0))
-            rotate(var(--w-rot, 0deg)) scale(calc(var(--w-scale, 1) * 0.94));
-    }
-}
-
-/* 卡片出现之后、淡出之前这段时间里的轻微漂浮。
-   ⚠️ 不能单独加第三条 animation 改 transform —— 会和 in/out 打架
-      （CSS 动画同一属性由最后一条命中的动画控制）。
-      改成给 .gift-wish 加一个 ::after 幽灵层做位移？太重。
-      实际上「原地停留 + 淡入淡出」已经够看了，
-      参考视频里的卡片本来也是基本静止的（只有出现/消失）。 */
 /* 阶段字幕 —— 不跑 canvas 的环境、读屏与低视力用户的兜底。
    压在底部，别挡住正中的信封。 */
 .gift-stage__caption {
@@ -1577,13 +1473,36 @@ body.gift-page {
    ============================================================ */
 .gift-envelope-wrap {
     position: relative;
-    z-index: 3;
+    /* ⚠️ z-index 5 —— 必须**高于** .gift-heart（2）和 .gift-wishes（3）。
+       fade 阶段给 .gift-stage 加 opacity 压暗，但 .gift-stage 本身没开
+       opacity，所以子元素的 z-index 关系不变 —— 信封仍然浮在最上层。
+       ⚠️ 别改成 1：那会让信封被满屏祝福标签压住，点都点不到。 */
+    z-index: 5;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2.2rem;
     padding: 2rem;
     perspective: 1200px;
+}
+
+/* ============================================================
+   fade 阶段：把「画面主体」压暗，但**不压信封**
+   ------------------------------------------------------------
+   ⚠️⚠️ 踩过的坑：最初是 `.gift-stage.is-dimming { opacity: 0 }`，
+      也就是压**整个 stage**。结果连信封一起压暗了 ——
+      截图上信封只剩一个几乎看不见的暗影，「点一下打开」的提示
+      也读不出来。
+      z-index 救不了：opacity 是**父级**属性，子元素再高也一起变淡。
+
+   正解：把两个「内容层」（心形 + 祝福标签）各自压暗，
+   浮尘由 canvas 自己在 JS 里乘 darken，
+   信封和正文完全不动 —— 它们本来就要在最上面亮着。
+   ============================================================ */
+.gift-stage.is-dimming .gift-heart,
+.gift-stage.is-dimming .gift-wishes {
+    opacity: 0;
+    transition: opacity 1.5s ease;
 }
 
 /* [hidden] 必须显式压掉 —— 下面把 display 设成了 flex，

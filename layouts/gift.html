@@ -27,8 +27,8 @@
 {{ define "main" }}
     {{- $gift := .Params.gift -}}
     <article class="main-article gift-article" data-gift-quiz
-        data-unlock="{{ $gift.unlockAt }}"
-        data-expire="{{ $gift.expireAt }}"
+        data-unlock="{{ .Params.unlockAt }}"
+        data-expire="{{ .Params.expireAt }}"
         data-hash="{{ $gift.answersHash }}">
 
         <header class="gift-hero">
@@ -85,6 +85,9 @@
             </div>
         </form>
     </article>
+    {{- with .Site.GetPage "/page/gift-letter" }}
+        {{ partial "gift/stage.html" (dict "Page" . "Pending" true) }}
+    {{- end }}
 {{ end }}
 
 {{ define "body-class" }}article-page{{ end }}

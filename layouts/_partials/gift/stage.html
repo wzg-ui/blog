@@ -1,0 +1,84 @@
+{{- $page := .Page -}}
+{{- $pending := .Pending -}}
+{{- with $page -}}
+    {{- /* 整页铺满：Stack 的 main 容器有 max-width 和左右留白，
+           这里全部由 custom.css 的 body.gift-page 清掉 */ -}}
+    <div class="gift-stage" data-gift-show
+        data-title="{{ .Title }}" data-url="{{ .RelPermalink }}"{{ if $pending }} hidden{{ end }}
+        data-unlock="{{ .Params.unlockAt }}"
+        data-expire="{{ .Params.expireAt }}">
+
+        <div class="gift-heart" data-gift-heart aria-hidden="true"></div>
+        <canvas class="gift-canvas" data-gift-canvas aria-hidden="true"></canvas>
+        <div class="gift-wishes" data-gift-wishes aria-hidden="true"></div>
+        {{- with .Params.giftMusic }}
+        {{- $api := replace (replace $page.Site.Params.music.api ":server" "netease") ":type" "url" }}
+        <audio data-gift-audio preload="metadata"
+               data-start="{{ .introStart }}" data-end="{{ .introEnd }}" data-title="{{ .introTitle }}"
+               src="{{ replace $api ":id" (string .introId) }}"></audio>
+        <audio data-gift-letter-audio preload="metadata" data-title="{{ .letterTitle }}"
+               src="{{ replace $api ":id" (string .letterId) }}"></audio>
+        {{- end }}
+        <div class="gift-controls">
+            <button type="button" data-gift-music aria-pressed="false" hidden>开启音乐</button>
+            <button type="button" data-gift-skip hidden>跳过动画</button>
+            <button type="button" data-gift-replay hidden>再看一遍</button>
+        </div>
+
+        {{- /* 阶段提示：给不跑 canvas 的环境一个兜底，也是读屏用户的字幕 */ -}}
+        <p class="gift-stage__caption" data-gift-caption aria-live="polite"></p>
+
+        {{- /* ---------- ② 信封 ---------- */ -}}
+        <div class="gift-envelope-wrap" data-gift-envelope hidden>
+            <button type="button" class="gift-envelope" data-gift-open
+                    aria-label="打开信封">
+                <span class="gift-envelope__back" aria-hidden="true"></span>
+                <span class="gift-envelope__letter" aria-hidden="true"></span>
+                <span class="gift-envelope__front" aria-hidden="true"></span>
+                <span class="gift-envelope__flap" aria-hidden="true"></span>
+                <span class="gift-envelope__seal" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.7-9.6-9A5.4 5.4 0 0 1 12 5.6 5.4 5.4 0 0 1 21.6 12c-2.1 4.3-9.6 9-9.6 9z"/></svg>
+                </span>
+            </button>
+            <p class="gift-envelope__hint">点一下，把它打开</p>
+        </div>
+
+        {{- /* ---------- ③ 正文 ---------- */ -}}
+        <div class="gift-letter" data-gift-letter hidden>
+            <article class="gift-letter__paper">
+
+                {{- /* Happy Birthday —— 蛋糕蜡烛的 CSS 画法见 custom.css */ -}}
+                {{- with .Params.cake }}
+                <div class="gift-cake" role="img" aria-label="一支插着蜡烛的生日蛋糕">
+                    <span class="gift-cake__flame"></span>
+                    <span class="gift-cake__candle"></span>
+                    <span class="gift-cake__body"></span>
+                    <span class="gift-cake__plate"></span>
+                </div>
+                {{ end }}
+
+                <header class="gift-letter__head">
+                    <p class="gift-letter__happy">{{ .Params.happy | default "Happy Birthday" }}</p>
+                    <h1 class="gift-letter__title">{{ .Title }}</h1>
+                    {{- with .Params.subtitle }}<p class="gift-letter__sub">{{ . }}</p>{{ end }}
+                </header>
+
+                {{- /* ⚠️ 正文直接从 md 渲染。这里不要再写一级标题 ——
+                       上面已经有 title 当 H1 了，再写一个就是两个 H1。 */ -}}
+                <div class="article-content gift-letter__body" data-gift-body>
+                    {{- .Content -}}
+                </div>
+
+                <footer class="gift-letter__foot">
+                    <p class="gift-letter__sign">{{ .Params.signature | default "PIEMM" }}</p>
+                </footer>
+            </article>
+        </div>
+
+        {{- /* ---------- 出错兜底 ---------- */ -}}
+        <div class="gift-fallback" data-gift-fallback hidden>
+            <p class="gift-fallback__text" data-gift-fallback-text></p>
+            <a class="gift-fallback__back" href="{{ "/gift/" | relURL }}">回到第一页</a>
+        </div>
+    </div>
+{{- end -}}
