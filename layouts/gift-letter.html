@@ -28,6 +28,13 @@
         {{- /* ---------- ① 粒子 / 烟花 ---------- */ -}}
         <canvas class="gift-canvas" data-gift-canvas aria-hidden="true"></canvas>
 
+        {{- /* ---------- ② 祝福卡片层 ---------- 
+               参考视频后半段：彩色小卡片铺满屏。
+               ⚠️ 用 DOM 不用 canvas —— 卡片有圆角+阴影+文字，
+                  canvas 画出来就是一堆色块，没有便签纸的质感。
+               JS 在 wish 阶段按 fx.json 的 wishes 数组逐张塞进来。 */ -}}
+        <div class="gift-wishes" data-gift-wishes aria-hidden="true"></div>
+
         {{- /* 阶段提示：给不跑 canvas 的环境一个兜底，也是读屏用户的字幕 */ -}}
         <p class="gift-stage__caption" data-gift-caption aria-live="polite"></p>
 
