@@ -281,8 +281,14 @@ docker compose up -d
 | `static/aplayer/` | 已弃用（留档） | 上一版 APlayer + MetingJS 的自托管资源。2026-10-12 换成自研播放器后**不再加载**，留着备查与许可证 |
 | `layouts/_partials/footer/custom.html` | 新增 | 「右上角唱片播放器」+ 页脚「本站已运行」的挂载点，只把 `params.toml` 的 `[music]` 翻成 `data-*` |
 | `layouts/_partials/head/custom.html` | 追加统计骨架 | 已撤下 APlayer / MetingJS 的样式与脚本，现在只负责输出 Cloudflare 统计的 beacon |
-| `assets/ts/custom.ts` | 追加粒子点阵背景、运行时长计时器、右上角唱片播放器、导航折叠 | canvas 由脚本自己插进 body，模板不用改 |
-| `assets/css/custom.css` | 追加整套灰阶配色、背景装饰、卡片整块可点、导航子菜单、唱片播放器样式 | 覆盖主题的 `:root` / `[data-scheme="dark"]` 变量 |
+| `layouts/gift.html` | 新增 | 生日惊喜的答题页（五道题）。只在 10-15 当天由侧栏入口可达 |
+| `layouts/gift-letter.html` | 新增 | 表演页：满屏 canvas 粒子聚心 → 烟花 → 信封 → 正文。与主题的 `baseof` 走同一套 block，但清空了三栏侧边栏 |
+| `assets/icons/gift.svg` | 新增 | 主题只内置 24 个图标，没有 `gift` |
+| `assets/ts/custom.ts` | 追加粒子点阵背景、运行时长计时器、右上角唱片播放器、导航折叠、Gift 三件套 | canvas 由脚本自己插进 body，模板不用改 |
+| `assets/css/custom.css` | 追加整套灰阶配色、背景装饰、卡片整块可点、导航子菜单、唱片播放器、Gift 页面样式 | 覆盖主题的 `:root` / `[data-scheme="dark"]` 变量 |
+
+> Gift（生日惊喜）的完整说明在 `.workbuddy/GIFT.md`：怎么改答案、换正文、
+> 改时间锁，以及验收脚本怎么用。改完务必跑 `node .workbuddy/scripts/verify_gift.mjs`。
 
 **升级主题的正确姿势**：把新版本解压到 `themes/hugo-theme-stack`，然后逐个确认上表这些文件是否还需要保留（尤其 mermaid 那个），跑一次 `hugo` 看有没有报错。
 
