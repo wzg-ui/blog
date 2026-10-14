@@ -1,19 +1,27 @@
 {{- /*
-  Gift 第一页：五道题
+  Gift 第一页：五道题 → 一个大括号串
   ============================================================
   由 content/page/gift.md 的 `layout: gift` 触发。
 
-  这一页只干一件事：收五个答案，拼成一个字符串，
-  拿 SHA-256 跟 front matter 里的 `gift.answersHash` 对一下。
-  对上了 → 跳到表演页。
+  这一页只干一件事：收她填进来的**一整串**（五个答案拼起来的，
+  用一对大括号括着），规范化后取 SHA-256，
+  跟 front matter 里的 `gift.answersHash` 对一下。对上了 → 跳到表演页。
 
-  ⚠️ 这里**不存**密码、表演页也**不读**密码：
-     正文没有加密，是明文写在 gift-letter.md 里由 Hugo 正常渲染的。
-     所以这道题就是唯一的门 —— 校验过不去，表演页根本不会开始。
+  ⚠️ 为什么是「一个框」而不是五个框：
+     她的玩法是「五题都答对了，把答案连成一个字符串」。
+     五个框是让她帮我们做拼装；一个框才是那个字符串本身。
+
+  ⚠️ 规范化（giftCanonical）会 NFKC → 转小写 → 只留字母数字。
+     所以大小写、空格、逗号、有没有大括号都不影响判定 ——
+     她不会一字不差地照抄，判定太严就是白拦她一次。
 
   ⚠️ 仓库公开，所以 front matter 里只有 answersHash（SHA-256），
      答案明文不入库。整体判定，不提示哪一题错了 ——
      逐题提示就得存五个单独哈希，等于把每题的可搜索空间缩到 1/5。
+
+  ⚠️ 这里不存密码、表演页也不读密码：
+     正文没有加密，是明文写在 gift-letter.md 里由 Hugo 正常渲染的。
+     所以这道题就是唯一的门 —— 校验过不去，表演页根本不会开始。
 */ -}}
 
 {{ define "main" }}
@@ -40,7 +48,7 @@
             </noscript>
         </div>
 
-        {{- /* ---------- 五道题 ---------- */ -}}
+        {{- /* ---------- 五道题 + 一个输入框 ---------- */ -}}
         <form class="gift-quiz" data-gift-form hidden autocomplete="off" novalidate>
             <p class="gift-quiz__lead">{{ .Params.lead | default "来看看能不能 Get 到我的问题" }}</p>
             {{- with .Params.note }}<p class="gift-quiz__note">{{ . }}</p>{{ end }}
@@ -48,17 +56,28 @@
             <ol class="gift-questions">
                 {{- range $i, $q := .Params.questions }}
                 <li class="gift-q">
-                    <label class="gift-q__label" for="gift-a{{ $i }}">
+                    <span class="gift-q__label">
                         <span class="gift-q__no">{{ add $i 1 }}</span>
                         <span class="gift-q__text">{{ $q }}</span>
-                    </label>
-                    <input id="gift-a{{ $i }}" class="gift-q__input" data-gift-input
-                           type="text" enterkeyhint="next"
-                           autocapitalize="off" autocorrect="off" spellcheck="false"
-                           placeholder="你的答案" />
+                    </span>
                 </li>
                 {{- end }}
             </ol>
+
+            {{- /* 判定对象是「一整串」，所以只有一个框。
+                   textarea 而不是 input —— 她大概率会粘贴多行，
+                   单行框粘贴会自动折行且看不全。 */ -}}
+            <div class="gift-answer">
+                <label class="gift-answer__label" for="gift-phrase">
+                    五题都答出来之后，把它们连成一句话，填在下面
+                </label>
+                <textarea id="gift-phrase" class="gift-answer__input" data-gift-input
+                    rows="2" spellcheck="false" autocapitalize="off" autocorrect="off"
+                    placeholder="{{ .Params.placeholder | default "{ 你的五个答案 }" }}"></textarea>
+                <p class="gift-answer__hint">
+                    大括号包起来，怎么写都行 —— 大小写、空格、逗号都不影响。
+                </p>
+            </div>
 
             <div class="gift-quiz__foot">
                 <button type="submit" class="gift-submit" data-gift-submit>提交</button>

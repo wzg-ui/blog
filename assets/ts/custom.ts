@@ -1276,28 +1276,46 @@ document.addEventListener('DOMContentLoaded', setupMusicPlayer);
       等于把每题的可搜索空间砍到 1/5，白送爆破面。
    ============================================================ */
 
-/** 表演阶段的时间线（毫秒）。加在这里方便整体调节奏。 */
+/**
+ * 表演阶段的时间线（毫秒）。加在这里方便整体调节奏。
+ *
+ * ⚠️ 总和 = 60000ms，整整一分钟。改的时候记得让总和还是一分钟 ——
+ *    step() 里所有阶段都是拿 `elapsed` 和这些常量比，换算全靠它们。
+ *    验收脚本 verify_gift.mjs 里有一条静态断言在盯这个 60000。
+ */
 const GIFT_SHOW = {
-    scatter: 2600,    // ① 粒子乱飞 → 开始聚心
-    gather: 3400,    // 聚成心形所需
-    hold: 1500,      // 心形稳定跳动
-    burst: 2400,     // ③ 心形炸成烟花
-    fade: 900,       // 烟花散尽、画面压暗
+    scatter: 6000,    // ① 粒子散着飘，没方向      6s
+    gather: 14000,    // ② 向心形汇聚（easeOut）  14s
+    hold: 20000,      // ③ 心形稳着心跳          20s
+    burst: 14000,     // ④ 炸成烟花              14s
+    fade: 6000,       // ⑤ 压暗、准备出信封       6s
 } as const;
 
 /**
- * 答案规范化 —— **必须与 .workbuddy/scripts/make_gift.mjs 的 normalize() 逐字一致**。
+ * 判定串规范化 —— **必须与 .workbuddy/scripts/make_gift.mjs 的 normalize() 逐字一致**。
  * 两边对不上，症状是「答案明明是对的却总说不对」。
- *   NFKC     全角「ＡＢＣ」≡ 半角「ABC」，中文全角标点也一并归一
- *   trim     去首尾空白
- *   \s+ → ' ' 中间连续空白压成一个（复制粘贴常带 nbsp）
- *   toLower  第 4/5 题是英文单词，大小写不该有影响
+ *
+ * 三步，每一步都对应「她会怎么打」：
+ *   NFKC    全角「ＡＢＣ」≡ 半角「ABC」，全角标点、圈码也一并归一
+ *   toLower 大小写不该有影响（五个答案都是英文）
+ *   只留 \p{L} \p{N}  空格、逗号、顿号、竖线、大括号、句点全丢掉
+ *
+ *   ⇒ 也就是说下面这几种写法，规范化之后**完全一样**：
+ *       带大括号、空格分隔、正常大小写
+ *       带大括号、逗号分隔、全小写
+ *       不带大括号、空格分隔
+ *
+ * ⚠️⚠️ 这个文件是**入库的**，注释里绝对不能出现真答案 ——
+ *    仓库公开，写在注释里等于把答案贴在门上。
+ *    （这条曾经真踩过：注释里写了三个示例答案，验收脚本一 grep 就红了。）
+ *    要举例子就用 <答案1> <答案2> 这种占位形式。
+ *
+ *   \p{L} 含汉字，所以中文答案也不会被误删。
  */
-const giftNormalize = (raw: string): string =>
-    raw.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
-
-/** 五题拼成一个串。用 \n 分隔（input 是单行控件，答案里不会出现换行） */
-const giftJoinAnswers = (list: string[]): string => list.map(giftNormalize).join('\n');
+const giftCanonical = (raw: string): string =>
+    raw.normalize('NFKC')
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, '');
 
 const giftPad = (n: number): string => String(n).padStart(2, '0');
 
@@ -1373,11 +1391,12 @@ function setupGiftQuiz() {
     const gate = root.querySelector<HTMLElement>('[data-gift-gate]');
     const state = root.querySelector<HTMLElement>('[data-gift-state]');
     const form = root.querySelector<HTMLFormElement>('[data-gift-form]');
-    const inputs = Array.from(root.querySelectorAll<HTMLInputElement>('[data-gift-input]'));
+    // 只有一个框：五题答案连成一整串，她自己填进来的就是那个串
+    const input = root.querySelector<HTMLTextAreaElement>('[data-gift-input]');
     const submit = root.querySelector<HTMLButtonElement>('[data-gift-submit]');
     const msg = root.querySelector<HTMLElement>('[data-gift-msg]');
 
-    if (!gate || !state || !form || !submit || !msg || !inputs.length) return;
+    if (!gate || !state || !form || !submit || !msg || !input) return;
 
     const expectHash = (root.dataset.hash ?? '').trim().toLowerCase();
     if (!/^[0-9a-f]{64}$/.test(expectHash)) return;
@@ -1417,15 +1436,15 @@ function setupGiftQuiz() {
         }
         if (hasUnlock && now < unlockAt) return;
 
-        const answers = inputs.map((el) => el.value);
-        const missing = answers.findIndex((v) => !giftNormalize(v));
-        if (missing >= 0) {
-            say(`第 ${missing + 1} 题还没答`, 'error');
-            inputs[missing].focus();
+        // 她填的是「五题答案连起来的一整串」，规范化后直接拿去哈希 ——
+        // 不再由前端拼，前端拼就得知道分隔符，两边规则容易对不上
+        const phrase = giftCanonical(input.value);
+        if (!phrase) {
+            say('还没填呢', 'error');
+            input.focus();
             return;
         }
 
-        const phrase = giftJoinAnswers(answers);
         busy = true;
         submit.disabled = true;
         submit.textContent = '看看对不对…';
@@ -1462,6 +1481,15 @@ function setupGiftQuiz() {
         }, 16);
     });
 
+    // 只有一个输入框了，Enter 必须能直接提交 —— 五个框的时候靠 Tab 串，
+    // 只有一个框再让人去点按钮是倒退
+    input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            form.requestSubmit();
+        }
+    });
+
     /* ---------- 时间锁 ---------- */
 
     let shown = false;
@@ -1490,7 +1518,7 @@ function setupGiftQuiz() {
         shown = true;
         gate.hidden = true;
         form.hidden = false;
-        inputs[0]?.focus({ preventScroll: true });
+        input.focus({ preventScroll: true });
     };
 
     const timer = window.setInterval(tick, 1000);
@@ -1525,27 +1553,35 @@ function setupGiftQuiz() {
    ============================================================ */
 
 interface GiftParticle {
+    /** 当前屏幕坐标 */
     x: number;
     y: number;
-    /** 目标点（已乘上当前视口尺寸） */
+    /** 心形目标点（已乘上当前视口尺寸） */
     tx: number;
     ty: number;
     /** 色相 */
     hue: number;
     size: number;
-    /** 汇聚进度 0→1 */
-    t: number;
-    /** 汇聚速度 */
-    speed: number;
     /** 错峰延迟，来自 Python 算好的 delay */
     delay: number;
-    /** 烟花初速度 */
+    /** 烟花初速度（像素，fire() 每次重算） */
     vx: number;
     vy: number;
+    /**
+     * Python 算好的原始归一化初速度方向。
+     * ⚠️ 必须单独存一份：fire() 会把 vx/vy 覆盖成像素值，
+     *    而 burst 阶段要反复重放好几轮 —— 直接读 vx 会指数放大。
+     */
+    bvx: number;
+    bvy: number;
     life: number;
     /** 该粒子爆发时的初始寿命（Python 给的，有差异，炸完有先后） */
     life0: number;
+    /** 已经炸开了 */
     fired: boolean;
+    /** 起始点（散落阶段随机撒的位置，粒子从这里飞进心形） */
+    ox: number;
+    oy: number;
 }
 
 /** fx.json 的形状（见 gift_fx.py 的产出说明） */
@@ -1574,8 +1610,9 @@ function giftFallbackFx(count = 1400): GiftFx {
     const AMP = 16.0;
     for (let i = 0; i < count; i++) {
         const t = (i / count) * Math.PI * 2;
-        const x = 16 * Math.pow(Math.sin(t), 3) / AMP;
-        const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / AMP;
+        const x = (16 * Math.pow(Math.sin(t), 3)) / AMP;
+        const y =
+            -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / AMP;
         const hue = 330 + Math.random() * 40;
         heart.push([x, y, 0.7 + Math.random() * 1.9, hue, Math.random() * 0.45]);
         const len = Math.hypot(x, y) || 1;
@@ -1687,13 +1724,20 @@ function setupGiftShow() {
 
     const particles: GiftParticle[] = [];
     let fx: GiftFx | null = null;
-    /** 心形短边系数 */
+    /** 心形半宽（像素） */
     let heartScale = 0;
 
     let startedAt = 0;
+    let lastFrameAt = 0;
     let phase: 'scatter' | 'gather' | 'hold' | 'burst' | 'done' = 'scatter';
     let rafId = 0;
     let envelopeShown = false;
+
+    // 各阶段结束时刻（绝对毫秒），step() 里只跟 elapsed 比
+    const T_GATHER_END = GIFT_SHOW.scatter + GIFT_SHOW.gather;
+    const T_HOLD_END = T_GATHER_END + GIFT_SHOW.hold;
+    const T_BURST_END = T_HOLD_END + GIFT_SHOW.burst;
+    const T_END = T_BURST_END + GIFT_SHOW.fade;
 
     const resize = () => {
         // 移动端 dpr 压到 2，再高纯属浪费（粒子本身是模糊光点，看不出差别）
@@ -1704,10 +1748,12 @@ function setupGiftShow() {
         canvas.height = Math.round(height * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        // 心形半宽（像素）：视口短边 × ratio。
-        // ⚠️ ratio 必须跟 gift_fx.py 写进 fx.json 的 heartRatio 一致，
+        // 心形半宽（像素）：视口短边 × ratio × 方程振幅。
+        // ⚠️ ratio / amp 必须跟 gift_fx.py 写进 fx.json 的一致，
         //    两边对不上心就会缩成一个小点或撑爆屏幕。
-        heartScale = Math.min(width, height) * (fx?.meta.heartRatio ?? 0.017) *
+        heartScale =
+            Math.min(width, height) *
+            (fx?.meta.heartRatio ?? 0.017) *
             (fx?.meta.heartAmp ?? 16.0);
     };
 
@@ -1723,17 +1769,19 @@ function setupGiftShow() {
             const b = fx.burst[i] ?? [0, 0, hue, 1];
             particles.push({
                 // 起点撒满视口，飞进来才有「聚拢」的感觉
-                x: Math.random() * width,
-                y: Math.random() * height,
+                ox: Math.random() * width,
+                oy: Math.random() * height,
+                x: 0,
+                y: 0,
                 tx: cx + nx * heartScale,
                 ty: cy + ny * heartScale,
                 hue,
                 size,
-                t: 0,
-                speed: 1,
                 delay,
-                vx: b[0] ?? 0,
-                vy: b[1] ?? 0,
+                vx: (b[0] ?? 0) * heartScale,
+                vy: (b[1] ?? 0) * heartScale,
+                bvx: b[0] ?? 0,
+                bvy: b[1] ?? 0,
                 life: b[3] ?? 1,
                 life0: b[3] ?? 1,
                 fired: false,
@@ -1741,23 +1789,64 @@ function setupGiftShow() {
         }
     };
 
-    const fire = () => {
-        const cx = width / 2;
-        const cy = height / 2;
-        for (const p of particles) {
-            // 炸开的方向是从心形中心指向该粒子 —— 炸出来是个心形的花，
-            // 比纯随机四处乱飞好看得多。
-            // Python 给的初速度单位是「心形半宽」，这里乘回去。
-            const dx = p.tx - cx;
-            const dy = p.ty - cy;
-            const len = Math.hypot(dx, dy) || 1;
-            const radial = 0.55 + (p.size / 2.6) * 0.45; // 尺寸大的炸得更远
-            p.vx = (dx / len) * heartScale * radial + p.vx * heartScale;
-            p.vy = (dy / len) * heartScale * radial + p.vy * heartScale;
-            p.life = p.life0;
-            p.fired = true;
+    /**
+ * 放一轮烟花。
+ *
+ * ⚠️ 关键设计：这不是「一次性炸完」，而是 burst 阶段里**反复重放**。
+ *    原因：单颗粒子寿命只有几秒（life ≈ 1、lifeDecay ≈ 0.0048/帧 ⇒ 200+ 帧
+ *    ≈ 3.5 秒），而 burst 有 14 秒。一次性炸的话后面 10 秒全是黑屏。
+ *
+ * @param strength 这一轮的炸开力度，1 = 从心形中心径向炸（最壮观）
+ * @param spread   随机扰动强度。>0 时方向不是纯径向，像真的烟花四散
+ * @param regroup  搬回心形再炸的粒子比例（0~1）。
+ *                 <1 时其余粒子从当前位置续飞 —— 全搬回会让画面
+ *                 每轮都「闪回心形」，看久了很机械。
+ */
+const fire = (strength = 1, spread = 0, regroup = 1) => {
+    const cx = width / 2;
+    const cy = height / 2;
+    for (const p of particles) {
+        // 炸开的方向是从心形中心指向该粒子 —— 炸出来是个心形的花，
+        // 比纯随机四处乱飞好看得多。
+        // Python 给的初速度单位是「心形半宽」，这里乘回去。
+        const dx = p.tx - cx;
+        const dy = p.ty - cy;
+        const len = Math.hypot(dx, dy) || 1;
+        const radial = 0.55 + (p.size / 2.6) * 0.45; // 尺寸大的炸得更远
+
+        // ⚠️ 用 bvx / bvy（seed 时从 Python 存下来的**原始归一化方向**），
+        //    不是 p.vx / p.vy —— 后者每次 fire 都会被覆盖成像素速度，
+        //    反复调用会指数放大，第二轮之后整屏粒子直接飞出宇宙。
+        p.vx = p.bvx * heartScale + (dx / len) * heartScale * radial * strength;
+        p.vy = p.bvy * heartScale + (dy / len) * heartScale * radial * strength;
+        if (spread) {
+            p.vx += (Math.random() - 0.5) * spread * heartScale;
+            p.vy += (Math.random() - 0.5) * spread * heartScale;
         }
-    };
+
+        // 按比例搬回心形，其余从当前位置续飞
+        if (Math.random() < regroup) {
+            p.x = p.tx;
+            p.y = p.ty;
+        }
+        p.life = p.life0;
+        p.fired = true;
+    }
+};
+
+/**
+ * burst 阶段里两次「开火」之间的间隔（毫秒）
+ *
+ * ⚠️ 必须**小于**单颗粒子的寿命，否则两轮之间会露出黑屏。
+ *    寿命 ≈ life0 / lifeDecay = 1.0 / 0.0048 ≈ 208 帧 ≈ 3.5 秒。
+ *    原来（时间线 10 秒时）burst 只有 2.4 秒，放一轮就够；
+ *    拉长到 14 秒后如果间隔还是 2.6 秒，就会出现 1.1 秒全黑 ——
+ *    实测采样点全落在空档里，整段烟花看起来是「黑屏」。
+ *    1.6 秒留约 1.9 秒余量 ⇒ 任意时刻都有两轮在飞，无缝。
+ */
+const FIRE_INTERVAL = 1600;
+/** burst 阶段已经放过几轮 */
+let fireCount = 0;
 
     const showEnvelope = () => {
         if (envelopeShown) return;
@@ -1771,29 +1860,57 @@ function setupGiftShow() {
 
         /* ---- 阶段推进 ---- */
         if (phase === 'scatter' && elapsed > GIFT_SHOW.scatter) phase = 'gather';
-        if (phase === 'gather' && elapsed > GIFT_SHOW.scatter + GIFT_SHOW.gather) phase = 'hold';
-        if (phase === 'hold' && elapsed > GIFT_SHOW.scatter + GIFT_SHOW.gather + GIFT_SHOW.hold) {
+        if (phase === 'gather' && elapsed > T_GATHER_END) phase = 'hold';
+        if (phase === 'hold' && elapsed > T_HOLD_END) {
             phase = 'burst';
-            fire();
+            fireCount = 0;
+            // 第一轮最壮观：纯径向炸开
+            fire(1, 0);
         }
-        if (phase === 'burst' && elapsed > GIFT_SHOW.scatter + GIFT_SHOW.gather + GIFT_SHOW.hold + GIFT_SHOW.burst) {
-            phase = 'done';
+        if (phase === 'burst') {
+            // 后续轮次：加随机扰动让方向更散，并且**只搬回一部分粒子** ——
+            // 全部搬回的话画面会每轮都闪回心形，看久了很机械。
+            // 14 秒 / 1.6 秒 ≈ 8 轮。
+            const due = Math.floor((elapsed - T_HOLD_END) / FIRE_INTERVAL);
+            if (due > fireCount) {
+                fireCount = due;
+                // 逐渐收敛力度，避免最后一轮太散看不清形状
+                fire(0.9, 0.35, 0.55);
+            }
+            if (elapsed > T_BURST_END) phase = 'done';
         }
+
+        /* ---- 时间驱动，而不是帧驱动 ----
+         * ⚠️ 这一段是从「按帧」改成「按时间」的核心。
+         *    原来每帧 p.t += 0.008，粒子 125 帧（约 2 秒）就聚完心形，
+         *    剩下的十几秒只能干站着 —— 时间线从 10 秒拉长到 60 秒时
+         *    这个 bug 会暴露得非常明显。
+         *    现在进度直接由 elapsed / 阶段时长算出：
+         *      · 帧率高 → 帧多，但每帧走得更少
+         *      · 帧率低（老手机）→ 帧少，每帧走得多
+         *    两者观感一致，一分钟就是一分钟。
+         */
+        const dt = Math.min(0.05, (now - lastFrameAt) / 1000) || 0.016;
+        lastFrameAt = now;
+
+        const scatterP = Math.min(1, elapsed / GIFT_SHOW.scatter);
+        const gatherP = Math.max(0, Math.min(1, (elapsed - GIFT_SHOW.scatter) / GIFT_SHOW.gather));
+        const holdP = Math.max(0, (elapsed - T_GATHER_END) / GIFT_SHOW.hold);
+        const burstP = Math.max(0, Math.min(1, (elapsed - T_HOLD_END) / GIFT_SHOW.burst));
 
         // 心跳：hold 阶段一下一下地缩放
         let scaleMul = 1;
-        if (phase === 'hold' || phase === 'gather') {
-            const since = elapsed - GIFT_SHOW.scatter - (phase === 'hold' ? GIFT_SHOW.gather : 0);
-            const beat = Math.max(0, Math.sin((since / 1000) * Math.PI * 2.2));
-            scaleMul = 1 + beat * 0.045;
+        if (phase === 'hold') {
+            const beat = Math.max(0, Math.sin((holdP * GIFT_SHOW.hold * Math.PI * 2.2) / 1000));
+            scaleMul = 1 + beat * 0.05;
+        } else if (phase === 'burst') {
+            // 炸开的一瞬先鼓一下再散，像真的爆炸
+            scaleMul = 1 + Math.max(0, 1 - burstP * 6) * 0.12;
         }
 
         /* ---- 画 ---- */
-        const burstEnd = GIFT_SHOW.scatter + GIFT_SHOW.gather + GIFT_SHOW.hold + GIFT_SHOW.burst;
         const darken =
-            phase === 'done'
-                ? Math.max(0, 1 - (elapsed - burstEnd) / GIFT_SHOW.fade)
-                : 1;
+            phase === 'done' ? Math.max(0, 1 - (elapsed - T_BURST_END) / GIFT_SHOW.fade) : 1;
 
         ctx.clearRect(0, 0, width, height);
         if (darken <= 0.02) {
@@ -1810,32 +1927,50 @@ function setupGiftShow() {
 
         for (const p of particles) {
             if (!p.fired) {
-                // 汇聚：各粒子错峰（delay 来自 Python），easeOutCubic 减速接近目标
-                const delay = p.delay;
-                p.t = Math.min(1, p.t + 0.008 * p.speed);
-                const local = Math.max(0, Math.min(1, (p.t - delay) / (1 - delay)));
-                const eased = 1 - Math.pow(1 - local, 3);
+                if (phase === 'scatter') {
+                    // 散落阶段：在起点附近慢慢飘，营造「还没成形」的呼吸感
+                    const drift = scatterP * 60;
+                    p.x = p.ox + Math.sin(scatterP * 7 + p.delay * 12) * drift;
+                    p.y = p.oy + Math.cos(scatterP * 5.5 + p.delay * 9) * drift;
+                } else {
+                    // 汇聚：各粒子错峰（delay 来自 Python），easeOutCubic 减速接近目标
+                    const lead = p.delay * 0.55;
+                    const local = Math.max(0, Math.min(1, (gatherP - lead) / (1 - lead)));
+                    const eased = 1 - Math.pow(1 - local, 3);
 
-                // 心跳时目标点整体缩放
-                const gx = cx + (p.tx - cx) * scaleMul;
-                const gy = cy + (p.ty - cy) * scaleMul;
-                p.x += (gx - p.x) * eased * 0.14;
-                p.y += (gy - p.y) * eased * 0.14;
+                    // 心跳时目标点整体缩放
+                    const gx = cx + (p.tx - cx) * scaleMul;
+                    const gy = cy + (p.ty - cy) * scaleMul;
+                    p.x += (gx - p.x) * eased * 0.16;
+                    p.y += (gy - p.y) * eased * 0.16;
+                }
             } else {
-                p.x += p.vx * 0.016;
-                p.y += p.vy * 0.016;
-                p.vx *= fx!.meta.damping;
-                p.vy *= fx!.meta.damping;
-                p.vy += fx!.meta.gravity; // 重力
-                p.life -= fx!.meta.lifeDecay;
+                // 烟花：按真实 dt 积分。原来写死 0.016，
+                // 意味着 120Hz 屏幕上烟花速度是 60Hz 的两倍 —— 现在不会了。
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                // 阻尼也按 dt 折算，否则高刷屏上衰减快一倍
+                const damp = Math.pow(fx!.meta.damping, dt * 60);
+                p.vx *= damp;
+                p.vy *= damp;
+                p.vy += fx!.meta.gravity * dt * 60; // 重力
+                p.life -= fx!.meta.lifeDecay * dt * 60;
             }
 
             if (p.life <= 0) continue;
 
-            const alpha = (p.fired ? p.life / p.life0 : 0.42 + p.t * 0.58) * darken;
+            const alpha =
+                (p.fired
+                    ? p.life / p.life0
+                    : 0.14 +
+                      // 散落阶段压得很暗：粒子铺满全屏时太亮会抢掉
+                      // 「逐渐聚拢」这个动作的戏，越暗对比越明显
+                      (phase === 'scatter'
+                          ? scatterP * 0.16
+                          : 0.86 * Math.min(1, gatherP * 1.6))) * darken;
             if (alpha <= 0.01) continue;
 
-            ctx.fillStyle = `hsla(${p.hue}, 92%, ${58 + p.t * 12}%, ${alpha})`;
+            ctx.fillStyle = `hsla(${p.hue}, 92%, ${58 + (1 - Math.min(1, gatherP)) * 12}%, ${alpha})`;
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size * (p.fired ? 1.1 : 1), 0, Math.PI * 2);
             ctx.fill();
@@ -1857,7 +1992,7 @@ function setupGiftShow() {
 
         /* ---- 收尾 ---- */
         if (phase === 'done') {
-            if (elapsed - burstEnd > GIFT_SHOW.fade * 0.55) showEnvelope();
+            if (elapsed - T_BURST_END > GIFT_SHOW.fade * 0.55) showEnvelope();
             rafId = window.requestAnimationFrame(step);
             return;
         }
@@ -1877,11 +2012,17 @@ function setupGiftShow() {
         //    seed() 才拿得到位置系数把粒子铺开。反了的话所有粒子会叠在正中一点。
         resize();
         seed();
+        for (const p of particles) {
+            p.x = p.ox;
+            p.y = p.oy;
+        }
+
         if (reduced) {
             showEnvelope();
             return;
         }
         startedAt = performance.now();
+        lastFrameAt = startedAt;
         rafId = window.requestAnimationFrame(step);
     };
 
@@ -1897,12 +2038,23 @@ function setupGiftShow() {
     window.addEventListener('resize', () => {
         if (phase === 'done' || envelopeShown) return;
         resize();
+        // ⚠️ resize 后必须重新铺起点，否则散落阶段的粒子会留在旧坐标上，
+        //    画面尺寸一变就看到粒子「跳」到别处
         seed();
+        if (phase === 'scatter') {
+            for (const p of particles) {
+                p.ox = Math.random() * width;
+                p.oy = Math.random() * height;
+                p.x = p.ox;
+                p.y = p.oy;
+            }
+        }
     }, { passive: true });
 
     window.addEventListener('pagehide', () => {
         if (rafId) window.cancelAnimationFrame(rafId);
         window.clearInterval(expireGuard);
+        void T_END; // 保留常量引用，提醒改时间线时五个阶段是一组
     });
 }
 

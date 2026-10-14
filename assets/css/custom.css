@@ -2169,33 +2169,60 @@ body.gift-page {
     font-weight: 600;
 }
 
-/* ---------- 输入框 ----------
+/* ---------- 答案输入框 ----------
+   五题答案要连成一整串，所以只有一个框，不是五个。
+   用 textarea 不是 input：她大概率是粘贴的，单行框粘贴会自动折行、
+   而且只显示一行 —— 看不全自己写的东西会让人怀疑打错了。
+
    字号 1.6rem = 16px：iOS Safari 对小于 16px 的输入框会自动放大整页。 */
-.gift-q__input {
+.gift-answer {
+    margin-top: 2.6rem;
+    padding-top: 2.6rem;
+    border-top: 1px dashed var(--card-separator-color);
+}
+
+.gift-answer__label {
+    display: block;
+    margin-bottom: 1.2rem;
+    color: var(--card-text-color-main);
+    font-size: 1.5rem;
+    line-height: 1.7;
+    font-weight: 600;
+}
+
+.gift-answer__input {
     display: block;
     width: 100%;
-    padding: 0.9rem 1.2rem;
-    border: 1px solid var(--card-separator-color);
-    border-radius: 0.8rem;
+    min-height: 6rem;
+    padding: 1.2rem 1.4rem;
+    border: 2px solid var(--card-separator-color);
+    border-radius: 1rem;
     background: var(--body-background);
     color: var(--card-text-color-main);
-    font-family: var(--base-font-family);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 1.6rem;
-    line-height: 1.5;
+    line-height: 1.6;
     caret-color: var(--gift-rose-deep);
     outline: none;
-    -webkit-appearance: none;
-    appearance: none;
+    resize: vertical;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.gift-q__input::placeholder {
+.gift-answer__input::placeholder {
     color: var(--card-text-color-tertiary);
+    font-family: var(--base-font-family);
 }
 
-.gift-q__input:focus {
+.gift-answer__input:focus {
     border-color: var(--gift-rose);
     box-shadow: 0 0 0 3px var(--gift-rose-wash);
+}
+
+.gift-answer__hint {
+    margin: 0.8rem 0 0;
+    color: var(--card-text-color-tertiary);
+    font-size: 1.25rem;
+    line-height: 1.6;
 }
 
 /* ---------- 提交 ---------- */
