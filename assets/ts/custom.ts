@@ -1279,16 +1279,30 @@ document.addEventListener('DOMContentLoaded', setupMusicPlayer);
 /**
  * 表演阶段的时间线（毫秒）。加在这里方便整体调节奏。
  *
- * ⚠️ 总和 = 60000ms，整整一分钟。改的时候记得让总和还是一分钟 ——
- *    step() 里所有阶段都是拿 `elapsed` 和这些常量比，换算全靠它们。
- *    验收脚本 verify_gift.mjs 里有一条静态断言在盯这个 60000。
+ * ⚠️ 总和 = 30000ms，整三十秒。
+ *    原来是 60000（一分钟），用户明确要求压到「二三十秒」——
+ *    一分钟太久，看到后半段已经审美疲劳，信封迟迟不来。
+ *    30 秒是折中：够看完所有变化，又不至于拖。
+ *
+ * ⚠️ 改阶段时长时，verify_gift.mjs 里那条「总和必须等于 30000」的静态断言
+ *    和它自己压缩用的 SPEEDUP 常量都要跟着改，否则验收脚本会误报。
+ *
+ * 阶段表：
+ *   ① scatter  3s  星尘从四面浮上来，画面还是散的
+ *   ② gather   6s  粒子汇聚成心（错峰 + easeOut）
+ *   ③ hold     8s  心形心跳，光带绕着心跑
+ *   ④ bloom   10s  心形化作星火**向外扩散**（反复脉冲）+ 椭圆冲击波
+ *   ⑤ fade     3s  压暗，粒子全部退场，信封从暗处浮上来
+ *
+ * ⚠️ bloom 给到 10 秒是因为「化开」是个慢动作 —— 8 秒时实测粒子已经
+ *    飘得只剩轮廓，10 秒配上更慢的初速度，全程都有内容可看。
  */
 const GIFT_SHOW = {
-    scatter: 6000,    // ① 粒子散着飘，没方向      6s
-    gather: 14000,    // ② 向心形汇聚（easeOut）  14s
-    hold: 20000,      // ③ 心形稳着心跳          20s
-    burst: 14000,     // ④ 炸成烟花              14s
-    fade: 6000,       // ⑤ 压暗、准备出信封       6s
+    scatter: 3000,    // ① 星尘浮现，没方向         3s
+    gather: 6000,     // ② 向心形汇聚（easeOut）   6s
+    hold: 8000,       // ③ 心形心跳 + 光带扫过     8s
+    bloom: 10000,     // ④ 化作星火四散 + 冲击波  10s
+    fade: 3000,       // ⑤ 压暗、准备出信封        3s
 } as const;
 
 /**
@@ -1575,13 +1589,61 @@ interface GiftParticle {
     bvx: number;
     bvy: number;
     life: number;
-    /** 该粒子爆发时的初始寿命（Python 给的，有差异，炸完有先后） */
+    /** 该粒子绽放时的初始寿命（Python 给的，有差异，散完有先后） */
     life0: number;
+    /**
+     * 绽放方式：0 = 星火（向上飘）、1 = 环（径向成圈）、2 = 拖尾（斜上飞）。
+     * ⚠️ 同一个初速度下三种画法观感差别很大：
+     *    全走纯径向 = 心被炸碎（用户明确不要这个）；
+     *    全走纯向上 = 像倒放的雨。只有掺着来才有层次。
+     */
+    kind: number;
     /** 已经炸开了 */
     fired: boolean;
     /** 起始点（散落阶段随机撒的位置，粒子从这里飞进心形） */
     ox: number;
     oy: number;
+}
+
+/** 背景星尘的一颗 */
+interface GiftMote {
+    /** 归一化坐标（-1.2 ~ 1.2，允许落在视口外） */
+    nx: number;
+    ny: number;
+    size: number;
+    /** 峰值亮度，很低 —— 这层只是让画面不空 */
+    alpha: number;
+    /** 漂移速度，单位「视口短边 / 秒」 */
+    vx: number;
+    vy: number;
+    /** 闪烁相位与频率：亮度 = base × (0.55 + 0.45 × sin(elapsed/1000 × freq + phase)) */
+    phase: number;
+    freq: number;
+    hue: number;
+    /** 当前像素坐标（每帧由 nx/ny + 积分更新） */
+    x: number;
+    y: number;
+}
+
+/** 一个扩散椭圆环（冲击波） */
+interface GiftShock {
+    hue: number;
+    /** 扩散速度，单位「视口短边 / 秒」 */
+    speed: number;
+    /** 环的平均粗细，单位「心形半宽」 */
+    thickness: number;
+    /** 相对 bloom 阶段开始的起跳延迟（毫秒） */
+    delay: number;
+    /** 峰值亮度 */
+    peak: number;
+    /** 椭圆扁率：1 = 正圆，0.72 = 明显扁 */
+    squash: number;
+    /** 旋转角（弧度） */
+    tilt: number;
+    /** 沿周长的粗细起伏波数 */
+    wobbleN: number;
+    /** 粗细起伏的相位 */
+    wobblePhase: number;
 }
 
 /** fx.json 的形状（见 gift_fx.py 的产出说明） */
@@ -1593,14 +1655,40 @@ interface GiftFx {
         heartAmp: number;
         /** 心形半宽 ÷ 视口短边 */
         heartRatio: number;
+        /** 旧的「下坠」加速度，新逻辑优先用 lift；留着只为兼容 */
         gravity: number;
+        /** 绽放时的向上加速度。**负值 = 向上**（canvas y 向下） */
+        lift: number;
         damping: number;
         lifeDecay: number;
     };
     /** 每条 [归一化x, 归一化y, 尺寸, 色相, 错峰延迟] */
     heart: number[][];
-    /** 每条 [vx, vy, 色相, 初始寿命]，速度单位是「心形半宽」 */
+    /** 每条 [vx, vy, 色相, 初始寿命, kind]，速度单位是「心形半宽」 */
     burst: number[][];
+    /** 每条 [色相, 扩散速度, 粗细, 起跳延迟ms, 峰值亮度, 扁率, 旋转角, 起伏波数, 起伏相位] */
+    shocks?: number[][];
+    /** 每条 [x, y, 尺寸, 峰值alpha, vx, vy, 相位, 频率, 色相] */
+    motes?: number[][];
+    /** 每条 [x偏移, y偏移, 尺寸, vx, vy, 寿命, 色相] —— 绽放阶段中央那束金色喷泉 */
+    sparks?: number[][];
+}
+
+/** 余烬柱的一颗（bloom 阶段专用） */
+interface GiftSpark {
+    /** 相对心形中心的偏移（归一化，心形半宽的倍数） */
+    ox: number;
+    oy: number;
+    size: number;
+    /** 像素速度，fireSparks() 时算好 */
+    vx: number;
+    vy: number;
+    life: number;
+    life0: number;
+    hue: number;
+    x: number;
+    y: number;
+    active: boolean;
 }
 
 /** fx.json 拿不到时的兜底。用同一套坐标系，心形大小才对得上。 */
@@ -1616,16 +1704,29 @@ function giftFallbackFx(count = 1400): GiftFx {
         const hue = 330 + Math.random() * 40;
         heart.push([x, y, 0.7 + Math.random() * 1.9, hue, Math.random() * 0.45]);
         const len = Math.hypot(x, y) || 1;
+        // 兜底也走「向上飘」的方向，跟新观感一致
+        const radial = (x / len) * 0.2 * (0.55 + Math.random() * 0.5);
         burst.push([
-            (x / len) * (0.55 + Math.random() * 0.75) + (Math.random() - 0.5) * 0.3,
-            (y / len) * (0.55 + Math.random() * 0.75) + (Math.random() - 0.5) * 0.3,
+            radial + (Math.random() - 0.5) * 0.4,
+            -(0.55 + Math.random() * 0.6) + (Math.random() - 0.5) * 0.3,
             320 + Math.random() * 60,
             0.75 + Math.random() * 0.25,
+            Math.random() < 0.6 ? 0 : Math.random() < 0.75 ? 1 : 2,
         ]);
     }
     return {
-        version: 2,
-        meta: { count, heartAmp: AMP, heartRatio: 0.017, gravity: 26, damping: 0.97, lifeDecay: 0.011 },
+        version: 3,
+        // ⚠️ heartRatio / lift 必须跟 gift_fx.py 的 meta 对齐，
+        //    否则 fx.json 加载失败时页面会「心突然缩小一半」
+        meta: {
+            count,
+            heartAmp: AMP,
+            heartRatio: 0.030,
+            gravity: 26,
+            lift: -5,
+            damping: 0.97,
+            lifeDecay: 0.0048,
+        },
         heart,
         burst,
     };
@@ -1723,25 +1824,31 @@ function setupGiftShow() {
     let height = 0;
 
     const particles: GiftParticle[] = [];
+    /** 背景星尘：全程都在，制造纵深 */
+    const motes: GiftMote[] = [];
+    /** 绽放时的扩散椭圆环 */
+    const shocks: GiftShock[] = [];
+    /** 绽放时中央往上窜的金色喷泉 */
+    const sparks: GiftSpark[] = [];
     let fx: GiftFx | null = null;
     /** 心形半宽（像素） */
     let heartScale = 0;
 
     let startedAt = 0;
     let lastFrameAt = 0;
-    let phase: 'scatter' | 'gather' | 'hold' | 'burst' | 'done' = 'scatter';
+    let phase: 'scatter' | 'gather' | 'hold' | 'bloom' | 'done' = 'scatter';
     let rafId = 0;
     let envelopeShown = false;
 
     // 各阶段结束时刻（绝对毫秒），step() 里只跟 elapsed 比
     const T_GATHER_END = GIFT_SHOW.scatter + GIFT_SHOW.gather;
     const T_HOLD_END = T_GATHER_END + GIFT_SHOW.hold;
-    const T_BURST_END = T_HOLD_END + GIFT_SHOW.burst;
-    const T_END = T_BURST_END + GIFT_SHOW.fade;
+    const T_BLOOM_END = T_HOLD_END + GIFT_SHOW.bloom;
+    const T_END = T_BLOOM_END + GIFT_SHOW.fade;
 
     const resize = () => {
         // 移动端 dpr 压到 2，再高纯属浪费（粒子本身是模糊光点，看不出差别）
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const dpr = Math.min(window.devicePixelRatio || 2, 2);
         width = canvas.clientWidth || window.innerWidth;
         height = canvas.clientHeight || window.innerHeight;
         canvas.width = Math.round(width * dpr);
@@ -1751,10 +1858,18 @@ function setupGiftShow() {
         // 心形半宽（像素）：视口短边 × ratio × 方程振幅。
         // ⚠️ ratio / amp 必须跟 gift_fx.py 写进 fx.json 的一致，
         //    两边对不上心就会缩成一个小点或撑爆屏幕。
+        //    ratio 现在是 0.030 ⇒ 心形竖向占约 60% 屏幕。
+        //
+        // ⚠️ 竖屏必须再压一档，否则心形下缘会超出视口（实测 390×844 时
+        //    内容范围 y 到了 161%）。原因：min(宽,高) 在竖屏下 = 宽度，
+        //    而心形方程的**竖直幅度比水平大**（y 振幅 17 对 x 的 16），
+        //    横向刚好占满时纵向就溢出了。
+        //    所以竖屏额外乘 0.78，让纵向留出余量给信封。
+        const ratio = fx?.meta.heartRatio ?? 0.030;
+        const amp = fx?.meta.heartAmp ?? 16.0;
+        const portrait = height > width;
         heartScale =
-            Math.min(width, height) *
-            (fx?.meta.heartRatio ?? 0.017) *
-            (fx?.meta.heartAmp ?? 16.0);
+            Math.min(width, height) * ratio * amp * (portrait ? 0.78 : 1);
     };
 
     /** 把 Python 给的归一化数据铺成实际粒子 */
@@ -1766,7 +1881,7 @@ function setupGiftShow() {
 
         for (let i = 0; i < fx.heart.length; i++) {
             const [nx, ny, size, hue, delay] = fx.heart[i];
-            const b = fx.burst[i] ?? [0, 0, hue, 1];
+            const b = fx.burst[i] ?? [0, 0, hue, 1, 0];
             particles.push({
                 // 起点撒满视口，飞进来才有「聚拢」的感觉
                 ox: Math.random() * width,
@@ -1784,69 +1899,165 @@ function setupGiftShow() {
                 bvy: b[1] ?? 0,
                 life: b[3] ?? 1,
                 life0: b[3] ?? 1,
+                kind: b[4] ?? 0,
                 fired: false,
+            });
+        }
+
+        // 背景星尘
+        motes.length = 0;
+        for (const m of fx.motes ?? []) {
+            const [nx, ny, size, alpha, vx, vy, phase, freq, hue] = m;
+            motes.push({
+                nx,
+                ny,
+                size,
+                alpha,
+                vx,
+                vy,
+                phase,
+                freq,
+                hue,
+                x: cx + nx * heartScale,
+                y: cy + ny * heartScale,
+            });
+        }
+
+        // 冲击波圆环
+        shocks.length = 0;
+        for (const s of fx.shocks ?? []) {
+            const [hue, speed, thickness, delay, peak, squash, tilt, wobbleN, wobblePhase] = s;
+            shocks.push({
+                hue,
+                speed,
+                thickness,
+                delay,
+                peak,
+                // 旧版数据只有 5 个字段，补上默认值 ⇒ 仍是正圆
+                squash: squash ?? 1,
+                tilt: tilt ?? 0,
+                wobbleN: wobbleN ?? 1,
+                wobblePhase: wobblePhase ?? 0,
+            });
+        }
+
+        // 金色余烬柱
+        sparks.length = 0;
+        for (const s of fx.sparks ?? []) {
+            const [ox, oy, size, s_vx, s_vy, life, hue] = s;
+            sparks.push({
+                ox,
+                oy,
+                size,
+                vx: 0,
+                vy: 0,
+                life: 0,
+                life0: life || 0.7,
+                hue,
+                x: cx + ox * heartScale,
+                y: cy + oy * heartScale,
+                active: false,
             });
         }
     };
 
     /**
- * 放一轮烟花。
- *
- * ⚠️ 关键设计：这不是「一次性炸完」，而是 burst 阶段里**反复重放**。
- *    原因：单颗粒子寿命只有几秒（life ≈ 1、lifeDecay ≈ 0.0048/帧 ⇒ 200+ 帧
- *    ≈ 3.5 秒），而 burst 有 14 秒。一次性炸的话后面 10 秒全是黑屏。
- *
- * @param strength 这一轮的炸开力度，1 = 从心形中心径向炸（最壮观）
- * @param spread   随机扰动强度。>0 时方向不是纯径向，像真的烟花四散
- * @param regroup  搬回心形再炸的粒子比例（0~1）。
- *                 <1 时其余粒子从当前位置续飞 —— 全搬回会让画面
- *                 每轮都「闪回心形」，看久了很机械。
- */
-const fire = (strength = 1, spread = 0, regroup = 1) => {
-    const cx = width / 2;
-    const cy = height / 2;
-    for (const p of particles) {
-        // 炸开的方向是从心形中心指向该粒子 —— 炸出来是个心形的花，
-        // 比纯随机四处乱飞好看得多。
-        // Python 给的初速度单位是「心形半宽」，这里乘回去。
-        const dx = p.tx - cx;
-        const dy = p.ty - cy;
-        const len = Math.hypot(dx, dy) || 1;
-        const radial = 0.55 + (p.size / 2.6) * 0.45; // 尺寸大的炸得更远
-
-        // ⚠️ 用 bvx / bvy（seed 时从 Python 存下来的**原始归一化方向**），
-        //    不是 p.vx / p.vy —— 后者每次 fire 都会被覆盖成像素速度，
-        //    反复调用会指数放大，第二轮之后整屏粒子直接飞出宇宙。
-        p.vx = p.bvx * heartScale + (dx / len) * heartScale * radial * strength;
-        p.vy = p.bvy * heartScale + (dy / len) * heartScale * radial * strength;
-        if (spread) {
-            p.vx += (Math.random() - 0.5) * spread * heartScale;
-            p.vy += (Math.random() - 0.5) * spread * heartScale;
+     * 点燃中央的金色喷泉。
+     *
+     * ⚠️ 为什么单独一批而不是让主粒子群多飞一点：
+     *    主粒子群 4200 颗是**均匀散开的面**，加亮它只会让整屏都亮一点，
+     *    读不出「有一束特别亮的核心」。真实烟花抓人的恰恰是那束核心 ——
+     *    它靠的是局部与整体之间的明度对比，不是数量。
+     */
+    const fireSparks = () => {
+        const cx = width / 2;
+        const cy = height / 2;
+        const data = fx?.sparks;
+        if (!data || !data.length) return;
+        for (let i = 0; i < sparks.length; i++) {
+            const sp = sparks[i];
+            const d = data[i];
+            sp.vx = (d[3] ?? 0) * heartScale;
+            sp.vy = (d[4] ?? 0) * heartScale;
+            sp.life = d[5] ?? 0.7;
+            sp.life0 = d[5] ?? 0.7;
+            sp.x = cx + (d[0] ?? 0) * heartScale;
+            sp.y = cy + (d[1] ?? 0) * heartScale;
+            sp.active = true;
         }
+    };
 
-        // 按比例搬回心形，其余从当前位置续飞
-        if (Math.random() < regroup) {
-            p.x = p.tx;
-            p.y = p.ty;
+    /**
+     * 放一轮绽放。
+     *
+     * ⚠️ 与旧版最大的区别：**不再把心形炸碎**。
+     *    旧版 fire() 给的是「从中心指向该粒子的径向速度」，
+     *    结果心形轮廓被炸得四散、粒子朝各个方向飞出屏幕 —— 像心碎了。
+     *    现在主要靠 Python 给的 bvy（向上偏置）往上飘，
+     *    径向只留一点点用来撑开轮廓。
+     *
+     * @param strength 这一轮的力度，1 = 最强
+     * @param spread   随机横向扰动强度
+     * @param regroup  搬回心形再飘的比例（0~1）。
+     *                 <1 时其余粒子从当前位置续飘 —— 全搬回会让画面
+     *                 每轮都「闪回心形」，看久了很机械。
+     */
+    const fire = (strength = 1, spread = 0, regroup = 1) => {
+        const cx = width / 2;
+        const cy = height / 2;
+        for (const p of particles) {
+            // ⚠️ 用 bvx / bvy（seed 时从 Python 存下来的**原始归一化速度**），
+            //    不是 p.vx / p.vy —— 后者每次 fire 都会被覆盖成像素速度，
+            //    反复调用会指数放大，第二轮之后整屏粒子直接飞出宇宙。
+            //
+            // 按 kind 改方向权重：
+            //   0 星火 → 几乎纯向上（bvy 本来就是负的）
+            //   1 环   → 加一点径向，让它形成一圈而不是一起上升
+            //   2 拖尾 → 侧向甩开 + 速度加倍，跑得又快又远
+            const dx = p.tx - cx;
+            const dy = p.ty - cy;
+            const len = Math.hypot(dx, dy) || 1;
+            const rx = dx / len;
+            const ry = dy / len;
+
+            let radialW = 0.12;
+            let speedMul = 1;
+            if (p.kind === 1) {
+                radialW = 0.85;    // 环：主要靠径向
+                speedMul = 1.05;
+            } else if (p.kind === 2) {
+                radialW = 0.45;
+                speedMul = 1.9;    // 拖尾：飞得远
+            }
+
+            p.vx = (p.bvx * 0.55 + rx * radialW) * heartScale * strength * speedMul;
+            p.vy = (p.bvy + ry * radialW * 0.35) * heartScale * strength * speedMul;
+            if (spread) {
+                p.vx += (Math.random() - 0.5) * spread * heartScale;
+                p.vy += (Math.random() - 0.5) * spread * heartScale * 0.4;
+            }
+
+            // 按比例搬回心形，其余从当前位置续飘
+            if (Math.random() < regroup) {
+                p.x = p.tx;
+                p.y = p.ty;
+            }
+            p.life = p.life0;
+            p.fired = true;
         }
-        p.life = p.life0;
-        p.fired = true;
-    }
-};
+    };
 
-/**
- * burst 阶段里两次「开火」之间的间隔（毫秒）
- *
- * ⚠️ 必须**小于**单颗粒子的寿命，否则两轮之间会露出黑屏。
- *    寿命 ≈ life0 / lifeDecay = 1.0 / 0.0048 ≈ 208 帧 ≈ 3.5 秒。
- *    原来（时间线 10 秒时）burst 只有 2.4 秒，放一轮就够；
- *    拉长到 14 秒后如果间隔还是 2.6 秒，就会出现 1.1 秒全黑 ——
- *    实测采样点全落在空档里，整段烟花看起来是「黑屏」。
- *    1.6 秒留约 1.9 秒余量 ⇒ 任意时刻都有两轮在飞，无缝。
- */
-const FIRE_INTERVAL = 1600;
-/** burst 阶段已经放过几轮 */
-let fireCount = 0;
+    /**
+     * bloom 阶段两次「绽放脉冲」之间的间隔（毫秒）
+     *
+     * ⚠️ 必须**小于**单颗粒子的寿命，否则两轮之间会露出黑屏。
+     *    寿命 ≈ life0 / lifeDecay = 1.0 / 0.0048 ≈ 208 帧 ≈ 3.5 秒。
+     *    2.4 秒留约 1.1 秒余量 ⇒ 任意时刻都有两轮在飘，无缝。
+     *    bloom 有 10 秒 ⇒ 10 / 2.4 ≈ 4 轮，最后一轮正好接上 fade。
+     */
+    const BLOOM_PULSE = 2400;
+    /** bloom 阶段已经放过几轮 */
+    let fireCount = 0;
 
     const showEnvelope = () => {
         if (envelopeShown) return;
@@ -1862,55 +2073,62 @@ let fireCount = 0;
         if (phase === 'scatter' && elapsed > GIFT_SHOW.scatter) phase = 'gather';
         if (phase === 'gather' && elapsed > T_GATHER_END) phase = 'hold';
         if (phase === 'hold' && elapsed > T_HOLD_END) {
-            phase = 'burst';
+            phase = 'bloom';
             fireCount = 0;
-            // 第一轮最壮观：纯径向炸开
+            // 第一轮最满：全量搬回心形，纯向上飘
             fire(1, 0);
+            // 中央金色喷泉同时点燃 —— 它是整个绽放段的「主音」
+            fireSparks();
         }
-        if (phase === 'burst') {
-            // 后续轮次：加随机扰动让方向更散，并且**只搬回一部分粒子** ——
-            // 全部搬回的话画面会每轮都闪回心形，看久了很机械。
-            // 14 秒 / 1.6 秒 ≈ 8 轮。
-            const due = Math.floor((elapsed - T_HOLD_END) / FIRE_INTERVAL);
+        if (phase === 'bloom') {
+            // 后续轮次：加随机横向扰动让星火不整齐，
+            // 并且**只搬回一部分粒子** —— 全搬回的话画面会每轮都闪回心形。
+            // 10 秒 / 2.4 秒 ≈ 4 轮，最后一轮正好接上 fade。
+            const due = Math.floor((elapsed - T_HOLD_END) / BLOOM_PULSE);
             if (due > fireCount) {
                 fireCount = due;
-                // 逐渐收敛力度，避免最后一轮太散看不清形状
-                fire(0.9, 0.35, 0.55);
+                // 力度递减：最后收尾时已经不需要炸得很开了
+                fire(0.85, 0.30, 0.5);
+                // 喷泉只在第 1 轮和第 3 轮点 —— 每轮都点的话中心会一直很亮，
+                // 反而盖掉「化开」这个动作
+                if (due === 1 || due === 3) fireSparks();
             }
-            if (elapsed > T_BURST_END) phase = 'done';
+            if (elapsed > T_BLOOM_END) phase = 'done';
         }
 
         /* ---- 时间驱动，而不是帧驱动 ----
          * ⚠️ 这一段是从「按帧」改成「按时间」的核心。
          *    原来每帧 p.t += 0.008，粒子 125 帧（约 2 秒）就聚完心形，
-         *    剩下的十几秒只能干站着 —— 时间线从 10 秒拉长到 60 秒时
-         *    这个 bug 会暴露得非常明显。
+         *    剩下的十几秒只能干站着。
          *    现在进度直接由 elapsed / 阶段时长算出：
          *      · 帧率高 → 帧多，但每帧走得更少
          *      · 帧率低（老手机）→ 帧少，每帧走得多
-         *    两者观感一致，一分钟就是一分钟。
+         *    两者观感一致，三十秒就是三十秒。
          */
         const dt = Math.min(0.05, (now - lastFrameAt) / 1000) || 0.016;
         lastFrameAt = now;
 
+        const tSec = elapsed / 1000;
         const scatterP = Math.min(1, elapsed / GIFT_SHOW.scatter);
         const gatherP = Math.max(0, Math.min(1, (elapsed - GIFT_SHOW.scatter) / GIFT_SHOW.gather));
         const holdP = Math.max(0, (elapsed - T_GATHER_END) / GIFT_SHOW.hold);
-        const burstP = Math.max(0, Math.min(1, (elapsed - T_HOLD_END) / GIFT_SHOW.burst));
+        const bloomP = Math.max(0, Math.min(1, (elapsed - T_HOLD_END) / GIFT_SHOW.bloom));
 
-        // 心跳：hold 阶段一下一下地缩放
+        // 心跳：hold 阶段一下一下地缩放。
+        // 频率用「每分钟 68 次」换算 —— 写死 Math.PI * 2.2 是按「hold 有 9 秒」
+        // 调的，阶段一改心跳就会变得忽快忽慢。
         let scaleMul = 1;
         if (phase === 'hold') {
-            const beat = Math.max(0, Math.sin((holdP * GIFT_SHOW.hold * Math.PI * 2.2) / 1000));
-            scaleMul = 1 + beat * 0.05;
-        } else if (phase === 'burst') {
-            // 炸开的一瞬先鼓一下再散，像真的爆炸
-            scaleMul = 1 + Math.max(0, 1 - burstP * 6) * 0.12;
+            const beat = Math.max(0, Math.sin(tSec * ((68 / 60) * Math.PI * 2)));
+            scaleMul = 1 + beat * beat * 0.055;
+        } else if (phase === 'bloom') {
+            // 绽放起手鼓一下再散开 —— 心「松开」的那一下
+            scaleMul = 1 + Math.max(0, 1 - bloomP * 8) * 0.10;
         }
 
         /* ---- 画 ---- */
         const darken =
-            phase === 'done' ? Math.max(0, 1 - (elapsed - T_BURST_END) / GIFT_SHOW.fade) : 1;
+            phase === 'done' ? Math.max(0, 1 - (elapsed - T_BLOOM_END) / GIFT_SHOW.fade) : 1;
 
         ctx.clearRect(0, 0, width, height);
         if (darken <= 0.02) {
@@ -1921,10 +2139,102 @@ let fireCount = 0;
 
         const cx = width / 2;
         const cy = height / 2;
+        const shortSide = Math.min(width, height);
 
         // 'lighter' 让密集处自然过曝成亮白，比逐个画光晕快得多也好看
         ctx.globalCompositeOperation = 'lighter';
 
+        /* ---- ① 背景星尘：全程都在，最先画（在最底层） ----
+         * 亮度按 sin 呼吸，每颗频率不同（Python 给），
+         * 加上向上飘 —— 越过视口顶边就从底部循环回来。 */
+        for (const m of motes) {
+            m.x += m.vx * shortSide * dt;
+            m.y += m.vy * shortSide * dt;
+            // 飘出上边界就从下方回来（无限循环）
+            if (m.y < -shortSide * 0.25) {
+                m.y = height + shortSide * 0.2;
+                m.x = cx + m.nx * shortSide;
+            }
+            if (m.x < -shortSide * 0.25) m.x = width + shortSide * 0.2;
+            else if (m.x > width + shortSide * 0.25) m.x = -shortSide * 0.2;
+
+            const twinkle = 0.55 + 0.45 * Math.sin(tSec * m.freq + m.phase);
+            const a = m.alpha * twinkle * darken;
+            if (a <= 0.005) continue;
+            ctx.fillStyle = `hsla(${m.hue}, 70%, 72%, ${a})`;
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, m.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        /* ---- ② 心形辉光底：中心一团柔光 ----
+         * ⚠️ 必须画在主粒子**下面**（现在编号排②，主粒子是③）。
+         *    之前它写在最后、画在最上层，径向渐变会把已经成形的心形糊掉 ——
+         *    'lighter' 模式下 0.16 的粉紫叠上去，心内部直接变成一团糊。
+         *    让心「发亮」而不是「一堆亮点」。 */
+        if (phase === 'hold' || phase === 'gather') {
+            const glowR = heartScale * (1.15 + 0.06 * Math.sin(tSec * 2));
+            const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+            const ga = (phase === 'hold' ? 0.16 : 0.08) * darken;
+            g.addColorStop(0, `hsla(330, 90%, 70%, ${ga})`);
+            g.addColorStop(0.55, `hsla(300, 85%, 60%, ${ga * 0.45})`);
+            g.addColorStop(1, 'hsla(280, 80%, 55%, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        /* ---- ③ 冲击波椭圆环：只在 bloom 阶段 ----
+         * ⚠️ 分段画而不是一次 arc()，因为要沿周长调制粗细。
+         *    一次画出来的完美正圆在动态画面里极其扎眼，
+         *    像 Photoshop 的辅助线；真实烟火的冲击波是**略扁的椭圆**
+         *    （向上飘的气流把它压扁），粗细也不均匀。
+         *    放在粒子**之前**画，环才像在粒子后面扩散。
+         *
+         * 分段数取 72：再少旋转会看出折角，再多纯属浪费（每次 arc 要落笔）。
+         */
+        if (phase === 'bloom' || phase === 'done') {
+            const bloomElapsed = elapsed - T_HOLD_END;
+            const SEG = 72;
+            for (const s of shocks) {
+                const local = (bloomElapsed - s.delay) / 1000;
+                if (local <= 0) continue;
+                // 张开约 3.2 秒才走完 —— 必须跟 Python 里调慢后的 speed 配套。
+                // 环速 0.55~1.15 视口短边/秒 ⇒ 3.2 秒正好张开 2~4 屏，
+                // 在 bloom 的 8 秒里始终有一两个环在画面内。
+                const r = local * s.speed * shortSide;
+                if (r > shortSide * 1.6) continue;
+                const t = Math.min(1, local / 3.2);
+                // 淡出用平方：起手亮、后面快速收，避免环张到最大时还很刺眼
+                const a = s.peak * (1 - t) * (1 - t) * darken;
+                if (a <= 0.004) continue;
+
+                const baseLw = Math.max(1.5, s.thickness * heartScale * (1 - t * 0.5));
+                const cosTilt = Math.cos(s.tilt);
+                const sinTilt = Math.sin(s.tilt);
+
+                for (let i = 0; i < SEG; i++) {
+                    const th = (i / SEG) * Math.PI * 2;
+                    // 椭圆：先在单位圆上取点，沿 y 压扁，再整体旋转
+                    const ex = Math.cos(th) * r;
+                    const ey = Math.sin(th) * r * s.squash;
+                    const px = cx + ex * cosTilt - ey * sinTilt;
+                    const py = cy + ex * sinTilt + ey * cosTilt;
+
+                    // 沿周长的粗细起伏：让环不是均匀的「笔画」
+                    const wob = 0.62 + 0.38 * Math.sin(th * s.wobbleN + s.wobblePhase);
+                    ctx.strokeStyle = `hsla(${s.hue}, 96%, 72%, ${a * wob})`;
+                    ctx.lineWidth = baseLw * wob;
+                    ctx.beginPath();
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(px, py);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        /* ---- ④ 主粒子群 ---- */
         for (const p of particles) {
             if (!p.fired) {
                 if (phase === 'scatter') {
@@ -1945,15 +2255,18 @@ let fireCount = 0;
                     p.y += (gy - p.y) * eased * 0.16;
                 }
             } else {
-                // 烟花：按真实 dt 积分。原来写死 0.016，
-                // 意味着 120Hz 屏幕上烟花速度是 60Hz 的两倍 —— 现在不会了。
+                // 绽放：按真实 dt 积分。写死 0.016 的话，
+                // 120Hz 屏幕上的星火会比 60Hz 快一倍 —— 现在不会了。
                 p.x += p.vx * dt;
                 p.y += p.vy * dt;
-                // 阻尼也按 dt 折算，否则高刷屏上衰减快一倍
+                // 阻尼按 dt 折算，否则高刷屏上衰减快一倍
                 const damp = Math.pow(fx!.meta.damping, dt * 60);
                 p.vx *= damp;
                 p.vy *= damp;
-                p.vy += fx!.meta.gravity * dt * 60; // 重力
+                // ⚠️ lift 是「向上加速度」（负值），不是重力。
+                //    心形化作星火往上飘，所以这里必须用 lift，
+                //    用旧的 gravity 会把星火拽回地面。
+                p.vy += (fx!.meta.lift ?? -5) * dt * 60;
                 p.life -= fx!.meta.lifeDecay * dt * 60;
             }
 
@@ -1970,20 +2283,83 @@ let fireCount = 0;
                           : 0.86 * Math.min(1, gatherP * 1.6))) * darken;
             if (alpha <= 0.01) continue;
 
-            ctx.fillStyle = `hsla(${p.hue}, 92%, ${58 + (1 - Math.min(1, gatherP)) * 12}%, ${alpha})`;
+            // 汇聚期间色相偏粉紫；绽放后让 hue_burst 的金/青点缀显出来，
+            // 用 mix 慢慢过渡而不是突然换色
+            const hueShift = p.fired ? bloomP * 26 : 0;
+            ctx.fillStyle =
+                `hsla(${(p.hue + hueShift) % 360}, 94%, ${62 + (1 - Math.min(1, gatherP)) * 10}%, ${alpha})`;
             ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size * (p.fired ? 1.1 : 1), 0, Math.PI * 2);
+            // kind 2（拖尾）在绽放时画大一点、拉长一点
+            const sizeMul = p.fired ? (p.kind === 2 ? 1.5 : 1.15) : 1;
+            ctx.arc(p.x, p.y, p.size * sizeMul, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // 烟花阶段叠一层大尺寸低透明度的光点当辉光
-        if (phase === 'burst') {
-            for (let i = 0; i < 40; i++) {
+        /* ---- ⑤ 光带：hold 阶段绕着心形轮廓跑的一道亮线 ----
+         * ⚠️ 这是让 9 秒的 hold 阶段不显得「干站着」的关键。
+         *    做法：给每颗粒子一个随时间循环的相位偏移，
+         *    相位差的绝对值小于阈值就点亮 —— 视觉上就是一道光带绕圈跑。
+         *    比整体亮度呼吸更「活」，因为亮的是**局部**。 */
+        if (phase === 'hold') {
+            const bandPos = (tSec * 0.85) % 1;          // 光带绕一圈的周期 ≈ 1.2s
+            const bandHalf = 0.075;                     // 光带占整圈的宽度
+            for (const p of particles) {
+                // 用目标点相对中心的角度当相位，保证光带贴着心形轮廓
+                const ang = Math.atan2(p.ty - cy, p.tx - cx);
+                const norm = (ang + Math.PI) / (Math.PI * 2);
+                // 环形距离（0 附近最亮），用最短弧
+                let d = Math.abs(norm - bandPos);
+                if (d > 0.5) d = 1 - d;
+                if (d > bandHalf) continue;
+                const f = 1 - d / bandHalf;              // 0~1，中心最亮
+                ctx.fillStyle = `hsla(48, 100%, 82%, ${0.5 * f * f * darken})`;
+                ctx.beginPath();
+                ctx.arc(cx + (p.tx - cx) * scaleMul, cy + (p.ty - cy) * scaleMul,
+                        p.size * 2.1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        /* ---- ⑥ 金色余烬柱：bloom 阶段中央那束往上窜的喷泉 ----
+         * 画在主粒子**之后**：它是整个绽放段的视觉焦点，
+         * 叠在上层才压得住均匀散开的面。
+         * 寿命比主粒子短（life0 0.45~0.85 ⇒ 1.5~2.8 秒），
+         * 所以它总是「窜一下就没」，配上下一次点燃才有节奏感。 */
+        for (const sp of sparks) {
+            if (!sp.active || sp.life <= 0) continue;
+            sp.x += sp.vx * dt;
+            sp.y += sp.vy * dt;
+            const damp = Math.pow(fx!.meta.damping, dt * 60);
+            sp.vx *= damp;
+            sp.vy *= damp;
+            sp.vy += (fx!.meta.lift ?? -5) * dt * 60;
+            sp.life -= fx!.meta.lifeDecay * dt * 60 * 1.05;   // 比主粒子略快
+
+            if (sp.life <= 0) { sp.active = false; continue; }
+            // 亮度的衰减用平方：起手「窜」出来时很亮，随后快速收掉
+            const a = Math.pow(sp.life / sp.life0, 2) * 0.95 * darken;
+            if (a <= 0.01) continue;
+            ctx.fillStyle = `hsla(${sp.hue}, 98%, ${66 + 14 * (sp.life / sp.life0)}%, ${a})`;
+            ctx.beginPath();
+            // 快灭时画大一点糊开，像余烬散掉
+            const r = sp.size * (1 + (1 - sp.life / sp.life0) * 0.9);
+            ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        /* ---- ⑦ 辉光：bloom 阶段叠一层大尺寸低透明度光点 ----
+         * ⚠️ 采样点从 40 提到 130，原因：粒子化作星火四散后，
+         *    每个位置只有零星几颗，单点辉光叠不出「一片火光」的整体感。
+         *    步长用 37（与粒子数互质）保证取样不落规律。 */
+        if (phase === 'bloom') {
+            for (let i = 0; i < 130; i++) {
                 const p = particles[(i * 37) % particles.length];
                 if (!p.fired || p.life <= 0) continue;
-                ctx.fillStyle = `hsla(${p.hue}, 95%, 72%, ${0.10 * (p.life / p.life0) * darken})`;
+                const a = 0.13 * (p.life / p.life0) * darken;
+                if (a <= 0.006) continue;
+                ctx.fillStyle = `hsla(${p.hue}, 95%, 76%, ${a})`;
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size * 5, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, p.size * 6, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
@@ -1992,7 +2368,7 @@ let fireCount = 0;
 
         /* ---- 收尾 ---- */
         if (phase === 'done') {
-            if (elapsed - T_BURST_END > GIFT_SHOW.fade * 0.55) showEnvelope();
+            if (elapsed - T_BLOOM_END > GIFT_SHOW.fade * 0.55) showEnvelope();
             rafId = window.requestAnimationFrame(step);
             return;
         }

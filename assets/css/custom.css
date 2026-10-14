@@ -1336,6 +1336,29 @@ body.gift-page #toggle-menu {
     display: none;
 }
 
+/* ⚠️ 主题 header 的真实位置：Stack 4.0.3 把站点名/副标题放在**左侧栏**的
+   `<header><div class="site-meta">` 里，不是常见的 `.site-header`。
+   查产物 HTML 才确认的 —— 一开始按 `.site-header` 写，探针报「已隐藏」，
+   截图上两行字明明还在：选择器根本没匹配到东西。
+
+   gift-letter.html 已经 `{{ define "left-sidebar" }}{{ end }}` 清空了侧栏内容，
+   但 `<aside class="sidebar left-sidebar">` 这个壳还在（由 baseof 模板输出），
+   里面的 header 是主题硬编码的，清空 define 也清不掉。
+   ⇒ 手机端 on-phone--column 布局下它就露在顶部，压着星尘背景像穿帮。
+
+   一并藏掉：整个左栏壳 + hamburger + 社交图标。表演页要的是纯黑夜空。 */
+body.gift-page .left-sidebar,
+body.gift-page .site-meta,
+body.gift-page .menu-social {
+    display: none;
+}
+
+/* 主题的 widget 区（右侧栏内容在手机上会堆到主区上方） */
+body.gift-page .widget,
+body.gift-page .right-sidebar {
+    display: none;
+}
+
 body.gift-page .container.main-container {
     max-width: none;
     padding: 0;

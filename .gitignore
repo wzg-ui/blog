@@ -4,6 +4,9 @@
 .hugo_build.lock
 # 上传 Cloudflare Pages 用的打包文件，每次构建都会重新生成，等同 public/ 的副本
 /public.zip
+# 本地预览用的构建目录（.workbuddy/scripts/preview_gift.mjs），
+# 内容是「时间锁临时打开」的站点，绝不能进仓库 —— 否则等于提前公开答案页
+/build-preview/
 
 # ---------- 编辑器 / 系统 ----------
 .DS_Store
