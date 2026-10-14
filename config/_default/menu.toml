@@ -24,6 +24,21 @@
     [main.params]
         icon = "home"
 
+# 「Special Gift」—— 生日惊喜入口。
+# 只在 unlockAt ~ expireAt 之间显示（10-15 00:00 到 10-16 00:00），
+# 时间判断在 custom.ts 的 setupGiftMenu()，靠下面这两个时间戳驱动。
+# 模板负责把这两个值写进 data-gift-* 属性。
+[[main]]
+    identifier = "gift"
+    name       = "Special Gift"
+    url        = "/gift/"
+    weight     = -45
+
+    [main.params]
+        icon      = "gift"
+        giftUnlock = "2026-10-15T00:00:00+08:00"
+        giftExpire = "2026-10-16T00:00:00+08:00"
+
 # 投稿入口。放主菜单而不是只放页脚 —— 页脚那行小字跟版权信息混在一起，
 # 没人会注意到，而这才是别人想写东西时唯一要找的地方。
 [[main]]

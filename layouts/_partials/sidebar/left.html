@@ -94,7 +94,19 @@
             </ol>
         </li>
         {{ else }}
-        <li {{ if $active }} class='current'{{ end }}>
+        {{- /* 「Special Gift」这一项挂上时间窗，交给 custom.ts 的 setupGiftMenu()
+               在 unlock ~ expire 之间才显示。菜单是静态渲染的，没法在构建期按
+               当前时间决定显隐 —— 所以先把标记打上，运行时再藏。
+
+               ⚠️ 用 with 而不是 `eq .Params.giftUnlock`：
+               没有这个键时 .Params.giftUnlock 是 nil，单参数的 eq 会直接
+               报 "missing arguments for comparison"，整页渲染失败。 */ -}}
+        {{- $giftItem := false -}}
+        {{- with .Params.giftUnlock }}{{ $giftItem = true }}{{ end -}}
+        <li {{ if $active }} class='current'{{ end }}
+            {{- if $giftItem }}
+            data-gift-menu data-gift-unlock="{{ .Params.giftUnlock }}" data-gift-expire="{{ .Params.giftExpire }}"
+            {{- end }}>
             <a href='{{ .URL }}' {{ if .Params.newTab }}target="_blank"{{ end }}>
                 {{ with .Params.Icon }}
                     {{ partial "helper/icon" . }}

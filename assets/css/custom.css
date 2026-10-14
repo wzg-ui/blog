@@ -1259,3 +1259,916 @@ body::before {
         flex-direction: column;
     }
 }
+
+/* ============================================================
+   Gift（私密礼物）
+   ------------------------------------------------------------
+   两个模板，两套完全不同的视觉：
+
+     layouts/gift.html          答题页    → .gift-article …
+     layouts/gift-letter.html   表演页    → .gift-stage …
+
+   行为全在 assets/ts/custom.ts 的 setupGiftShow() 里，
+   这里只管长相。类名一律照抄模板，不要另起名字。
+
+   ---------------- ⚠️ 三个必须记住的坑 ----------------
+
+   ① **1rem = 10px，不是 16px。**
+      主题在 html 上写了 font-size: 62.5%（62.5% × 16px = 10px）。
+      所以本节里所有字号都按 10px 换算：1.6rem = 16px、3.2rem = 32px。
+      间距、圆角、阴影半径也一并按这个基准写，别混。
+
+   ② **答题页跟主题走，表演页跟主题断。**
+      答题页是普通 article，用 --card-* / --accent-color，
+      亮暗色自动适配。表演页要的是「黑夜里的演出」——
+      满屏纯色 + 发光，不该跟着主题变亮，所以那一段全部写死深色，
+      一个主题变量都不引（粉色系另开 --gift-* 变量，方便统一改配色）。
+
+   ③ **body 类不同，两页的干扰元素处理也不同。**
+      gift.html 的 body-class 是 article-page：站点外壳保留，正常显示。
+      gift-letter.html 的 body-class 是 gift-page：满屏 canvas，
+      唱片 / 页脚 / 站点粒子背景 / 汉堡菜单全是干扰，一并藏掉
+      （见下面第一节）。
+
+   ---------------- 性能 ----------------
+      表演页所有动画只碰 transform 和 opacity —— 这两个走合成层，
+      不触发重排。信封翻开用 rotateX + preserve-3d，需要祖先有 perspective。
+   ============================================================ */
+
+/* ============================================================
+   本节配色变量
+   ------------------------------------------------------------
+   统一改配色只动这里。分两组：
+
+     --gift-night-*  表演页的夜色（固定深色，不跟主题）
+     --gift-rose-*   粉紫主色，答题页与表演页共用
+   ============================================================ */
+:root {
+    /* ---------- 表演页夜色（固定，不随主题变亮） ---------- */
+    --gift-night-0: #0a0510;
+    --gift-night-1: #12081c;
+    --gift-night-2: #1d0f2b;
+
+    /* ---------- 粉紫主色 ---------- */
+    --gift-rose: #ff8fb8;
+    --gift-rose-deep: #d1417c;
+    --gift-rose-dark: #8e2352;
+    --gift-rose-wash: rgba(255, 143, 184, 0.16);
+
+    /* ---------- 信纸（浅底，别用纯白，刺眼） ---------- */
+    --gift-paper: #fdf3f1;
+    --gift-paper-edge: #f6e4e2;
+    --gift-ink: #4a2f3c;
+    --gift-ink-soft: #7d5f6b;
+}
+
+/* ============================================================
+   ① 表演页：先把站点外壳收干净
+   ------------------------------------------------------------
+   .gift-stage 是 position:fixed 满屏，不清掉 main-container 的
+   max-width 和左右 padding 的话，canvas 撑不满、粒子会被裁掉。
+   （左侧栏模板里已经清空了，这里再藏一次 #toggle-menu 是保险。）
+   ============================================================ */
+body.gift-page .mp,
+body.gift-page .site-footer,
+body.gift-page #bg-particles,
+body.gift-page #toggle-menu {
+    display: none;
+}
+
+body.gift-page .container.main-container {
+    max-width: none;
+    padding: 0;
+}
+
+/* ⚠️ 正文展开后整页会高于视口，于是 body 上出现滚动条 —— 那条滚动条所在的
+   区域不属于 .gift-stage（position:fixed 铺的是「视口减去滚动条」），
+   右边就会露出一条主题底色的白边。把 body 本身的滚动条藏掉：
+   正文区 .gift-letter 自己 overflow-y:auto 负责滚动，body 不该再有滚动条。 */
+body.gift-page {
+    overflow: hidden;
+    background: var(--gift-night-0);
+}
+
+/* ============================================================
+   ② 表演页：舞台
+   ============================================================ */
+
+/* 满屏容器。z-index 0 —— 压在站点外壳之上、canvas 之下。 */
+.gift-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background:
+        radial-gradient(ellipse 80% 60% at 50% 42%, var(--gift-night-2) 0%, transparent 70%),
+        linear-gradient(180deg, var(--gift-night-1) 0%, var(--gift-night-0) 100%);
+    color: #fff;
+    font-family: var(--base-font-family);
+}
+
+/* 粒子 / 烟花画布 */
+.gift-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* 阶段字幕 —— 不跑 canvas 的环境、读屏与低视力用户的兜底。
+   压在底部，别挡住正中的信封。 */
+.gift-stage__caption {
+    position: absolute;
+    right: 1.6rem;
+    bottom: 2.4rem;
+    left: 1.6rem;
+    z-index: 2;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 1.4rem;
+    line-height: 1.7;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-shadow: 0 0 12px rgba(255, 143, 184, 0.55);
+    pointer-events: none;
+}
+
+/* ============================================================
+   ③ 表演页：信封（纯 CSS 画的）
+   ------------------------------------------------------------
+   模板里是一个 <button>，内含 5 个 aria-hidden 的 span。
+   层级不靠 z-index —— .gift-envelope 开了 preserve-3d，
+   同平面的兄弟按 DOM 顺序绘制，而模板里的顺序正好就是
+   从背到前：back → letter → front → flap → seal。
+
+   perspective 放在 wrap 上，翻开时才有纵深。
+   ============================================================ */
+.gift-envelope-wrap {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2.2rem;
+    padding: 2rem;
+    perspective: 1200px;
+}
+
+/* [hidden] 必须显式压掉 —— 下面把 display 设成了 flex，
+   会盖掉浏览器 UA 样式表里的 [hidden]{display:none}。 */
+.gift-envelope-wrap[hidden],
+.gift-letter[hidden],
+.gift-fallback[hidden] {
+    display: none;
+}
+
+.gift-envelope-wrap:not([hidden]) {
+    animation: gift-fade-in 900ms ease both;
+}
+
+.gift-envelope {
+    position: relative;
+    display: block;
+    width: min(28rem, 84vw);
+    aspect-ratio: 28 / 18;
+    padding: 0;
+    border: 0;
+    background: none;
+    /* 按钮默认有居中文字和继承字形，全部抹掉 */
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    -webkit-tap-highlight-color: transparent;
+    /* 待机：轻微上下浮动 + 左右轻晃，只动 transform */
+    animation: gift-envelope-idle 3600ms ease-in-out infinite;
+}
+
+.gift-envelope:focus-visible {
+    outline: 2px solid var(--gift-rose);
+    outline-offset: 1.2rem;
+    border-radius: 0.8rem;
+}
+
+/* ---------- 信封背面 ---------- */
+.gift-envelope__back {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, var(--gift-rose-deep) 0%, var(--gift-rose-dark) 100%);
+    border-radius: 0.8rem;
+    box-shadow:
+        0 2rem 5rem rgba(0, 0, 0, 0.6),
+        0 0 6rem rgba(255, 143, 184, 0.28),
+        inset 0 0 3rem rgba(0, 0, 0, 0.28);
+}
+
+/* ---------- 信纸：初始整个藏在背面里，打开后向上滑出 ---------- */
+.gift-envelope__letter {
+    position: absolute;
+    top: 5%;
+    left: 5%;
+    width: 90%;
+    height: 90%;
+    background: var(--gift-paper);
+    border-radius: 0.4rem;
+    box-shadow: 0 0 2.4rem rgba(0, 0, 0, 0.45);
+    transform: translateY(0);
+    transition: transform 900ms cubic-bezier(0.22, 0.68, 0.32, 1);
+}
+
+/* 信纸上几道淡淡的横线，暗示里面写了字 */
+.gift-envelope__letter::after {
+    content: "";
+    position: absolute;
+    inset: 12% 10%;
+    background: repeating-linear-gradient(
+        180deg,
+        rgba(142, 35, 82, 0.22) 0 1px,
+        transparent 1px 12%
+    );
+    opacity: 0.55;
+}
+
+/* ---------- 信封正面：clip-path 切出中间的 V 形折痕 ---------- */
+.gift-envelope__front {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, var(--gift-rose) 0%, var(--gift-rose-deep) 100%);
+    /* 上边缘从两边斜切到中点，形成信封正面的 V */
+    clip-path: polygon(0 0, 50% 56%, 100% 0, 100% 100%, 0 100%);
+    border-radius: 0 0 0.8rem 0.8rem;
+    box-shadow: inset 0 -0.2rem 0.6rem rgba(0, 0, 0, 0.25);
+}
+
+/* ---------- 封盖：绕顶边翻 180° ---------- */
+.gift-envelope__flap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 56%;
+    background: linear-gradient(180deg, #ffa6c8 0%, var(--gift-rose-deep) 100%);
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    transform-origin: top center;
+    transform: rotateX(0deg);
+    transition: transform 720ms cubic-bezier(0.5, 0.05, 0.3, 1);
+}
+
+/* ---------- 蜡封 ---------- */
+.gift-envelope__seal {
+    position: absolute;
+    top: 52%;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 5.6rem;
+    height: 5.6rem;
+    color: #ffe9f0;
+    background: radial-gradient(circle at 34% 30%, #ff6f9c 0%, var(--gift-rose-dark) 72%);
+    border-radius: 50%;
+    box-shadow:
+        0 0.4rem 1.2rem rgba(0, 0, 0, 0.45),
+        0 0 2.4rem rgba(255, 111, 156, 0.6);
+    transform: translate(-50%, -50%);
+    animation: gift-seal-beat 2600ms ease-in-out infinite;
+}
+
+/* 心形 SVG 靠 fill: currentColor 继承蜡封的颜色 */
+.gift-envelope__seal svg {
+    width: 2.8rem;
+    height: 2.8rem;
+    fill: currentColor;
+}
+
+/* ---------- 打开态 ---------- */
+.gift-envelope.is-open {
+    animation: none;
+    cursor: default;
+}
+
+.gift-envelope.is-open .gift-envelope__flap {
+    transform: rotateX(-180deg);
+}
+
+.gift-envelope.is-open .gift-envelope__letter {
+    transform: translateY(-42%);
+}
+
+.gift-envelope.is-open .gift-envelope__seal {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+    transition: opacity 420ms ease, transform 420ms ease;
+    animation: none;
+}
+
+/* 「点一下，把它打开」 */
+.gift-envelope__hint {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.66);
+    font-size: 1.3rem;
+    line-height: 1.6;
+    letter-spacing: 0.18em;
+    text-shadow: 0 0 10px rgba(255, 143, 184, 0.5);
+    animation: gift-hint-breathe 2800ms ease-in-out infinite;
+}
+
+/* ============================================================
+   ④ 表演页：正文（信纸）
+   ------------------------------------------------------------
+   展开后整页从「满屏黑」变成可滚动的阅读区：
+   .gift-letter 自己滚，内层 __paper 才是那张纸。
+
+   正文的关键在浅底重写 —— .gift-letter__body 同时挂着
+   .article-content，主题在深色模式下给 a / code / blockquote /
+   hr 用的都是浅色，落在米色信纸上会看不清，全部要压掉。
+   ============================================================ */
+.gift-letter {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    justify-content: center;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8rem 2rem 6rem;
+    background:
+        linear-gradient(180deg, rgba(10, 5, 16, 0) 0%, var(--gift-night-0) 14rem),
+        var(--gift-night-0);
+}
+
+.gift-letter:not([hidden]) {
+    animation: gift-letter-in 1000ms ease both;
+}
+
+/* ---------- 信纸卡片 ---------- */
+.gift-letter__paper {
+    width: 100%;
+    max-width: 72rem;
+    padding: 5rem 4.4rem 4.4rem;
+    background-color: var(--gift-paper);
+    /* 纸张纹理：极淡的横纹，叠一层顶部高光 */
+    background-image:
+        repeating-linear-gradient(
+            180deg,
+            rgba(142, 35, 82, 0.035) 0 1px,
+            transparent 1px 6px
+        ),
+        linear-gradient(180deg, #fff 0%, rgba(255, 255, 255, 0) 30%);
+    border-radius: 1.2rem;
+    box-shadow:
+        0 0 6rem rgba(255, 143, 184, 0.28),
+        0 2.4rem 6rem rgba(0, 0, 0, 0.55),
+        inset 0 0 0 1px var(--gift-paper-edge);
+}
+
+.gift-letter__head {
+    margin-bottom: 3.6rem;
+    padding-bottom: 2.4rem;
+    border-bottom: 1px solid var(--gift-paper-edge);
+    text-align: center;
+}
+
+.gift-letter__eyebrow {
+    margin: 0 0 1rem;
+    color: var(--gift-rose-deep);
+    font-size: 1.3rem;
+    line-height: 1.6;
+    font-weight: 600;
+    letter-spacing: 0.4em;
+    text-indent: 0.4em;
+}
+
+.gift-letter__title {
+    margin: 0;
+    color: var(--gift-ink);
+    font-size: 2.8rem;
+    line-height: 1.4;
+    font-weight: 700;
+}
+
+.gift-letter__sub {
+    margin: 1.2rem 0 0;
+    color: var(--gift-ink-soft);
+    font-size: 1.4rem;
+    line-height: 1.7;
+}
+
+/* ---------- 正文：浅底重写 ----------
+   同特异性下 custom.css 在主题 style.css 之后加载，
+   但这里统一写成两级选择器，留出余量。 */
+.gift-letter__body {
+    margin: 0;
+    padding: 0;
+    color: var(--gift-ink);
+    font-family: var(--base-font-family);
+    font-size: 1.6rem;
+    line-height: 1.9;
+}
+
+.gift-letter__body p,
+.gift-letter__body li {
+    line-height: 1.9;
+}
+
+.gift-letter__body > :first-child {
+    margin-top: 0;
+}
+
+.gift-letter__body a {
+    color: var(--gift-rose-dark);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    transition: color 0.2s ease;
+}
+
+.gift-letter__body a:hover {
+    color: var(--gift-rose-deep);
+}
+
+.gift-letter__body strong {
+    color: var(--gift-rose-dark);
+}
+
+/* 行内代码：浅灰底 + 深字（主题深色下是深底浅字，信纸上很扎眼） */
+.gift-letter__body code:not(.chroma code) {
+    padding: 0.1em 0.4em;
+    color: #6b3550;
+    background-color: #f1e6ea;
+    border-radius: 0.4rem;
+    font-family: var(--code-font-family);
+    font-size: 0.9em;
+}
+
+/* 代码块（pre / chroma）刻意不重写背景。
+   主题的 --pre-background-color / --pre-text-color 本来就分深浅色各一套，
+   深色下是 #272822 配 #f8f8f2，本来就好读。
+   这里要是强行改成浅底，chroma 的 token 色（.n / .nb 是 #f8f8f2 近白）
+   就会变成米色纸上的白字 —— 那是自己制造不可读。
+   深色代码块落在浅信纸上反而像刻意做的反差，好读。 */
+
+/* 引用：粉色左边框 + 极淡粉底 */
+.gift-letter__body blockquote {
+    margin: 2rem 0;
+    padding: 1.2rem 1.8rem;
+    color: var(--gift-ink-soft);
+    background-color: rgba(255, 143, 184, 0.14);
+    border-inline-start: 4px solid var(--gift-rose);
+    border-radius: 0 0.6rem 0.6rem 0;
+}
+
+.gift-letter__body blockquote .cite a {
+    color: var(--gift-rose-dark);
+}
+
+/* 分隔线：浅色细线 */
+.gift-letter__body hr {
+    width: 6rem;
+    margin: 3.2rem auto;
+    height: 2px;
+    border: 0;
+    background: var(--gift-paper-edge);
+    opacity: 1;
+}
+
+/* 标题与列表：主题给标题的 accent 竖线在深色下是白色，落到浅纸上要改色 */
+.gift-letter__body h1,
+.gift-letter__body h2,
+.gift-letter__body h3,
+.gift-letter__body h4,
+.gift-letter__body h5,
+.gift-letter__body h6 {
+    color: var(--gift-ink);
+}
+
+.gift-letter__body h5,
+.gift-letter__body h6 {
+    border-inline-start-color: var(--gift-rose);
+}
+
+.gift-letter__body li::marker {
+    color: var(--gift-rose-deep);
+}
+
+.gift-letter__body img {
+    border-radius: 0.8rem;
+    box-shadow: 0 1.2rem 3rem rgba(90, 40, 60, 0.18);
+}
+
+/* ---------- 落款 ---------- */
+.gift-letter__foot {
+    margin-top: 3.6rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--gift-paper-edge);
+    text-align: right;
+}
+
+.gift-letter__sign {
+    margin: 0;
+    color: var(--gift-rose-dark);
+    font-size: 1.5rem;
+    line-height: 1.6;
+    font-style: italic;
+    letter-spacing: 0.08em;
+}
+
+/* ============================================================
+   ⑤ 表演页：出错兜底
+   ------------------------------------------------------------
+   没答对题 / 刷新了标签页 → 取不到 sessionStorage 里的密码，
+   setupGiftShow() 走到这里。
+   ============================================================ */
+.gift-fallback {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2.4rem;
+    padding: 3rem 2rem;
+    background: var(--gift-night-0);
+    text-align: center;
+}
+
+.gift-fallback:not([hidden]) {
+    animation: gift-fade-in 600ms ease both;
+}
+
+.gift-fallback__text {
+    max-width: 34rem;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 1.6rem;
+    line-height: 1.8;
+}
+
+.gift-fallback__back {
+    display: inline-block;
+    padding: 1rem 2.4rem;
+    color: #fff;
+    background: linear-gradient(135deg, var(--gift-rose) 0%, var(--gift-rose-deep) 100%);
+    border-radius: 999px;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-decoration: none;
+    box-shadow: 0 0 2.4rem var(--gift-rose-wash);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.gift-fallback__back:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 4rem rgba(255, 143, 184, 0.45);
+}
+
+/* ============================================================
+   ⑥ 表演页：动画
+   ------------------------------------------------------------
+   全部只动 transform / opacity。
+   ============================================================ */
+@keyframes gift-fade-in {    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* 待机：上下浮 + 左右轻晃，一个循环里做完 */
+@keyframes gift-envelope-idle {
+    0%,
+    100% {
+        transform: translateY(0) rotate(-0.7deg);
+    }
+    50% {
+        transform: translateY(-1.2rem) rotate(0.7deg);
+    }
+}
+
+/* 蜡封轻微心跳 */
+@keyframes gift-seal-beat {
+    0%,
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.08);
+    }
+}
+
+/* 提示文字呼吸 */
+@keyframes gift-hint-breathe {
+    0%,
+    100% {
+        opacity: 0.45;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+/* 正文：从满屏黑里浮上来 */
+@keyframes gift-letter-in {
+    from {
+        opacity: 0;
+        transform: translateY(3rem);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================================
+   ⑦ 答题页
+   ------------------------------------------------------------
+   body-class 是 article-page，外壳保留，这一页完全走主题变量，
+   亮暗色自动适配。字号同样按 1rem = 10px 换算。
+   ============================================================ */
+.gift-article {
+    padding-bottom: 1rem;
+}
+
+/* ---------- Hero ---------- */
+.gift-hero {
+    margin-bottom: 3.2rem;
+    text-align: center;
+}
+
+.gift-hero__eyebrow {
+    margin: 0 0 1rem;
+    color: var(--gift-rose-deep);
+    font-size: 1.3rem;
+    line-height: 1.6;
+    font-weight: 600;
+    letter-spacing: 0.42em;
+    /* letter-spacing 会在最后一个字右侧多出一截，右边距补回去才居中 */
+    text-indent: 0.42em;
+    text-transform: uppercase;
+}
+
+.gift-hero__title {
+    margin: 0;
+    font-size: 3.2rem;
+    line-height: 1.3;
+    font-weight: 700;
+}
+
+.gift-hero__sub {
+    max-width: 42rem;
+    margin: 1.4rem auto 0;
+    color: var(--card-text-color-secondary);
+    font-size: 1.5rem;
+    line-height: 1.8;
+}
+
+/* ---------- 未解锁 / 已过期 ---------- */
+.gift-gate {
+    margin: 0 0 3rem;
+    padding: 3rem 2rem;
+    border: 1px solid var(--card-separator-color);
+    border-radius: var(--card-border-radius, 16px);
+    background: rgba(142, 35, 82, 0.04);
+    text-align: center;
+}
+
+/* 倒计时大数字。等宽数字：位数每秒变化，不等宽整行会左右抖。
+   写法照抄 .secret-gate__count，类名独立不复用。 */
+.gift-gate__count {
+    display: block;
+    margin: 0.8rem 0 1.2rem;
+    color: var(--gift-rose-deep);
+    font-family: var(--code-font-family);
+    font-size: 3.6rem;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+}
+
+.gift-gate__hint {
+    margin: 1rem 0 0;
+    color: var(--card-text-color-secondary);
+    font-size: 1.3rem;
+    line-height: 1.8;
+}
+
+/* ---------- 答题表单 ---------- */
+.gift-quiz[hidden] {
+    display: none;
+}
+
+.gift-quiz:not([hidden]) {
+    animation: gift-fade-in 500ms ease both;
+}
+
+.gift-quiz__lead {
+    margin: 0 0 2.4rem;
+    color: var(--card-text-color-secondary);
+    font-size: 1.5rem;
+    line-height: 1.8;
+}
+
+/* 有序列表但不要默认序号 —— 序号在 .gift-q__no 里画 */
+.gift-questions {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* ---------- 单题 ---------- */
+.gift-q {
+    margin-bottom: 2.4rem;
+}
+
+.gift-q__label {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: 0.9rem;
+    cursor: pointer;
+}
+
+.gift-q__no {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    color: #fff;
+    background: linear-gradient(135deg, var(--gift-rose) 0%, var(--gift-rose-deep) 100%);
+    border-radius: 50%;
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 0.3rem 1rem var(--gift-rose-wash);
+}
+
+.gift-q__text {
+    padding-top: 0.2rem;
+    font-size: 1.5rem;
+    line-height: 1.6;
+    font-weight: 600;
+}
+
+/* ---------- 输入框 ----------
+   字号 1.6rem = 16px：iOS Safari 对小于 16px 的输入框会自动放大整页。 */
+.gift-q__input {
+    display: block;
+    width: 100%;
+    padding: 0.9rem 1.2rem;
+    border: 1px solid var(--card-separator-color);
+    border-radius: 0.8rem;
+    background: var(--body-background);
+    color: var(--card-text-color-main);
+    font-family: var(--base-font-family);
+    font-size: 1.6rem;
+    line-height: 1.5;
+    caret-color: var(--gift-rose-deep);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gift-q__input::placeholder {
+    color: var(--card-text-color-tertiary);
+}
+
+.gift-q__input:focus {
+    border-color: var(--gift-rose);
+    box-shadow: 0 0 0 3px var(--gift-rose-wash);
+}
+
+/* ---------- 提交 ---------- */
+.gift-quiz__foot {
+    display: flex;
+    gap: 1.4rem;
+    align-items: center;
+    margin-top: 3rem;
+}
+
+.gift-submit {
+    flex: none;
+    padding: 1rem 2.8rem;
+    border: 0;
+    border-radius: 999px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--gift-rose) 0%, var(--gift-rose-deep) 100%);
+    font-family: inherit;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    box-shadow: 0 0.4rem 1.6rem var(--gift-rose-wash);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.gift-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.8rem 2.4rem rgba(209, 65, 124, 0.35);
+}
+
+.gift-submit:disabled {
+    opacity: 0.55;
+    cursor: progress;
+    transform: none;
+    box-shadow: none;
+}
+
+.gift-quiz__msg {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    color: var(--card-text-color-secondary);
+    font-size: 1.3rem;
+    line-height: 1.6;
+}
+
+.gift-quiz__msg.is-error {
+    color: #d9534f;
+}
+
+/* ---------- 窄屏 ---------- */
+@media (max-width: 600px) {
+    .gift-hero__title {
+        font-size: 2.6rem;
+    }
+
+    .gift-gate {
+        padding: 2.4rem 1.4rem;
+    }
+
+    .gift-gate__count {
+        font-size: 3rem;
+    }
+
+    /* 按钮和提示竖排，避免中文提示被挤成一字一行 */
+    .gift-quiz__foot {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
+    }
+
+    .gift-letter {
+        padding: 4rem 1.4rem 4rem;
+    }
+
+    .gift-letter__paper {
+        padding: 3rem 2.2rem 3rem;
+        border-radius: 0.8rem;
+    }
+
+    .gift-letter__title {
+        font-size: 2.2rem;
+    }
+}
+
+/* ============================================================
+   ⑧ 无障碍：prefers-reduced-motion
+   ------------------------------------------------------------
+   关掉入场 / 浮动 / 摇晃 / 心跳 / 呼吸，只保留静态终态：
+   信封照常显示、封盖仍是闭合的、正文照样能展开。
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+    .gift-envelope-wrap:not([hidden]),
+    .gift-letter:not([hidden]),
+    .gift-fallback:not([hidden]),
+    .gift-quiz:not([hidden]) {
+        animation: none;
+    }
+
+    .gift-envelope,
+    .gift-envelope__seal,
+    .gift-envelope__hint {
+        animation: none;
+    }
+
+    .gift-envelope__seal {
+        /* 心跳停掉后要回到 scale(1)，否则会卡在动画中间帧 */
+        transform: translate(-50%, -50%);
+    }
+
+    .gift-envelope.is-open .gift-envelope__seal {
+        transform: translate(-50%, -50%) scale(0.4);
+    }
+
+    .gift-envelope__flap,
+    .gift-envelope__letter,
+    .gift-submit,
+    .gift-fallback__back {
+        transition: none;
+    }
+}

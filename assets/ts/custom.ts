@@ -1255,4 +1255,663 @@ document.addEventListener('DOMContentLoaded', setupParticleBackground);
 document.addEventListener('DOMContentLoaded', setupSiteRuntime);
 document.addEventListener('DOMContentLoaded', setupArchiveMenu);
 document.addEventListener('DOMContentLoaded', setupMusicPlayer);
+/* ============================================================
+   Gift 流程：五道题 → 密码中转 → 粒子表演 → 信封 → 正文
+   ------------------------------------------------------------
+   两个页面各管一段：
+
+     /gift/          setupGiftQuiz()  收五个答案 → 拼串 → SHA-256
+                     比对 front matter 里的 answersHash。对上了就把
+                     **那个串本身**（它就是密码）存 sessionStorage，跳走。
+
+     /gift/letter/   setupGiftShow()  从 sessionStorage 取密码，
+                     播粒子 + 烟花，弹出信封，点开才解密正文。
+
+   为什么密码要中转而不是表演页自己再问一遍：
+     表演页一上来就是满屏 canvas，前面插个密码框会把气氛全毁掉。
+   为什么用 sessionStorage 而不是 localStorage：
+     关掉标签页就没了 —— 她必须一口气答对才能看完，
+     不能分两次、不能第二天再来偷看。
+
+   ⚠️ 仓库公开，所以页面里只有 answersHash 和密文。
+      整体判定，不提示哪一题错了 —— 逐题提示就得存五个单独哈希，
+      等于把每题的可搜索空间砍到 1/5，白送爆破面。
+   ============================================================ */
+
+/** 答题页和表演页之间传密码用的 sessionStorage 键 */
+const GIFT_PASSPHRASE_KEY = 'gift-passphrase';
+
+/** 表演阶段的时间线（毫秒）。加在这里方便整体调节奏。 */
+const GIFT_SHOW = {
+    scatter: 2600,    // ① 粒子乱飞 → 开始聚心
+    gather: 3400,    // 聚成心形所需
+    hold: 1500,      // 心形稳定跳动
+    burst: 2400,     // ③ 心形炸成烟花
+    fade: 900,       // 烟花散尽、画面压暗
+} as const;
+
+/**
+ * 答案规范化 —— **必须与 .workbuddy/scripts/make_gift.mjs 的 normalize() 逐字一致**。
+ * 两边对不上，症状是「答案明明是对的却总说不对」。
+ *   NFKC     全角「ＡＢＣ」≡ 半角「ABC」，中文全角标点也一并归一
+ *   trim     去首尾空白
+ *   \s+ → ' ' 中间连续空白压成一个（复制粘贴常带 nbsp）
+ *   toLower  第 4/5 题是英文单词，大小写不该有影响
+ */
+const giftNormalize = (raw: string): string =>
+    raw.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+
+/** 五题拼成一个串。用 \n 分隔（input 是单行控件，答案里不会出现换行） */
+const giftJoinAnswers = (list: string[]): string => list.map(giftNormalize).join('\n');
+
+const giftPad = (n: number): string => String(n).padStart(2, '0');
+
+const giftCountdown = (ms: number): string => {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const d = Math.floor(total / 86400);
+    const h = Math.floor((total % 86400) / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const clock = `${giftPad(h)}:${giftPad(m)}:${giftPad(s)}`;
+    return d > 0 ? `${d} 天 ${clock}` : clock;
+};
+
+const giftFormatDate = (t: number): string => {
+    const d = new Date(t);
+    return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日 ` +
+        `${giftPad(d.getHours())}:${giftPad(d.getMinutes())}`;
+};
+
+/** 读时间戳；解析不了返回 NaN，由调用方决定当没设置处理 */
+const giftTime = (raw: string | undefined): number =>
+    raw ? new Date(raw).getTime() : NaN;
+
+/**
+ * 侧栏「Special Gift」入口的时间显隐
+ *
+ * 菜单是 Hugo 静态渲染的，没法在构建期按「当前时刻」决定显隐 ——
+ * 构建早就跑完了，而解锁时刻在未来。所以模板（sidebar/left.html）先把这一项
+ * 渲染出来，并挂上 giftUnlock / giftExpire 两个时间戳，这里在运行时决定藏不藏。
+ *
+ * ⚠️ 藏的只是菜单项，不是路由 —— 知道 URL 的人照样能直接打开 /gift/。
+ *    真正把关的是那一页自己的时间锁。
+ */
+function setupGiftMenu() {
+    const items = Array.from(document.querySelectorAll<HTMLElement>('[data-gift-menu]'));
+    if (!items.length) return;
+
+    const sync = () => {
+        const now = Date.now();
+        for (const item of items) {
+            const unlock = giftTime(item.dataset.giftUnlock);
+            const expire = giftTime(item.dataset.giftExpire);
+            const tooEarly = Number.isFinite(unlock) && now < unlock;
+            const tooLate = Number.isFinite(expire) && now >= expire;
+            item.hidden = tooEarly || tooLate;
+        }
+    };
+
+    sync();
+    // 30 秒一次足够 —— 这个窗口跨的是整天，不是秒级倒计时
+    const timer = window.setInterval(sync, 30_000);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') sync();
+    });
+    window.addEventListener('pagehide', () => window.clearInterval(timer), { once: true });
+}
+
+/** base64 → Uint8Array。atob 只认 ASCII，所以走逐字符 charCodeAt */
+const giftB64ToBytes = (b64: string): Uint8Array => {
+    const raw = atob(b64.trim());
+    const out = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+};
+
+/**
+ * 答题页
+ */
+function setupGiftQuiz() {
+    const root = document.querySelector<HTMLElement>('[data-gift-quiz]');
+    if (!root) return;
+
+    const gate = root.querySelector<HTMLElement>('[data-gift-gate]');
+    const state = root.querySelector<HTMLElement>('[data-gift-state]');
+    const form = root.querySelector<HTMLFormElement>('[data-gift-form]');
+    const inputs = Array.from(root.querySelectorAll<HTMLInputElement>('[data-gift-input]'));
+    const submit = root.querySelector<HTMLButtonElement>('[data-gift-submit]');
+    const msg = root.querySelector<HTMLElement>('[data-gift-msg]');
+
+    if (!gate || !state || !form || !submit || !msg || !inputs.length) return;
+
+    const expectHash = (root.dataset.hash ?? '').trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(expectHash)) return;
+
+    const unlockAt = giftTime(root.dataset.unlock);
+    const expireAt = giftTime(root.dataset.expire);
+    const hasUnlock = Number.isFinite(unlockAt);
+    const hasExpire = Number.isFinite(expireAt);
+
+    const say = (text: string, kind: 'info' | 'error' = 'info') => {
+        msg.textContent = text;
+        msg.classList.toggle('is-error', kind === 'error');
+    };
+
+    const lock = (html: string) => {
+        form.hidden = true;
+        state.hidden = false;
+        state.innerHTML = html;
+    };
+
+    /* ---------- 提交 ---------- */
+
+    let busy = false;
+
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (busy) return;
+
+        // 时间锁优先：过期后即便哈希对了也不放行
+        const now = Date.now();
+        if (hasExpire && now >= expireAt) {
+            lock(
+                `<p class="gift-gate__title">已经结束啦</p>` +
+                `<p class="gift-gate__hint">开放时间到 ${giftFormatDate(expireAt)} 为止。</p>`
+            );
+            return;
+        }
+        if (hasUnlock && now < unlockAt) return;
+
+        const answers = inputs.map((el) => el.value);
+        const missing = answers.findIndex((v) => !giftNormalize(v));
+        if (missing >= 0) {
+            say(`第 ${missing + 1} 题还没答`, 'error');
+            inputs[missing].focus();
+            return;
+        }
+
+        const phrase = giftJoinAnswers(answers);
+        busy = true;
+        submit.disabled = true;
+        submit.textContent = '看看对不对…';
+        say('正在核对…');
+
+        // SHA-256 是异步的，必须让出一帧，否则按钮会卡一下才变文案
+        window.setTimeout(async () => {
+            try {
+                const digest = await crypto.subtle.digest(
+                    'SHA-256',
+                    new TextEncoder().encode(phrase)
+                );
+                const hex = Array.from(new Uint8Array(digest))
+                    .map((b) => b.toString(16).padStart(2, '0'))
+                    .join('');
+
+                if (hex !== expectHash) {
+                    say('有答案不对，再想想', 'error');
+                    return;
+                }
+
+                // 对上了 —— 这个串就是密码，中转给表演页
+                try {
+                    sessionStorage.setItem(GIFT_PASSPHRASE_KEY, phrase);
+                } catch {
+                    // 隐私模式下 sessionStorage 可能写不进去。那就没法中转，
+                    // 直接跳过去，表演页会退回到「回到第一页」的兜底。
+                }
+                say('对了，正在打开…');
+                // 换成 location 而不是 <a>，避免密码在 referrer 里外流
+                window.location.replace('/gift/letter/');
+            } catch {
+                say('核对失败，稍后再试', 'error');
+            } finally {
+                busy = false;
+                submit.disabled = false;
+                submit.textContent = '提交';
+            }
+        }, 16);
+    });
+
+    /* ---------- 时间锁 ---------- */
+
+    let shown = false;
+
+    const tick = () => {
+        const now = Date.now();
+
+        if (hasExpire && now >= expireAt) {
+            lock(
+                `<p class="gift-gate__title">已经结束啦</p>` +
+                `<p class="gift-gate__hint">开放时间到 ${giftFormatDate(expireAt)} 为止。</p>`
+            );
+            return;
+        }
+
+        if (hasUnlock && now < unlockAt) {
+            lock(
+                `<p class="gift-gate__title">还没到时间</p>` +
+                `<p class="gift-gate__count">${giftCountdown(unlockAt - now)}</p>` +
+                `<p class="gift-gate__hint">${giftFormatDate(unlockAt)} 准时打开。</p>`
+            );
+            return;
+        }
+
+        if (shown) return;
+        shown = true;
+        gate.hidden = true;
+        form.hidden = false;
+        inputs[0]?.focus({ preventScroll: true });
+    };
+
+    const timer = window.setInterval(tick, 1000);
+    tick();
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') tick();
+    });
+
+    window.addEventListener('pagehide', () => window.clearInterval(timer), { once: true });
+}
+
+/* ============================================================
+   表演页：粒子聚心 + 烟花 + 信封
+   ============================================================ */
+
+interface GiftParticle {
+    x: number;
+    y: number;
+    /** 目标点（心形上的位置） */
+    tx: number;
+    ty: number;
+    /** 当前颜色 */
+    hue: number;
+    size: number;
+    /** 汇聚进度 0→1，各粒子错峰，所以起点是随机小数 */
+    t: number;
+    /** 汇聚速度（越大越快追上） */
+    speed: number;
+    /** 烟花爆发后的速度向量 */
+    vx: number;
+    vy: number;
+    life: number;
+    /** 是否已爆发（进入烟花阶段） */
+    fired: boolean;
+}
+
+/** 心形参数方程取点。t ∈ [0, 2π) */
+function giftHeartPoint(theta: number, scale: number): [number, number] {
+    const x = 16 * Math.pow(Math.sin(theta), 3);
+    const y =
+        13 * Math.cos(theta) -
+        5 * Math.cos(2 * theta) -
+        2 * Math.cos(3 * theta) -
+        Math.cos(4 * theta);
+    // y 轴翻转：数学里 y 向上，canvas 里向下
+    return [x * scale, -y * scale];
+}
+
+function setupGiftShow() {
+    const root = document.querySelector<HTMLElement>('[data-gift-show]');
+    if (!root) return;
+
+    const canvas = root.querySelector<HTMLCanvasElement>('[data-gift-canvas]');
+    const caption = root.querySelector<HTMLElement>('[data-gift-caption]');
+    const envelopeWrap = root.querySelector<HTMLElement>('[data-gift-envelope]');
+    const envelopeBtn = root.querySelector<HTMLButtonElement>('[data-gift-open]');
+    const letter = root.querySelector<HTMLElement>('[data-gift-letter]');
+    const body = root.querySelector<HTMLElement>('[data-gift-body]');
+    const fallback = root.querySelector<HTMLElement>('[data-gift-fallback]');
+    const fallbackText = root.querySelector<HTMLElement>('[data-gift-fallback-text]');
+
+    if (!canvas || !envelopeWrap || !envelopeBtn || !letter || !body) return;
+
+    const cipherRaw = root.dataset.cipher ?? '';
+    const iterations = Number(root.dataset.iterations ?? 120000);
+    const unlockAt = giftTime(root.dataset.unlock);
+    const expireAt = giftTime(root.dataset.expire);
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /* ---------- 兜底 ---------- */
+
+    const bail = (text: string) => {
+        if (fallback && fallbackText) {
+            fallbackText.textContent = text;
+            fallback.hidden = false;
+        }
+        envelopeWrap.hidden = true;
+        letter.hidden = true;
+        if (caption) caption.textContent = '';
+    };
+
+    // 时间锁：解锁前 / 过期后都不演
+    const now = Date.now();
+    if (Number.isFinite(unlockAt) && now < unlockAt) {
+        bail(`还没到时间 —— ${giftFormatDate(unlockAt)} 准时打开。`);
+        return;
+    }
+    if (Number.isFinite(expireAt) && now >= expireAt) {
+        bail('已经结束啦。');
+        return;
+    }
+
+    // 取密码：答题页校验通过后中转过来的
+    let phrase: string | null = null;
+    try {
+        phrase = sessionStorage.getItem(GIFT_PASSPHRASE_KEY);
+    } catch {
+        phrase = null;
+    }
+    if (!phrase) {
+        bail('要先答对上面五道题才能看这个。');
+        return;
+    }
+    if (!cipherRaw) {
+        bail('正文密文没加载出来，刷新一下试试。');
+        return;
+    }
+
+    // ⚠️ 一路走到这里说明她在同一个标签页里答对了题。
+    //    顺手把过期的表演也挡掉：到点后页面会自己收回正文。
+    const expireGuard = window.setInterval(() => {
+        if (Number.isFinite(expireAt) && Date.now() >= expireAt) {
+            window.clearInterval(expireGuard);
+            body.innerHTML = '';
+            letter.hidden = true;
+            envelopeWrap.hidden = true;
+            bail('已经结束啦。');
+        }
+    }, 30_000);
+
+    /* ---------- 解密 ---------- */
+
+    const decryptGift = async (password: string): Promise<string> => {
+        const packed = giftB64ToBytes(cipherRaw);
+        if (packed.length < 44) throw new Error('密文长度不对');
+
+        const salt = packed.slice(0, 16);
+        const iv = packed.slice(16, 28);
+        const data = packed.slice(28); // ct || tag 必须拼一起，WebCrypto 不接受分开传
+
+        const te = new TextEncoder();
+        const material = await crypto.subtle.importKey(
+            'raw', te.encode(password), 'PBKDF2', false, ['deriveKey']
+        );
+        const key = await crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+            material,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['decrypt']
+        );
+        const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+        return new TextDecoder().decode(plain);
+    };
+
+    /** 先解密码，正文到手后才允许点信封 —— 免得点了半天还在转圈 */
+    let ready: Promise<void> | null = decryptGift(phrase)
+        .then((html) => {
+            body.innerHTML = html;
+            // 解密出来的正文里可能有懒加载图片，属性要重新触发计算
+            body.querySelectorAll('img[data-src]').forEach((img) => {
+                const lazy = img as HTMLImageElement & { dataSrc?: string };
+                if (lazy.dataset.src) img.src = lazy.dataset.src;
+            });
+            ready = null;
+        })
+        .catch(() => {
+            // 走到这里说明哈希对上了但解不开 —— 只可能是 sessionStorage 被清过
+            try { sessionStorage.removeItem(GIFT_PASSPHRASE_KEY); } catch { /* 忽略 */ }
+            bail('密码没对上，回上一页重新答一次吧。');
+            throw new Error('decrypt failed');
+        });
+
+    /* ---------- 开信封 ---------- */
+
+    let opening = false;
+    envelopeBtn.addEventListener('click', () => {
+        if (opening) return;
+        opening = true;
+        envelopeBtn.classList.add('is-open');
+        if (caption) caption.textContent = '';
+
+        // 等翻盖动画走完一半再放信纸出来，两段错开才不会像同时发生
+        window.setTimeout(() => {
+            envelopeWrap.hidden = true;
+            letter.hidden = false;
+        }, reduced ? 60 : 900);
+
+        if (!ready) return;
+        void ready.catch(() => { /* 已经在 bail 里提示过了 */ });
+    });
+
+    // 键盘可达：信封是 button，Enter / Space 原生能触发，这里只补焦点可见
+    envelopeBtn.focus({ preventScroll: true });
+
+    /* ---------- canvas：粒子聚心 + 烟花 ---------- */
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+
+    // 屏幕小 / 核少就减半，手机上 1400 个粒子会掉帧
+    const COUNT = window.innerWidth < 640 ? 900 : 2600;
+
+    const particles: GiftParticle[] = [];
+    /** 阶段起始时间戳 */
+    let startedAt = 0;
+    let phase: 'scatter' | 'gather' | 'hold' | 'burst' | 'done' = 'scatter';
+    let rafId = 0;
+    let envelopeShown = false;
+
+    const resize = () => {
+        // 移动端 dpr 压到 2，再高纯属浪费（粒子本身是模糊光点，看不出差别）
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = canvas.clientWidth || window.innerWidth;
+        height = canvas.clientHeight || window.innerHeight;
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    /** 心形整体大小：取视口的较小边，别让心撑出屏幕 */
+    const heartScale = () => Math.min(width, height) * 0.017;
+
+    const seed = () => {
+        particles.length = 0;
+        const scale = heartScale();
+        const cx = width / 2;
+        const cy = height / 2;
+
+        for (let i = 0; i < COUNT; i++) {
+            // 目标点：沿心形周长均匀取，再叠一点随机抖动填出体积感
+            const theta = (i / COUNT) * Math.PI * 2 + Math.random() * 0.05;
+            const [hx, hy] = giftHeartPoint(theta, scale);
+            const jitter = Math.random() * scale * 0.16;
+
+            particles.push({
+                // 起点撒在视口四周之外，飞进来才有「聚拢」的感觉
+                x: Math.random() * width,
+                y: Math.random() * height,
+                tx: cx + hx + (Math.random() - 0.5) * jitter,
+                ty: cy + hy + (Math.random() - 0.5) * jitter,
+                hue: 330 + Math.random() * 40, // 玫红 → 紫
+                size: 0.7 + Math.random() * 1.9,
+                t: 0,
+                speed: 0.55 + Math.random() * 0.75,
+                vx: 0,
+                vy: 0,
+                life: 1,
+                fired: false,
+            });
+        }
+    };
+
+    /** 心形炸开：给每个粒子一个朝外的初速度 */
+    const fire = () => {
+        const scale = heartScale();
+        const cx = width / 2;
+        const cy = height / 2;
+        const maxR = scale * 20;
+
+        for (const p of particles) {
+            const dx = p.tx - cx;
+            const dy = p.ty - cy;
+            const len = Math.hypot(dx, dy) || 1;
+            // 稍微夹一点随机，散得太整齐反而假
+            const kick = maxR * (0.55 + Math.random() * 0.75);
+            p.vx = (dx / len) * kick + (Math.random() - 0.5) * maxR * 0.3;
+            p.vy = (dy / len) * kick + (Math.random() - 0.5) * maxR * 0.3;
+            p.life = 1;
+            p.fired = true;
+            p.hue = 320 + Math.random() * 60; // 爆发时往紫蓝偏一点，跟聚心时区分开
+        }
+    };
+
+    const showEnvelope = () => {
+        if (envelopeShown) return;
+        envelopeShown = true;
+        envelopeWrap.hidden = false;
+        if (caption) caption.textContent = '';
+    };
+
+    const step = (now: number) => {
+        const elapsed = now - startedAt;
+        let scale = heartScale();
+
+        /* ---- 阶段推进 ---- */
+        if (phase === 'scatter' && elapsed > GIFT_SHOW.scatter) phase = 'gather';
+        if (phase === 'gather' && elapsed > GIFT_SHOW.scatter + GIFT_SHOW.gather) phase = 'hold';
+        if (phase === 'hold' && elapsed > GIFT_SHOW.scatter + GIFT_SHOW.gather + GIFT_SHOW.hold) {
+            phase = 'burst';
+            fire();
+        }
+        if (phase === 'burst' && elapsed > GIFT_SHOW.scatter + GIFT_SHOW.gather + GIFT_SHOW.hold + GIFT_SHOW.burst) {
+            phase = 'done';
+        }
+
+        // 心跳：hold 阶段一下一下地缩放
+        if (phase === 'hold' || phase === 'gather') {
+            const since = elapsed - GIFT_SHOW.scatter - (phase === 'hold' ? GIFT_SHOW.gather : 0);
+            const beat = Math.max(0, Math.sin((since / 1000) * Math.PI * 2.2));
+            scale *= 1 + beat * 0.045;
+        }
+
+        /* ---- 画 ---- */
+        // burst 尾段整体压暗，给信封让位
+        const darken = phase === 'done'
+            ? Math.max(0, 1 - (elapsed - (GIFT_SHOW.scatter + GIFT_SHOW.gather + GIFT_SHOW.hold + GIFT_SHOW.burst)) / GIFT_SHOW.fade)
+            : 1;
+
+        ctx.clearRect(0, 0, width, height);
+        if (darken <= 0.02) {
+            rafId = 0;
+            showEnvelope();
+            return;
+        }
+
+        const cx = width / 2;
+        const cy = height / 2;
+
+        // 'lighter' 让密集处自然过曝成亮白，比逐个画光晕快得多也好看
+        ctx.globalCompositeOperation = 'lighter';
+
+        for (const p of particles) {
+            if (!p.fired) {
+                // 汇聚：各粒子错峰，用 easeOutCubic 减速接近目标
+                const delay = (p.t % 1) * 0.45;
+                p.t = Math.min(1, p.t + 0.008 * p.speed);
+                const local = Math.max(0, Math.min(1, (p.t - delay) / (1 - delay)));
+                const eased = 1 - Math.pow(1 - local, 3);
+
+                p.x += (p.tx - p.x) * eased * 0.14;
+                p.y += (p.ty - p.y) * eased * 0.14;
+            } else {
+                p.x += p.vx * 0.016;
+                p.y += p.vy * 0.016;
+                // 阻尼：速度每帧衰减 3%，看起来像被空气拖住
+                p.vx *= 0.97;
+                p.vy *= 0.97;
+                p.vy += 26; // 重力
+                p.life -= 0.011;
+            }
+
+            if (p.life <= 0) continue;
+
+            const alpha = (p.fired ? p.life : 0.42 + p.t * 0.58) * darken;
+            if (alpha <= 0.01) continue;
+
+            ctx.fillStyle = `hsla(${p.hue}, 92%, ${58 + p.t * 12}%, ${alpha})`;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * (p.fired ? 1.1 : 1), 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.globalCompositeOperation = 'source-over';
+
+        // burst 阶段让粒子聚成几簇「烟花」：把心形整体放慢旋转，
+        // 再叠一层大尺寸低透明度的光点当辉光
+        if (phase === 'burst') {
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = 0; i < 40; i++) {
+                const p = particles[(i * 37) % particles.length];
+                if (!p.fired || p.life <= 0) continue;
+                ctx.fillStyle = `hsla(${p.hue}, 95%, 72%, ${0.10 * p.life * darken})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        /* ---- 收尾 ---- */
+        if (phase === 'done') {
+            const sinceDone = elapsed - (GIFT_SHOW.scatter + GIFT_SHOW.gather + GIFT_SHOW.hold + GIFT_SHOW.burst);
+            if (sinceDone > GIFT_SHOW.fade * 0.55) showEnvelope();
+            rafId = window.requestAnimationFrame(step);
+            return;
+        }
+
+        /* ---- 字幕（也给读屏用户一份时间线） ---- */
+        if (caption) {
+            if (phase === 'scatter') caption.textContent = '…';
+            else if (phase === 'gather') caption.textContent = '正在聚拢…';
+            else if (phase === 'hold') caption.textContent = '';
+        }
+
+        rafId = window.requestAnimationFrame(step);
+    };
+
+    const start = () => {
+        resize();
+        seed();
+        startedAt = performance.now();
+        if (reduced) {
+            // 降级：直接跳到信封，不放粒子
+            showEnvelope();
+            return;
+        }
+        rafId = window.requestAnimationFrame(step);
+    };
+
+    start();
+
+    window.addEventListener('resize', () => {
+        if (phase === 'done' || envelopeShown) return;
+        resize();
+        seed();
+    }, { passive: true });
+
+    window.addEventListener('pagehide', () => {
+        if (rafId) window.cancelAnimationFrame(rafId);
+        window.clearInterval(expireGuard);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', setupSecretPost);
+document.addEventListener('DOMContentLoaded', setupGiftMenu);
+document.addEventListener('DOMContentLoaded', setupGiftQuiz);
+document.addEventListener('DOMContentLoaded', setupGiftShow);

@@ -1,0 +1,92 @@
+{{- /*
+  Gift 第二页：表演 + 信封 + 正文
+  ============================================================
+  由 content/page/gift/letter/index.md 的 `layout: gift-letter` 触发。
+
+  三个阶段（全部由 assets/ts/custom.ts 的 setupGiftShow() 驱动）：
+
+    ① SHOW   canvas 满屏。粒子从四周汇聚成一个会心跳的心形，
+                   心跳一下就炸成烟花。
+    ② ENVELOPE  烟花散尽，一个信封从暗处浮上来，轻轻晃。
+    ③ OPEN   点信封 → 封盖翻开 → 信纸升起 → 正文解密并淡入。
+
+  密码不在这一页问 —— 答题页校验通过后已经把拼好的串
+  存进 sessionStorage（键 `gift-passphrase`），这里取出来直接解密。
+  取不到就说明没答对题 / 刷新了标签页，退回第一页重答。
+
+  ⚠️ 密文放 data-cipher 属性，**不要**放 <script>：
+     Hugo 会把 base64 里的 `+` 转成 `&#43;`，而 <script> 内是原始文本，
+     浏览器不解码 HTML 实体 → atob() 拿到坏串 → 永远报「解密失败」。
+     属性值走 HTML 属性解码，能拿到原始 base64（同 secret 文章的坑）。
+*/ -}}
+
+{{ define "main" }}
+    {{- $gift := .Params.gift -}}
+    {{- /* 整页铺满：Stack 的 main 容器有 max-width 和左右留白，
+           这里全部清掉，否则 canvas 撑不满、粒子会被裁掉 */ -}}
+    <div class="gift-stage" data-gift-show
+        data-unlock="{{ $gift.unlockAt }}"
+        data-expire="{{ $gift.expireAt }}"
+        data-iterations="{{ $gift.pbkdf2Iterations | default 120000 }}"
+        data-cipher="{{ $gift.cipher }}">
+
+        {{- /* ---------- ① 粒子 / 烟花 ---------- */ -}}
+        <canvas class="gift-canvas" data-gift-canvas aria-hidden="true"></canvas>
+
+        {{- /* 阶段提示：给不跑 canvas 的环境一个兜底，也是听力/低视力用户的字幕 */ -}}
+        <p class="gift-stage__caption" data-gift-caption aria-live="polite"></p>
+
+        {{- /* ---------- ② 信封 ---------- */ -}}
+        <div class="gift-envelope-wrap" data-gift-envelope hidden>
+            <button type="button" class="gift-envelope" data-gift-open
+                    aria-label="打开信封">
+                <span class="gift-envelope__back" aria-hidden="true"></span>
+                <span class="gift-envelope__letter" aria-hidden="true"></span>
+                <span class="gift-envelope__front" aria-hidden="true"></span>
+                <span class="gift-envelope__flap" aria-hidden="true"></span>
+                <span class="gift-envelope__seal" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.7-9.6-9A5.4 5.4 0 0 1 12 5.6 5.4 5.4 0 0 1 21.6 12c-2.1 4.3-9.6 9-9.6 9z"/></svg>
+                </span>
+            </button>
+            <p class="gift-envelope__hint">点一下，把它打开</p>
+        </div>
+
+        {{- /* ---------- ③ 正文 ---------- */ -}}
+        <div class="gift-letter" data-gift-letter hidden>
+            <article class="gift-letter__paper">
+                <header class="gift-letter__head">
+                    <p class="gift-letter__eyebrow">给你的</p>
+                    <h1 class="gift-letter__title">{{ .Title }}</h1>
+                    {{- with .Params.subtitle }}<p class="gift-letter__sub">{{ . }}</p>{{ end }}
+                </header>
+
+                {{- /* 密文解开后填在这里。
+                       ⚠️ 正文 Markdown 里不要再写一级标题 —— 上面已经有
+                       front matter 的 title 当 H1 了，再写一个就是两个 H1，
+                       读屏软件会当成两篇不同的文章。正文从 ## 起步。 */ -}}
+                <div class="article-content gift-letter__body" data-gift-body></div>
+
+                <footer class="gift-letter__foot">
+                    <p class="gift-letter__sign">{{ .Params.signature | default "PIEMM" }}</p>
+                </footer>
+            </article>
+        </div>
+
+        {{- /* ---------- 出错兜底 ---------- */ -}}
+        <div class="gift-fallback" data-gift-fallback hidden>
+            <p class="gift-fallback__text" data-gift-fallback-text></p>
+            <a class="gift-fallback__back" href="{{ "/gift/" | relURL }}">回到第一页</a>
+        </div>
+    </div>
+{{ end }}
+
+{{- /* 满屏 canvas，左侧栏在这里是干扰 —— 连汉堡菜单一起收掉，
+       只留一个返回首页的最小出口在 fallback 里。 */ -}}
+{{ define "left-sidebar" }}{{ end }}
+
+{{ define "right-sidebar" }}{{ end }}
+
+{{- /* body-class 是关键：music 播放器、页脚这些在满屏 canvas 上全是干扰，
+       custom.css 里用 `body.gift-page` 选择器一并藏掉。
+       （baseof 没有 footer block，footer 是直接 partial 调的，定义它没用） */ -}}
+{{ define "body-class" }}gift-page{{ end }}

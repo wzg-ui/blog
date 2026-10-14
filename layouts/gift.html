@@ -1,0 +1,77 @@
+{{- /*
+  Gift 第一页：五道题
+  ============================================================
+  由 content/page/gift/index.md 的 `layout: gift` 触发。
+
+  这一页只干一件事：收五个答案，拼成一个字符串，
+  拿 SHA-256 跟 front matter 里的 `gift.answersHash` 对一下。
+  对上了 → 把**拼好的那个串**（也就是密码本身）存 sessionStorage，
+  跳到表演页；表演页拿它去解密正文。
+
+  为什么密码要中转一次而不是让表演页自己问一遍：
+    表演页要放粒子 + 烟花 + 信封，前面不能插一个密码框破坏气氛。
+    sessionStorage 只活在当前标签页，关掉就没了 —— 正好，
+    她必须一口气答对才能看完，不想让她分两次偷看。
+
+  ⚠️ 仓库公开，所以 front matter 里只有 answersHash（SHA-256），
+     答案明文和密码都不入库。整体判定，不提示哪一题错了 ——
+     逐题提示就得存五个单独哈希，等于把每题的可搜索空间缩到 1/N。
+
+  时间锁：unlockAt 之前只显示倒计时，expireAt 之后整个入口下线。
+*/ -}}
+
+{{ define "main" }}
+    {{- $gift := .Params.gift -}}
+    <article class="main-article gift-article" data-gift-quiz
+        data-unlock="{{ $gift.unlockAt }}"
+        data-expire="{{ $gift.expireAt }}"
+        data-hash="{{ $gift.answersHash }}">
+
+        <header class="gift-hero">
+            <p class="gift-hero__eyebrow">Special Gift</p>
+            <h1 class="gift-hero__title">{{ .Title }}</h1>
+            {{- with .Params.description }}<p class="gift-hero__sub">{{ . }}</p>{{ end }}
+        </header>
+
+        {{- /* ---------- 未解锁 / 已过期时的状态区 ---------- */ -}}
+        <div class="gift-gate" data-gift-gate>
+            <div data-gift-state></div>
+
+            <noscript>
+                <p class="gift-gate__hint">
+                    这一页需要 JavaScript 才能继续，请在浏览器里允许它运行。
+                </p>
+            </noscript>
+        </div>
+
+        {{- /* ---------- 五道题 ---------- */ -}}
+        <form class="gift-quiz" data-gift-form hidden autocomplete="off" novalidate>
+            <p class="gift-quiz__lead">{{ .Params.lead | default "来看看能不能 Get 到我的问题" }}</p>
+
+            <ol class="gift-questions">
+                {{- range $i, $q := .Params.questions }}
+                <li class="gift-q">
+                    <label class="gift-q__label" for="gift-a{{ $i }}">
+                        <span class="gift-q__no">{{ add $i 1 }}</span>
+                        <span class="gift-q__text">{{ $q }}</span>
+                    </label>
+                    <input id="gift-a{{ $i }}" class="gift-q__input" data-gift-input
+                           type="text" enterkeyhint="next"
+                           autocapitalize="off" autocorrect="off" spellcheck="false"
+                           placeholder="你的答案" />
+                </li>
+                {{- end }}
+            </ol>
+
+            <div class="gift-quiz__foot">
+                <button type="submit" class="gift-submit" data-gift-submit>提交</button>
+                <p class="gift-quiz__msg" data-gift-msg role="status" aria-live="polite"></p>
+            </div>
+        </form>
+    </article>
+{{ end }}
+
+{{ define "body-class" }}article-page{{ end }}
+
+{{- /* 表演页要的是一整块黑，右侧目录栏在这里只会碍事 */ -}}
+{{ define "right-sidebar" }}{{ end }}
