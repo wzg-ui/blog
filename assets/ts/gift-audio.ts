@@ -16,7 +16,7 @@ export function primeGiftAudio(root: HTMLElement | null): () => void {
     };
 }
 
-/** Two NetEase tracks: a timed intro excerpt, then a separate song for the letter. */
+/** The intro continues through the envelope; opening it switches to the reading song. */
 export function setupGiftAudio(root: HTMLElement, time: () => number, canPlay: () => boolean) {
     const intro = root.querySelector<HTMLAudioElement>('[data-gift-audio]');
     const letter = root.querySelector<HTMLAudioElement>('[data-gift-letter-audio]');
@@ -43,10 +43,7 @@ export function setupGiftAudio(root: HTMLElement, time: () => number, canPlay: (
     };
     const syncIntro = () => {
         if (active !== intro || !intro || !Number.isFinite(intro.duration)) return;
-        if (waitingForLetter) {
-            if (intro.currentTime < startAt || intro.currentTime >= endAt) intro.currentTime = startAt;
-            return;
-        }
+        if (waitingForLetter) return;
         const position = Math.min(endAt, startAt + Math.max(0, time() / 1000), intro.duration - 0.05);
         if (Math.abs(intro.currentTime - position) > 0.3) intro.currentTime = position;
     };
@@ -71,17 +68,6 @@ export function setupGiftAudio(root: HTMLElement, time: () => number, canPlay: (
         track.addEventListener('error', () => { failed.add(track); update(); });
     }
     intro?.addEventListener('loadedmetadata', syncIntro);
-    intro?.addEventListener('timeupdate', () => {
-        if (active === intro && intro.currentTime >= endAt) {
-            if (waitingForLetter) {
-                intro.currentTime = startAt;
-                play();
-                return;
-            }
-            intro.pause();
-            if (intro.currentTime > endAt + 0.05) intro.currentTime = endAt;
-        }
-    });
     button?.addEventListener('click', () => {
         if (!canPlay() || !active) return;
         if (!active.paused) { wanted = false; pause(); }
@@ -102,7 +88,7 @@ export function setupGiftAudio(root: HTMLElement, time: () => number, canPlay: (
         waitForLetter: () => {
             waitingForLetter = true;
             if (active !== intro) select(intro, startAt, 0.65);
-            else play();
+            else if (intro?.paused) play();
         },
         readLetter: () => { waitingForLetter = false; select(letter, 0, 0.4); },
         pause,

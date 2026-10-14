@@ -10,10 +10,10 @@ import { join, resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const output = join(root, 'public');
+const output = join(root, 'build-preview', 'codex-gift-verify');
 const shots = join(root, 'shots', 'gift-combined');
 mkdirSync(shots, { recursive: true });
-execFileSync(process.platform === 'win32' ? join(root, 'tools/hugo/hugo.exe') : 'hugo', ['--gc', '--minify'], { cwd: root, stdio: 'inherit' });
+execFileSync(process.platform === 'win32' ? join(root, 'tools/hugo/hugo.exe') : 'hugo', ['--minify', '--destination', output], { cwd: root, stdio: 'inherit' });
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const server = createServer((req, res) => {
     try {
@@ -119,6 +119,26 @@ try {
         return { call, evaluate, advance, screenshot, click, close: () => send('Target.closeTarget', { targetId }) };
     };
 
+    const checkLetterLayout = async (p, name) => {
+        const layout = await p.evaluate(`(() => {
+            const paper = document.querySelector('.gift-letter__paper').getBoundingClientRect();
+            const footer = document.querySelector('.gift-letter__foot').getBoundingClientRect();
+            const paragraphs = [...document.querySelectorAll('[data-gift-body] > p')];
+            return {
+                paperBottom: paper.bottom, footerBottom: footer.bottom,
+                paragraphs: paragraphs.length,
+                containsParagraphs: paragraphs.every(p => p.getBoundingClientRect().bottom <= paper.bottom),
+                noHorizontalOverflow: document.querySelector('[data-gift-letter]').scrollWidth <= innerWidth,
+            };
+        })()`);
+        assert.ok(layout.paragraphs > 1, 'The letter must retain separate paragraphs');
+        assert.ok(layout.containsParagraphs && layout.paperBottom >= layout.footerBottom, 'Paper must contain the entire letter and signature');
+        assert.equal(layout.noHorizontalOverflow, true, 'Reading layout must fit the viewport');
+        await p.screenshot(`${name}-letter-top`);
+        await p.evaluate("document.querySelector('[data-gift-letter]').scrollTop = document.querySelector('[data-gift-letter]').scrollHeight");
+        await p.screenshot(`${name}-letter-bottom`);
+    };
+
     const checks = [];
     const scenarios = [
         (async () => {
@@ -184,18 +204,25 @@ try {
             assert.equal(await p.evaluate("document.querySelector('[data-gift-audio]').paused"), true);
             await p.advance(7000); await p.click('[data-gift-music]');
             assert.ok(await p.evaluate("document.querySelector('[data-gift-audio]').currentTime") >= 37, 'Enable seeks inside the requested excerpt');
+            const beforeEnvelope = await p.evaluate(`(() => {
+                const audio = document.querySelector('[data-gift-audio]');
+                window.__introEvents = [];
+                for (const event of ['pause', 'play', 'seeking', 'emptied']) {
+                    audio.addEventListener(event, () => window.__introEvents.push(event));
+                }
+                return audio.currentTime;
+            })()`);
             await p.advance(45000);
+            assert.deepEqual(await p.evaluate('window.__introEvents'), [], 'Envelope transition must not pause, seek, reload or restart audio');
+            const afterEnvelope = await p.evaluate("document.querySelector('[data-gift-audio]').currentTime");
+            assert.ok(afterEnvelope >= beforeEnvelope && afterEnvelope < beforeEnvelope + 2, 'Envelope preserves the playback position');
             assert.equal(await p.evaluate("document.querySelector('[data-gift-envelope]').hidden"), false);
             assert.equal(await p.evaluate("document.querySelector('[data-gift-audio]').paused"), false, 'First song continues while waiting at the envelope');
             assert.equal(await p.evaluate("document.querySelector('[data-gift-letter-audio]').paused"), true, 'Reading song waits for the click');
             assert.equal(await p.evaluate("document.querySelector('[data-gift-music]').hidden"), false);
             await p.evaluate("document.querySelector('[data-gift-audio]').currentTime = 74.1");
-            for (let i = 0; i < 80; i++) {
-                if (await p.evaluate("document.querySelector('[data-gift-audio]').currentTime < 32")) break;
-                await new Promise(r => setTimeout(r, 50));
-            }
-            assert.ok(await p.evaluate("document.querySelector('[data-gift-audio]').currentTime") >= 30);
-            assert.ok(await p.evaluate("document.querySelector('[data-gift-audio]').currentTime") < 32, 'Waiting loops back to 00:30');
+            await new Promise(r => setTimeout(r, 600));
+            assert.ok(await p.evaluate("document.querySelector('[data-gift-audio]').currentTime") > 74.1, 'Waiting continues naturally beyond 01:14');
             assert.equal(await p.evaluate("document.querySelector('[data-gift-audio]').paused"), false);
             await p.evaluate('window.__giftTime = 0'); await p.click('[data-gift-replay]');
             assert.equal(await p.evaluate("document.querySelector('[data-gift-audio]').paused"), false);
@@ -237,6 +264,7 @@ try {
             await p.evaluate("document.querySelector('[data-gift-open]').click()");
             await new Promise(r => setTimeout(r, 1000));
             assert.equal(await p.evaluate("document.querySelector('[data-gift-letter]').hidden"), false);
+            await checkLetterLayout(p, 'desktop');
             // Replay and skip must clear the previous state and remain repeatable.
             await p.evaluate("window.__giftTime = 0; document.querySelector('[data-gift-replay]').click()");
             assert.equal(await p.evaluate("document.querySelector('[data-gift-letter]').hidden"), true);
@@ -261,6 +289,9 @@ try {
             assert.equal(await p.evaluate("document.documentElement.scrollWidth <= innerWidth"), true);
             await p.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
             assert.equal(await p.evaluate("document.querySelector('[data-gift-envelope]').hidden"), false);
+            await p.click('[data-gift-open]');
+            await new Promise(r => setTimeout(r, 1000));
+            await checkLetterLayout(p, 'mobile');
             await p.close(); return 'mobile: portrait, landscape, 320px, resize, escape';
         }),
         (async () => {

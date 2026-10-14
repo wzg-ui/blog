@@ -1681,6 +1681,7 @@ html:has(body.gift-page) {
     z-index: 4;
     display: flex;
     justify-content: center;
+    align-items: flex-start;
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -1698,6 +1699,8 @@ html:has(body.gift-page) {
 .gift-letter__paper {
     width: 100%;
     max-width: 72rem;
+    flex-shrink: 0;
+    min-width: 0;
     padding: 5rem 4.4rem 4.4rem;
     background-color: var(--gift-paper);
     /* 纸张纹理：极淡的横纹，叠一层顶部高光 */
@@ -1862,6 +1865,53 @@ html:has(body.gift-page) {
     font-weight: 700;
 }
 
+/* ⚠️⚠️ 必须清掉主题给的标题「左侧竖条 + 负边距」。
+   主题 .article-content 下的 h1~h6 全都带：
+       margin-inline-start: calc(var(--card-padding) * -1);
+       padding-inline-start: calc(var(--card-padding) - var(--heading-border-size));
+       border-inline-start: <size> solid var(--accent-color);
+   信纸的 h1 是 text-align: center的居中标题，
+   那个负左边距把它拉出正文列、竖条又横穿整个标题 ——
+   实测渲染成一个把「给你的」整个框起来的黑框，非常难看。
+   四条属性逐个归零，别只写 border: none（负边距会让它整体左移）。 */
+.gift-letter__title,
+.gift-letter__sub,
+.gift-letter__body h1,
+.gift-letter__body h2,
+.gift-letter__body h3,
+.gift-letter__body h4,
+.gift-letter__body h5,
+.gift-letter__body h6 {
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+    border-inline-start: 0;
+}
+
+/* ⚠️ 焦点轮廓：信纸的 h1 不是可点元素，却会被点信封时的焦点跳转带出
+   浏览器默认的 `outline: auto 1px`（实测 rgb(16,16,16)），在浅粉信纸上
+   就是一个突兀的黑框把标题整个框住。
+   只清 outline（可访问性允许），不动 border。 */
+.gift-letter__title:focus,
+.gift-letter__title:focus-visible,
+.gift-letter__head h1:focus {
+    outline: none;
+}
+
+/* ---------- 正文：浅底重写 ----------
+   同特异性下 custom.css 在主题 style.css 之后加载，
+   但这里统一写成两级选择器，留出余量。 */
+.gift-letter__body {
+    margin: 0;
+    padding: 0;
+    color: var(--gift-ink);
+    font-family: var(--base-font-family);
+    font-size: 1.6rem;
+    line-height: 1.9;
+}
+
+/* ⚠️ 段落间距：信是长文，24 段连着读，没有段间距会糊成一片。
+   1.9的line-height 只管「行内」松紧，段与段之间完全靠margin。
+   移动端压到 1.2rem —— 手机上段距太大要滑很久才看到下一段。 */
 .gift-letter__sub {
     margin: 1.2rem 0 0;
     color: var(--gift-ink-soft);
@@ -1884,6 +1934,15 @@ html:has(body.gift-page) {
 .gift-letter__body p,
 .gift-letter__body li {
     line-height: 1.9;
+}
+
+.gift-letter__body > p {
+    margin: 0 0 1em;
+    text-indent: 2em;
+}
+
+.gift-letter__body > p:last-child {
+    margin-bottom: 0;
 }
 
 .gift-letter__body > :first-child {
