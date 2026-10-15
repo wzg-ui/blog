@@ -354,7 +354,7 @@ python3 hello.py
 
 ### IDLE：先用自带的工具写起来
 
-IDLE 是 Python 的集成开发与学习环境，提供交互式 Shell 和文件编辑器。（我可能会叫它清朝老编辑器哈哈哈哈）
+IDLE 是 Python 的集成开发与学习环境，提供交互式 Shell 和文件编辑器。（我有时会叫它清朝老编辑器哈哈哈哈）
 
 打开 IDLE 后，Shell 窗口里的 `>>>` 和命令行交互环境用法相近。想写文件，就选 **File → New File**，输入代码并保存为 `.py`，再选 **Run → Run Module**，或按 `F5`，结果会出现在 Shell 中。
 
