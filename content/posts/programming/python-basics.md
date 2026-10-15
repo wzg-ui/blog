@@ -19,7 +19,7 @@ description: "初出茅庐的PIEMM"
 
 看完这个标题，你不会以为我会打出所有关键字以及标识符吧，这好像有点难为 PIEEE 了。去，哪来那么多规矩。就像老师让我被校规一样，我可能背吗，那当然不可能啦，到这里你可能说
 
-{{< img src="reply-too-strong.jpg" >}}
+![太强了](/images/reply-too-strong.jpg)
 
 
 ## 缩进与注释：代码怎么排、怎么写注解

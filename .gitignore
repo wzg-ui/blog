@@ -40,6 +40,14 @@ Thumbs.db
 # 换了机器没意义，不该进仓库（真实内容只有 appId 和本地目录）
 .wbapp_*.genie
 
+# ---------- 正文插图的本机映射 ----------
+# 根目录的 images/ 是**目录联接**（junction），指向 static/images/。
+# 作用只有一个：让 VS Code 的 Markdown 预览能显示正文里的图。
+# Hugo 短代码 `{{< img >}}` 在编辑器里只显示成裸文本，而写文章时想看到图。
+# 真正的图片文件在 static/images/（那个才入库），这里的 images/ 只是个指针，
+# 删掉不影响站点，但重建一次才能恢复（cmd //c "mklink /J images static\images"）。
+/images/
+
 # ---------- 服务器部署 ----------
 # .env 里有数据库密码和会话密钥，绝对不能提交
 deploy/.env
