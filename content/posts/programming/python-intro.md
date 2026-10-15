@@ -6,7 +6,7 @@ slug: "python-intro"
 description: "穿越之重拾 Python"
 ---
 
-这是「重新理解编程语言」系列的第一篇。
+这是「重拾 Python」系列的第一篇。
 之前那篇文章里，我从 C++ 出发，重新认识了 C、Python 以及不同编程语言背后的设计思想。
 而这一篇，我想真正重新开始学习 Python。
 那么现在 PIEMM 穿越了，这一世我一定要学好 Python！
