@@ -16,6 +16,12 @@
            绕不过去 —— 漏掉的话生日惊喜会在首页提前露出来）。 */ -}}
     {{- $pages  := where $pages "Params.secret" "!=" "<no-value>" -}}
     {{- $pinned := where $pages "Params.pinned" true -}}
+    {{- /* ⚠️ 这里必须显式 sort —— .Site.RegularPages 是被主题按 pages-sort
+           排过的（SortBy=default 时它不碰 weight），where 只是过滤、不重排，
+           所以集合里「置顶那几篇」的先后是文件/路径顺序，不是 weight。
+           实测踩到：weight 0/1/2 排出来是 1,2,0。sort "Weight" "asc" 才是
+           weight 小 的在前；weight 相同时按日期倒序，跟常规列表一致。 */ -}}
+    {{- $pinned = sort $pinned "Weight" "asc" -}}
     {{- /* 用 where 反选，不要用 complement —— 实测 complement 对 page 集合
            不生效，$rest 会把置顶那几篇也带进来，首页直接重复一遍。 */ -}}
     {{- $rest   := where $pages "Params.pinned" "ne" true -}}
