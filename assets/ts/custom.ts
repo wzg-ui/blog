@@ -12,6 +12,10 @@ import { primeGiftAudio } from './gift-audio';
  *   2. 粒子点阵背景
  *   3. 页脚的「本站已运行」计时器
  *   4. 右上角的黑胶唱片播放器
+ *
+ * 另外这里是 KaTeX 的调用方（公式渲染本身的库与样式是本地静态资源，
+ * 由 layouts/_partials/head/custom.html 挂载）：
+ *   5. 正文公式渲染
  */
 
 function activateCodeGroup(group: Element, targetId: string) {
@@ -1255,6 +1259,46 @@ function setupSecretPost() {
     start();
 }
 
+/**
+ * 正文公式渲染（KaTeX + auto-render）
+ *
+ * 库与样式是本地静态资源，见 layouts/_partials/head/custom.html 的挂载段：
+ *   /katex/katex.min.css + katex.min.js + contrib/auto-render.min.js
+ * 本函数只负责「告诉 auto-render 去哪扫、扫什么分隔符」。
+ *
+ * ⚠️ 为什么要挂这一段：static/katex/ 里的文件早就下载好了，
+ *    但没在页面里挂载就等于不存在。2026-10-16 收到第一篇带公式的投稿
+ *    （《从一道 x→−∞ 的根号极限说起》）才发现公式全是裸的 $$ 文本。
+ *
+ * ⚠️ 为什么用 auto-render 而不是 Hugo 服务端渲染：
+ *    本站没配 math 引擎，纯前端最省事，也不拖慢静态站点的构建。
+ *
+ * ⚠️ 只扫 .article-content：侧栏、页脚都没有公式，
+ *    全页扫反而可能把代码块里的 $ 误判成公式。
+ *
+ * ⚠️ 忽略 code / pre：代码示例里常有 `$VAR`、`$(...)` 这类写法，
+ *    不排除掉会被当成公式渲染成一坨错的东西。
+ */
+function setupKatex() {
+    const content = document.querySelector('.article-content');
+    if (!content) return;
+
+    const render = (window as any).renderMathInElement;
+    if (typeof render !== 'function') return; // 资源没加载成功就别硬调
+
+    render(content, {
+        delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '\\[', right: '\\]', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\(', right: '\\)', display: false }
+        ],
+        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option'],
+        throwOnError: false
+    });
+}
+
+document.addEventListener('DOMContentLoaded', setupKatex);
 document.addEventListener('DOMContentLoaded', setupCodeGroups);
 document.addEventListener('DOMContentLoaded', setupParticleBackground);
 document.addEventListener('DOMContentLoaded', setupSiteRuntime);

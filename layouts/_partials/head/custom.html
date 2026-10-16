@@ -16,3 +16,24 @@
     <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "{{ .token }}"}'></script>
 {{- end -}}
 {{- end -}}
+
+{{- /* ============================================================
+       KaTeX —— 公式渲染
+       资源是static/katex/ 下的本地文件（不是 CDN，本机拦 jsdelivr）。
+       auto-render 在运行时扫描正文，把 $$...$$ 与 \( \) 交给 KaTeX。
+
+       ⚠️ 为什么必须挂这一段：static/katex/ 里文件早就下好了，
+          但**没挂载就等于没有**。之前一直没人写公式，
+          2026-10-16 收到第一篇带公式的投稿（数学极限）才发现公式全是裸文本。
+       ⚠️ 用 auto-render 而不是服务端渲染：Hugo 侧没配 math 引擎，
+          纯前端最省事，也不影响静态站点的构建速度。
+       ⚠️ 脚本带 defer，等 DOM 就绪后再扫，不会和主题脚本抢。*/ -}}
+<link rel="stylesheet" href="/katex/katex.min.css">
+<script defer src="/katex/katex.min.js"></script>
+<script defer src="/katex/contrib/auto-render.min.js"></script>
+{{- /* ⚠️ 为什么不写成内联 <script>：html/template 会把 <script> 里的
+       {{ }} 插值当 JS 上下文再编码一次。要内联就得加 safeJS，
+       不如老实放进 assets/ts/custom.ts —— 而且真正的逻辑（扫哪些分隔符、
+       渲染失败要不要降级）在那边更好维护。
+       打包产物在 /ts/custom.*.js（不是 /js/，见 custom.ts 顶部的构建说明）。 */ -}}
+
