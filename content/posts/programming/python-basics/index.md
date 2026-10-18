@@ -362,16 +362,22 @@ score = 95.5
 print("{}: {:.2f}".format(name, score))
 ```
 
-这三种格式化输出方式都可以使用。个人目前没啥喜好，都可以。
+这三种格式化输出方式都可以使用。本人写C++比较多的原因，所以会喜欢第一种，但这三种个人认为没有什么好坏之分，自己选择合适的，喜欢的就可以。
 
 ## 常用内置函数
 
 个人感觉好像没什么好讲的，概括一下结束了。
+
 对于类型转换 int(),float(),str(),eval()
+
 对于进制转换 bin(),oct(),hex()
+
 元素数量len(),求和sum()
+
 最大值max(),最小值min()，注意这个比较有一个key，也就是max(x[,key]),min(x[,key])
+
 排序函数sorted(x,key=,reversed=),逆序函数reversed(x,key=)
+
 range()函数，range(start,end,step),注意区间**左闭右开**。
 
 
