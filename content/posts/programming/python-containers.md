@@ -85,16 +85,22 @@ print(id(a) == before)   # True，还是原来那个
 
 | Python | C++ 里最接近的 | 差在哪 |
 |---|---|---|
-| `str` | `std::string` | C++ 的能原地改（`s[0] = 'x'` 合法），Python 不行；另外 `size()` 数字节，`len()` 数字符 |
-| `bytes` | `std::string` | C++ 的 string 既能装文本也能装二进制；Python 拆成 str 和 bytes 两个 |
-| `list` | `std::vector<T>` | 最接近的一组，都是动态数组，尾部追加均摊 O(1) |
-| `tuple` | `std::tuple` / `std::pair` / `std::array<T, N>` | 定长但能装不同类型，更接近 `std::tuple`；`std::array` 要求同类型 |
-| `set` | `std::unordered_set<T>` | 哈希、无序，不是 `std::set`（红黑树、按大小排好） |
-| `dict` | `std::unordered_map<K, V>` | 哈希；Python 从 3.7 起还保插入顺序，`unordered_map` 不保 |
+| `str` | `string` | C++ 的能原地改（`s[0] = 'x'` 合法），Python 不行；另外 `size()` 数字节，`len()` 数字符 |
+| `bytes` | `string` | C++ 的 string 既能装文本也能装二进制；Python 拆成 str 和 bytes 两个 |
+| `list` | `vector` | 最接近的一组，都是动态数组，尾部追加均摊 O(1) |
+| `tuple` | `tuple` / `pair` / `array` | 定长但能装不同类型，更接近 `tuple`；`array` 要求同类型 |
+| `set` | `unordered_set` | 哈希、无序；`set` 是另一个——红黑树、按大小排好 |
+| `dict` | `unordered_map` | 哈希；`map` 是另一个——红黑树、按键排序 |
 
-最容易套错的是第一行：`str` 对着 `std::string` 没错，可变性却正好相反。C++ 里 `std::string` 就是一个能改的字节数组，限制它的是 `const`；Python 的 `str` 是天生没有修改接口。这两件事不是一回事——`const` 管的是「这个引用不许改」，换个引用照样改得动；Python 的不可变是对象自己没长那只手，谁拿到都改不了。
+名字前面常带 `std::`（`std::string`、`std::vector`），那是「标准库里」的标记，不影响它在做什么。
 
-竞赛里最常用的还是 `std::pair`：两个元素、类型可以不同，跟 Python 的二元 tuple 几乎能一一对上。`std::array` 则是定长同类型，更像「长度写死的 list」。
+C++ 那边每种东西都有两个版本：`set` / `unordered_set`、`map` / `unordered_map`。带 `unordered_` 的是哈希表，另一个是红黑树——插入时就把顺序排好，所以能 `lower_bound`、能从头到尾按序遍历。Python 只做了哈希那一半，所以 `set` / `dict` 对应的是 `unordered_*`，不是 `set` / `map`。
+
+红黑树那一半 Python 没有。真要有序，只能 `sorted()` 排一次，或者用 `bisect` 维护一个始终有序的 list。
+
+最容易套错的是第一行：`str` 对着 `string` 没错，可变性却正好相反。C++ 里 `string` 就是一个能改的字节数组，限制它的是 `const`；Python 的 `str` 是天生没有修改接口。这两件事不是一回事——`const` 管的是「这个引用不许改」，换个引用照样改得动；Python 的不可变是对象自己没长那只手，谁拿到都改不了。
+
+竞赛里最常用的还是 `pair`：两个元素、类型可以不同，跟 Python 的二元 tuple 几乎能一一对上。`array` 则是定长同类型，更像「长度写死的 list」。
 
 ## 字符串 str
 
