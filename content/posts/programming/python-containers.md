@@ -128,10 +128,13 @@ Python 的 `str` 则天生不可变：对象创建之后，不能原地修改它
 | 尾部删一个 | `a.pop()` | `v.pop_back()` |
 | 中间插一个 | `a.insert(i, x)` | `v.insert(v.begin() + i, x)` |
 | 按下标删 | `del a[i]` / `a.pop(i)` | `v.erase(v.begin() + i)` |
+| 按值删 | `a.remove(x)`，只删第一个，没有就报错 | `v.erase(remove(v.begin(), v.end(), x), v.end())`，删掉所有 |
 | 按下标取 | `a[i]` | `v[i]`（不查越界）/ `v.at(i)`（查） |
 | 按下标改 | `a[i] = x` | `v[i] = x` |
 | 长度 | `len(a)` | `v.size()` |
 | 找位置 | `a.index(x)`，找不到抛 `ValueError` | `find(v.begin(), v.end(), x) - v.begin()`，找不到得到 `size()` |
+| 数几个 | `a.count(x)` | `count(v.begin(), v.end(), x)` |
+| 在不在 | `x in a` | `find(v.begin(), v.end(), x) != v.end()` |
 | 原地排序 | `a.sort()` | `sort(v.begin(), v.end())` |
 | 排一份新的 | `sorted(a)` | 先拷一份再 `sort` |
 | 反转 | `a.reverse()` / `a[::-1]` | `reverse(v.begin(), v.end())` |
@@ -140,6 +143,7 @@ Python 的 `str` 则天生不可变：对象创建之后，不能原地修改它
 几处两边规矩不一样的：
 
 - `pop` 在 C++ 里只删尾部。Python 的 `pop()` 不写参数删尾部，写了参数删指定位置，一个名字管两件事。
+- 按值删两边删的东西不一样：`[1, 2, 2, 3]` 删 `2`，Python 得到 `[1, 2, 3]`，C++ 得到 `[1, 3]`。C++ 那个 `remove` 单独用还不算删——它只是把要留的元素往前挪，返回新的结尾，必须再接一个 `erase` 才真的变短；C++20 起有 `erase(v, x)` 一行写完（本机 g++ 16 两种都实测通过）。
 - 找位置失败，`a.index` 抛异常，`str.find` 返回 `-1`。同样是「找位置」，两种规矩，别混着记。
 - 下标越界，Python 抛 `IndexError`（实测 `a[5]` 报 `list index out of range`）。C++ 的 `v[i]` 根本不查，越界了也不吭声；想让它查得写 `v.at(i)`，抛的是 `out_of_range`（实测）。
 - `a[:] = b` 把整串换成 b 的内容，C++ 没有对应写法，得先 `clear()` 再 `insert`。
