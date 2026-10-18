@@ -85,42 +85,36 @@ print(id(a) == before)   # True，还是原来那个
 
 | Python | C++ 里最接近的 | 差在哪 |
 |---|---|---|
-| `str` | `string` | C++ 的能原地改（`s[0] = 'x'` 合法），Python 不行；另外 `size()` 数字节，`len()` 数字符 |
-| `bytes` | `string` | C++ 的 string 既能装文本也能装二进制；Python 拆成 str 和 bytes 两个 |
 | `list` | `vector` | 最接近的一组，都是动态数组，尾部追加均摊 O(1) |
 | `tuple` | `tuple` / `pair` | 定长但能装不同类型，更接近 `tuple` |
 | `set` | `unordered_set` | 哈希、无序；`set` 是另一个——红黑树、按大小排好 |
 | `dict` | `unordered_map` | 哈希；`map` 是另一个——红黑树、按键排序 |
+| `str` | `string` | C++ 的能原地改（`s[0] = 'x'` 合法），Python 不行；另外 `size()` 数字节，`len()` 数字符 |
+| `bytes` | `string` | C++ 的 string 既能装文本也能装二进制；Python 拆成 str 和 bytes 两个 |
 
 名字前面常带 `std::`（`std::string`、`std::vector`），那是「标准库里」的标记，不影响它在做什么。
 
 C++ 那边每种东西都有两个版本：`set` / `unordered_set`、`map` / `unordered_map`。带 `unordered_` 的是哈希表，另一个是红黑树——插入时就把顺序排好，所以能 `lower_bound`、能从头到尾按序遍历。Python 只做了哈希那一半，所以 `set` / `dict` 对应的是 `unordered_*`，不是 `set` / `map`。
 
-红黑树那一半 Python 没有。真要有序，只能 `sorted()` 排一次，或者用 `bisect` 维护一个始终有序的 list。
+红黑树那一半 Python 没有。真要有序，只能 `sorted()` 排一次。（目前PIEMM只会这个）。
 
-最容易套错的是第一行：`str` 对着 `string` 没错，可变性却正好相反。C++ 里 `string` 就是一个能改的字节数组，限制它的是 `const`；Python 的 `str` 是天生没有修改接口。这两件事不是一回事——`const` 管的是「这个引用不许改」，换个引用照样改得动；Python 的不可变是对象自己没长那只手，谁拿到都改不了。
+最容易套错的是 `str` 那一行：`str` 对着 `string` 没错，可变性却不能直接类比。
+
+C++ 里的 `std::string` 是可变的字符序列，能修改字符、追加内容；限制它修改的，可以是 `const`。但 `const` 管的是「不能通过这个访问路径修改对象」，换个非 `const` 的引用，照样可能改得动。
+
+简单来说，你可以把对象想象成一个人，引用就像这个人的多个小名。小名虽然不同，但指向的都是同一个人。
+
+有些小名被规定不能用来修改这个人的身份信息，有一个小名却可以。通过那个允许修改的小名改了身份信息，变的还是同一个人，只不过这个人的信息已经变了。其他小名再指向这个人时，看到的也会是修改后的信息。
+
+所以，`const` 限制的不是这个人本身能不能改变，而是**你能不能通过这个特定的引用去修改他**。
+
+Python 的 `str` 则天生不可变：对象创建之后，不能原地修改它的内容。变量可以重新赋值，但那是让变量指向另一个字符串对象，不是把原来的字符串改掉。
+
+说白了，**`const` 限制的是访问方式，Python 的不可变性限制的是对象本身的修改能力。**
 
 竞赛里最常用的还是 `pair`：两个元素、类型可以不同，跟 Python 的二元 tuple 几乎能一一对上。
 
 `array` 没进表，因为它两边都不完全像：长度写死像 tuple，元素却能改像 list。按这篇的判据（能不能原地改），它更该靠 list 那边，只是长度在写代码时就定死了，中途不能加不能减。
-
-## 字符串 str
-
-<!--
-要点：
-- 索引与切片：正负下标、`[start:stop:step]`、负步长反转
-- 常用方法：split / join / strip / replace / startswith / find / count
-- 格式化输出第二篇已经写过，这里**不要重讲**，一句话带过
-
-C++ 对照（要具体）：
-- str ↔ std::string，但 Python 的字符串**不可变**，`s[0] = 'x'` 直接报错
-- Python 没有 char 类型，单个字符就是长度为 1 的 str（C++ 里 `s[i]` 是 char）
-- 拼接：`+=` 在循环里是 O(n²)，习惯用 `"".join(parts)` 或 f-string
-- 中文/emoji：`len()` 数的是字符不是字节（C++ 的 std::string 数的是字节），
-  这条值得写一句，处理中文时是真差别
-
-⚠️ 不必写编码、Unicode 归一化，那是另一篇文章的量。
--->
 
 ## 列表 list
 
@@ -211,6 +205,24 @@ C++ 对照（最要命的一条放最前面）：
 ⚠️ 别写 `hash()` 的细节、别写哈希冲突
 -->
 
+## 字符串 str
+
+<!--
+要点：
+- 索引与切片：正负下标、`[start:stop:step]`、负步长反转
+- 常用方法：split / join / strip / replace / startswith / find / count
+- 格式化输出第二篇已经写过，这里**不要重讲**，一句话带过
+
+C++ 对照（要具体）：
+- str ↔ std::string，但 Python 的字符串**不可变**，`s[0] = 'x'` 直接报错
+- Python 没有 char 类型，单个字符就是长度为 1 的 str（C++ 里 `s[i]` 是 char）
+- 拼接：`+=` 在循环里是 O(n²)，习惯用 `"".join(parts)` 或 f-string
+- 中文/emoji：`len()` 数的是字符不是字节（C++ 的 std::string 数的是字节），
+  这条值得写一句，处理中文时是真差别
+
+⚠️ 不必写编码、Unicode 归一化，那是另一篇文章的量。
+-->
+
 ## bytes：一格装的是字节
 
 <!--
@@ -258,14 +270,19 @@ C++ 对照：不展开。只要知道那边没有专门装字节的类型，一�
 | 想要的 | C++ | Python |
 |---|---|---|
 | 栈 | std::stack | list（append / pop） |
+| 堆（优先队列） | std::priority_queue | heapq |
 | 队列 | std::queue | collections.deque（**不是 list**） |
 | 双端队列 | std::deque | collections.deque |
-| 堆（优先队列） | std::priority_queue | heapq |
-| 有序集合 / 有序字典 | std::set / std::map | 标准库没有 |
 | 链表 | std::list | 没有，手写或用数组模拟 |
+| 有序集合 / 有序字典 | std::set / std::map | 标准库没有 |
 
 ### 栈：list 就够
 append / pop，一行。提一句「不要用 list 当队列」。
+
+### 堆：heapq
+最小堆；最大堆取负数；heapify 建堆；heappush / heappop / heapreplace；
+`nlargest` / `nsmallest` 提一句。
+⚠️ 易错：heapq 操作的是**普通 list**，不是包装类型；直接对 list 排序不会变成堆。
 
 ### 队列：为什么必须用 deque
 `list.pop(0)` 是 O(n)（后面整体前移），deque 两端都是 O(1)。
@@ -288,11 +305,6 @@ appendleft / popleft / extendleft / rotate。
 这两不是数据结构，是**技巧**，但用栈和队列实现，所以放在这里合适。
 各给一个模板 + 一道典型题（下一个更大元素 / 滑动窗口最大值），说清「为什么能 O(n)」。
 ⚠️ 代码要实测（管理版 Python：C:\Users\13551\.workbuddy\binaries\python\versions\3.13.12\python.exe）。
-
-### 堆：heapq
-最小堆；最大堆取负数；heapify 建堆；heappush / heappop / heapreplace；
-`nlargest` / `nsmallest` 提一句。
-⚠️ 易错：heapq 操作的是**普通 list**，不是包装类型；直接对 list 排序不会变成堆。
 -->
 
 ## 更复杂的那些，先放一放
