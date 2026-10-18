@@ -19,7 +19,7 @@ description: "PIEMM喜欢数据容器"
 
 1. 它的底层原理是什么
 2. 最常用的几个操作
-3. 和 C++ 里哪个东西对得上。
+3. 每个操作在 C++ STL 里叫什么。
 
 ## 术语上要先纠一个偏
 
@@ -92,6 +92,8 @@ print(id(a) == before)   # True，还是原来那个
 | `str` | `string` | C++ 的能原地改（`s[0] = 'x'` 合法），Python 不行；另外 `size()` 数字节，`len()` 数字符 |
 | `bytes` | `string` | C++ 的 string 既能装文本也能装二进制；Python 拆成 str 和 bytes 两个 |
 
+这张表只解决「叫什么」。具体每个操作怎么对应，写在各个容器自己那一节里。
+
 名字前面常带 `std::`（`std::string`、`std::vector`），那是「标准库里」的标记，不影响它在做什么。
 
 C++ 那边每种东西都有两个版本：`set` / `unordered_set`、`map` / `unordered_map`。带 `unordered_` 的是哈希表，另一个是红黑树——插入时就把顺序排好，所以能 `lower_bound`、能从头到尾按序遍历。Python 只做了哈希那一半，所以 `set` / `dict` 对应的是 `unordered_*`，不是 `set` / `map`。
@@ -118,6 +120,28 @@ Python 的 `str` 则天生不可变：对象创建之后，不能原地修改它
 
 ## 列表 list
 
+先把操作对上号。C++ 那边是 `vector`，两边都是动态数组：尾部追加均摊 O(1)，中间插删要挪元素，是 O(n)。
+
+| 想做的事 | Python | C++ |
+|---|---|---|
+| 尾部加一个 | `a.append(x)` | `v.push_back(x)` |
+| 尾部删一个 | `a.pop()` | `v.pop_back()` |
+| 中间插一个 | `a.insert(i, x)` | `v.insert(v.begin() + i, x)` |
+| 按下标删 | `del a[i]` / `a.pop(i)` | `v.erase(v.begin() + i)` |
+| 按下标取 / 改 | `a[i]` / `a[i] = x` | `v[i]` |
+| 长度 | `len(a)` | `v.size()` |
+| 找位置 | `a.index(x)`，找不到抛 `ValueError` | `find(v.begin(), v.end(), x) - v.begin()`，找不到得到 `size()` |
+| 原地排序 | `a.sort()` | `sort(v.begin(), v.end())` |
+| 排一份新的 | `sorted(a)` | 先拷一份再 `sort` |
+| 反转 | `a.reverse()` / `a[::-1]` | `reverse(v.begin(), v.end())` |
+| 接上另一串 | `a.extend(b)` | `v.insert(v.end(), b.begin(), b.end())` |
+
+几处两边规矩不一样的：
+
+- `pop` 在 C++ 里只删尾部。Python 的 `pop()` 不写参数删尾部，写了参数删指定位置，一个名字管两件事。
+- 找位置失败，`a.index` 抛异常，`str.find` 返回 `-1`。同样是「找位置」，两种规矩，别混着记。
+- `a[:] = b` 把整串换成 b 的内容，C++ 没有对应写法，得先 `clear()` 再 `insert`。
+
 <!--
 要点：
 - 增删改查：append / extend / insert / pop / remove / index / count / sort
@@ -130,8 +154,9 @@ Python 的 `str` 则天生不可变：对象创建之后，不能原地修改它
 - 中间插入/删除 O(n)
 - 想 O(1) 头尾插入，得用 deque（后面那节）
 
-C++ 对照：list ↔ `vector`（动态数组）。把「名字骗人」这点写成一句能记住的话。
-顺带一句：`array` 是它的定长版——长度写死、元素照样能改，不在表里，正文已交代。
+C++ 对照表已经写在上面，正文别重复。只补「名字骗人」这一句：
+    名字叫 list，底层却是动态数组，对应 vector，不是链表 list。
+顺带一句：`array` 是定长版——长度写死、元素照样能改。
 
 ⚠️ 必写的坑：
 1. `b = a` 是别名不是拷贝（第二篇讲 `is` 时埋过，这里收口），配 `id()` 演示
@@ -141,6 +166,23 @@ C++ 对照：list ↔ `vector`（动态数组）。把「名字骗人」这点�
 
 ## 元组 tuple
 
+`tuple` 在 C++ 里有两个对应：两个元素是 `pair`，任意多个、类型还能不一样是 `tuple`。
+
+| 想做的事 | Python | C++ |
+|---|---|---|
+| 造两个 | `(1, 2)` | `make_pair(1, 2)` 或 `{1, 2}` |
+| 造多个、类型不同 | `(1, "a", 3.0)` | `tuple<int, string, double>` |
+| 取第几个 | `t[0]` | `p.first` / `get<0>(t)` |
+| 一次全取出来 | `a, b = t` | `auto [a, b] = p;`（C++17） |
+| 交换两个 | `a, b = b, a` | `swap(a, b)` |
+| 长度 | `len(t)` | `tuple_size`，编译期就知道 |
+| 比大小 | `(1, 2) < (1, 3)` 为真 | `p < q`，同样逐元素比，分出胜负就停 |
+| 只取后面几个 | `head, *rest = t` | 没有对应 |
+
+`get<0>` 尖括号里必须是写死的常量，所以 C++ 里不能拿变量当下标循环取。这一点是它比 Python 难用的主要来源。解包也是 Python 赚的地方：`auto [a, b] = p` 要 C++17 才有，而且只能一次性全拆。
+
+还有个小坑 C++ 那边没有：单元素元组必须写 `(1,)`，`(1)` 只是个加了括号的整数（实测 `type((1))` 是 `int`）。
+
 <!--
 要点：
 - 创建：`(1, 2)`，**单元素必须写 `(1,)`**（这个坑要单独提）
@@ -149,19 +191,32 @@ C++ 对照：list ↔ `vector`（动态数组）。把「名字骗人」这点�
 - 因为不可变所以能当 dict 的 key / set 的元素
 - 命名元组 `namedtuple` 提一句就够（不展开 dataclass）
 
-C++ 对照：
-- tuple ↔ `tuple`（可以装不同类型，异构）
+C++ 对照表已经写在上面，正文别重复。留一条就够：
 - ⚠️ `array` 别塞进 tuple 这一行：它定长但**能改**（`a[0] = 1` 合法），
   跟 tuple 的不可变正好相反，按这篇的判据该靠 list 那边。
   表格里不列它，在「先跟 C++ 对一下」下面用一句话交代
-- 一句话总结差别：C++ 的 `tuple` 主要靠 `std::get<0>` 取，丑；
-  Python 直接解包，这是它好用得多的地方
 
 ⚠️ 别把 tuple 写成「不可变的 list」就完了 —— 它真正的价值是**能当 key**，
    这一条要和上面「可变与不可变」那节呼应。
 -->
 
 ## 集合 set
+
+`set` 对应 `unordered_set`（哈希）。`set` 是另一个东西，红黑树、按大小排好，别看到同名就往一起对。
+
+| 想做的事 | Python | C++（`unordered_set`） |
+|---|---|---|
+| 插入 | `s.add(x)` | `us.insert(x)`，重复插入不报错，只是没插进去 |
+| 删，没有就算了 | `s.discard(x)` | `us.erase(x)`，返回删掉几个，0 就是不报错 |
+| 删，没有就报错 | `s.remove(x)` | 没有对应，`erase` 从不报错 |
+| 查在不在 | `x in s` | `us.count(x)` 或 `find(x) != end()` |
+| 大小 | `len(s)` | `us.size()` |
+| 交 / 并 / 差 / 对称差 | `a & b`、`a \| b`、`a - b`、`a ^ b` | 没有运算符，得自己写循环，或者用 `set_intersection` 那一套 |
+| 遍历 | `for x in s` | `for (int x : us)` |
+
+交并差这一行是两边手感差最大的。Python 直接给运算符，C++ 没有，只能循环。`set_intersection` / `set_union` 那套要求两个区间已经排好序：实测两个递增的 `vector` 能直接出结果，`unordered_set` 无序用不了，`set` 天生有序所以能用。
+
+有序那一半 Python 没有。要用 `lower_bound` 或者按序遍历，只能 `sorted(s)` 排一份（结果是 list 不是 set），或者用 `bisect` 维护一个始终有序的 list。
 
 <!--
 要点：
@@ -170,12 +225,7 @@ C++ 对照：
 - 交并差：`& | - ^`，以及对应的 `intersection / union / difference`
 - add / discard / remove 的区别（discard 不报错）
 
-C++ 对照（这里必须纠偏）：
-- Python 的 set 是**哈希表**，对应 `std::unordered_set`，**不是** `std::set`
-- 后果：Python 的 set 迭代顺序不保证（同一份数据不同次运行顺序可能不同），
-  而 `std::set` 是红黑树、天然有序
-- 所以「要一个有序集合」在 Python 标准库里没有直接对应，只能排序后转 list
-- 元素必须可哈希 ⇒ 不能放 list，可以放 tuple
+C++ 对照表已经写在上面，正文别重复。这条留给正文：元素必须可哈希 ⇒ 不能放 list，可以放 tuple。
 - 实测素材（写的时候用得上）：同一份 4 个字符串的 set，`PYTHONHASHSEED` 取 0 / 1 / 42 跑出三种顺序；
   同一组 `{3, 1, 2}` 在 `std::set` 里迭代 `1 2 3`、在 `unordered_set` 里 `2 1 3`
 - 要 `lower_bound` 那种行为：`bisect_left`（对标 `lower_bound`）+ `insort`；
@@ -188,6 +238,26 @@ C++ 对照（这里必须纠偏）：
 
 ## 字典 dict
 
+`dict` 对应 `unordered_map`（哈希）。`map` 是红黑树版，按键排序。
+
+| 想做的事 | Python | C++（`unordered_map`） |
+|---|---|---|
+| 写 / 改 | `d[k] = v` | `m[k] = v` |
+| 读，键一定在 | `d[k]`，不在就 `KeyError` | `m[k]`，不在就插一个默认值进去 |
+| 读，键可能不在 | `d.get(k)` / `d.get(k, 0)` | `find(k)` 再判 `!= end()` |
+| 键在不在 | `k in d`（看的是键） | `m.count(k)` |
+| 删 | `del d[k]` / `d.pop(k)` | `m.erase(k)` |
+| 没有才插入 | `d.setdefault(k, 0)` | `m.emplace(k, 0)`，已存在就不动 |
+| 计数 | `d[k] = d.get(k, 0) + 1` 或 `Counter` | `++m[k]` 一行 |
+| 遍历键值 | `for k, v in d.items()` | `for (auto &[k, v] : m)` |
+| 遍历键 | `for k in d` | `for (auto &p : m) p.first` |
+| 大小 | `len(d)` | `m.size()` |
+| 迭代顺序 | 3.7 起按插入顺序 | 不保证 |
+
+第二行最容易栽：C++ 的 `m[k]` 读一次就把键插进去了（实测 `m["new"]` 之后 `size()` 从 0 变 1），Python 的 `d[k]` 只报错不动数据。从 C++ 过来写「查一下有没有」，顺手就把表改了。
+
+计数那行，`++m[k]` 在 C++ 里是一次查找；Python 写 `d[k] = d.get(k, 0) + 1` 是取一次、写一次。真在意的场景用 `Counter` 省事。
+
 <!--
 要点：
 - 增删查改、`in` 判断的是键不是值
@@ -195,11 +265,11 @@ C++ 对照（这里必须纠偏）：
 - 遍历：`keys()` / `values()` / `items()`，以及 `.items()` 解包成 `k, v`
 - 3.7 起**保插入顺序**（原来是实现细节，后来写进语言规范）
 
-C++ 对照（最要命的一条放最前面）：
-- `d[k]` 取**不存在的键**会抛 KeyError；C++ 的 `m[k]` 会**默认构造一个值插进去**
+C++ 对照表已经写在上面，正文别重复。要展开的是第一行那个坑：
+- `d[k]` 取不存在的键抛 KeyError；C++ 的 `m[k]` 会默认构造一个值插进去
   ⇒ 一个报错、一个悄悄改数据，从 C++ 过来的人会栽
-- 要"没有就插入"的语义，Python 用 `setdefault` 或 `collections.defaultdict`
-- dict ↔ `std::unordered_map`（哈希、保插入序），不是 `std::map`（红黑树、按键排序）
+- 要「没有就插入」的语义，Python 用 `setdefault` 或 `collections.defaultdict`
+- ⚠️ 别写成「unordered_map 保插入序」——它不保。保插入序的是 Python 3.7 起的 dict
 
 ⚠️ 计数场景顺手引出 `collections.Counter`（一句话 + 一个例子就够，别展开整个 collections）
 ⚠️ 别写 `hash()` 的细节、别写哈希冲突
@@ -207,15 +277,38 @@ C++ 对照（最要命的一条放最前面）：
 
 ## 字符串 str
 
+`str` 对应 `string`，两边有个根本差别：C++ 的能原地改，Python 的不能。
+
+| 想做的事 | Python | C++ |
+|---|---|---|
+| 取一个字符 | `s[i]`，是长度 1 的 str | `s[i]`，是 char |
+| 取一段 | `s[1:3]` | `s.substr(1, 2)`，第二个参数是长度，不是结束位置 |
+| 长度 | `len(s)`，数的是字符 | `s.size()`，数的是字节 |
+| 拼接 | `s + t` / `s += t` | 一样 |
+| 找子串 | `s.find("x")`，找不到返回 `-1` | `s.find("x")`，找不到返回 `npos` |
+| 替换 | `s.replace("a", "b")`，全部替换 | `s.replace(pos, len, "b")`，按位置换 |
+| 分割 | `s.split(",")` | 没有，用 stringstream 手写 |
+| 连接 | `",".join(parts)` | 没有，循环 `+=` |
+| 去首尾空白 | `s.strip()` | 没有，手写 |
+| 判断前缀 | `s.startswith("x")` | C++20 才有 `starts_with` |
+| 转整数 | `int(s)` | `stoi(s)` |
+| 数字转串 | `str(n)` / f-string | `to_string(n)` |
+| 改一个字符 | `s[0] = "x"` 直接报错 | 合法 |
+
+替换这行同名不同义，最容易想当然：C++ 的 `replace` 是「从第 pos 位开始删掉 len 个，塞进新串」，Python 的 `replace` 是「把某个子串全部换掉」。实测 `"abcabc".replace("a", "x")` 得到 `xbcxbc`。
+
+`npos` 是个很大的无符号数（实测 18446744073709551615），所以 C++ 里不能写 `s.find(x) >= 0` 判断有没有，那个条件永远成立。Python 的 `-1` 反倒能直接比。
+
+分割、连接、去空白这三样 C++ 都没有，这是两边手感差距最大的地方。
+
 <!--
 要点：
 - 索引与切片：正负下标、`[start:stop:step]`、负步长反转
 - 常用方法：split / join / strip / replace / startswith / find / count
 - 格式化输出第二篇已经写过，这里**不要重讲**，一句话带过
 
-C++ 对照（要具体）：
-- str ↔ std::string，但 Python 的字符串**不可变**，`s[0] = 'x'` 直接报错
-- Python 没有 char 类型，单个字符就是长度为 1 的 str（C++ 里 `s[i]` 是 char）
+C++ 对照表已经写在上面，正文别重复。留这三条给正文：
+- Python 没有 char 类型，单个字符就是长度为 1 的 str
 - 拼接：`+=` 在循环里是 O(n²)，习惯用 `"".join(parts)` 或 f-string
 - 中文/emoji：`len()` 数的是字符不是字节（C++ 的 std::string 数的是字节），
   这条值得写一句，处理中文时是真差别
@@ -224,6 +317,20 @@ C++ 对照（要具体）：
 -->
 
 ## bytes：一格装的是字节
+
+C++ 那边没有专门装字节的类型，一个 `string` 兼着文本和二进制。
+
+| 想做的事 | Python | C++ |
+|---|---|---|
+| 取一个字节 | `b[0]`，直接是 0~255 的整数 | `s[0]` 是 char，当字符用；要当数字得再转一次 |
+| 取一段 | `b[1:3]` | `s.substr(1, 2)` |
+| 长度 | `len(b)` | `s.size()` |
+| 拼接 | `b"a" + b"b"` | `s + t` |
+| hex → 字节 | `bytes.fromhex("41 42")` | 没有，手写 |
+| 字节 → hex | `b.hex()` | 没有，手写 |
+| 文本 ↔ 字节 | `.encode()` / `.decode()` | 不分，`string` 本身就是字节 |
+
+C++ 里没有「这串是文本还是字节」这个区别，`string` 就是字节，打印时按字符印出来。Python 故意把两种拆开，混着算直接 `TypeError`（实测 `"a" + b"b"`）。hex 两个方向 C++ 都没有，得自己写循环，CTF 里这件事 Python 省事得多。
 
 <!--
 为什么把它也算一种：CTF 里几乎每次都会撞上它——读文件、收包、hex 来回转。
@@ -252,8 +359,8 @@ CTF 里具体在哪遇到（写的时候挑两三个讲，别列清单）：
 - ⚠️ 和 C 字符串最大的不同：`b"A\x00B"` 长度是 3，`\0` 不截断
   （实测 `b"A\x00B".split(b"\x00")` 得到 `[b'A', b'B']`）
 
-C++ 对照：不展开。只要知道那边没有专门装字节的类型，一个 `std::string` 兼着装文本和
-二进制，靠长度而不是 `\0` 收尾。Python 这边拆成 str（文本）和 bytes（二进制）两个。
+C++ 对照表已经写在上面，别重复。正文留一句：C 字符串靠 `\0` 收尾，C++ 的 string
+靠长度，Python 的 bytes 也是靠长度（`b"A\x00B"` 长度是 3）。
 
 示例要能跑：取一个字节、切片、hex 往返、改 bytearray 的一个元素。
 ⚠️ 别在这里展开字符编码原理（UTF-8 怎么变长、BOM 之类），那是另一篇的量。
