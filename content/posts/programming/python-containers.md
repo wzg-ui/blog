@@ -19,7 +19,7 @@ description: "PIEMM喜欢数据容器"
 - **容器**：`in` 能用的对象。`5 in {1, 2}` 返回 `True`，它就是容器。判据是「能不能做成员测试」，不是「能不能装多个数据」——`10 in 5` 直接报错，装得多不多跟这件事无关。
 - **序列**：在容器之上，再多约定一整套行为——有顺序、能按下标取、能切片、能 `len`。不是「凑够几条就算」，而是这些行为要合起来自洽。
 
-`collections.abc` 是标准库里放这些清单的地方，`abc` 是 abstract base class（抽象基类）的缩写。它本身不存放数据，主要作用是让你能问「这东西算不算序列」——`isinstance(x, Sequence)`。跟 C++ 的 concept 有点像：都描述「要满足什么条件才算」，而不是「你继承自谁」。区别是它跑在运行时，`isinstance` 要等程序跑起来才检查；concept 在编译期就把不合格的模板参数挡掉了。
+`collections.abc` 是标准库里放这些清单的地方，`abc` 是 abstract base class（抽象基类）的缩写。它本身不存放数据，主要作用是让你能问「这东西算不算序列」——`isinstance(x, Sequence)`。这跟 C++ 模板有点像：类型不满足要求，模板就用不了，只能换一个。区别在时机——模板在编译期就报错，`isinstance` 要等程序跑起来才检查。
 
 `in` 本身又比 `Container` 宽松：对象没写 `__contains__`，Python 会退回去用 `__iter__` 或 `__getitem__` 一个个比过去。所以「`in` 能用」和「`isinstance(x, Container)` 为真」是两件事——只实现 `__iter__` 的类，`2 in obj` 是 `True`，`isinstance(obj, Container)` 反而是 `False`。
 
