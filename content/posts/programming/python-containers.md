@@ -73,52 +73,26 @@ print(id(a) == before)   # True，还是原来那个
 | `set` | `{1, 2, 3}` | ✅ | ❌ |
 | `dict` | `{"a": 1}` | ✅ | ❌ |
 
-光看形式也看得出来：方括号、花括号、圆括号各管一摊。只有 `b"abc"` 那个 `b` 看着有点怪——它是个标记，意思是「这一串是字节，不是字符串」，跟 C++ 里 `u8"..."`、`L"..."` 那种前缀一个用法。还有个坑要先说：`{}` 是空字典，不是空集合，空集合得写 `set()`。
+光看形式也看得出来：方括号、花括号、圆括号各管一摊。只有 `b"abc"` 那个 `b` 看着有点怪——它是个标记，意思是「这一串是字节，不是字符串」。还有个坑要先说：**`{}` 是空字典，不是空集合，空集合得写 `set()`**。
 
 三行不可变、三行可变，分得很齐。这里的「哈希」得先说一句：`hash(x)` 把对象的内容算成一个整数，dict 拿这个整数除以表的长度取余数，算出去哪一格存、去哪一格取，不用从头翻一遍。所以键一旦能改，哈希值跟着变，之前存进去的位置就再也找不着了——可变的那三个，Python 干脆不给 `__hash__`。
 
 验证起来很简单：`hash([1])` 报 `unhashable type: 'list'`，`hash((1, 2))` 有值。
 
-⚠️ 但 tuple 不是无条件可哈希：`hash(([1], 2))` 一样报错。它要逐元素算哈希，里面装了个 list 就卡住。
+但 tuple 不是无条件可哈希：`hash(([1], 2))` 一样报错。它要逐元素算哈希，里面装了个 list 就卡住。
 
 ### 先跟 C++ 对一下
 
 | Python | C++ 里最接近的 | 差在哪 |
 |---|---|---|
 | `str` | `std::string` | C++ 的能原地改（`s[0] = 'x'` 合法），Python 不行；另外 `size()` 数字节，`len()` 数字符 |
-| `bytes` | `const std::vector<uint8_t>`；能改的 `bytearray` 才对 `std::vector<uint8_t>` | C++ 一个类型兼两种用途，Python 按能不能改拆成两个 |
+| `bytes` | `std::string` / `std::vector<uint8_t>` | C++ 一个类型兼两种用途，Python 拆成两个 |
 | `list` | `std::vector<T>` | 最接近的一组，都是动态数组，尾部追加均摊 O(1) |
 | `tuple` | `std::tuple` / `std::pair` / `std::array<T, N>` | 定长但能装不同类型，更接近 `std::tuple`；`std::array` 要求同类型 |
-| `set` | `std::unordered_set<T>` | 都是哈希表；`std::set` 是红黑树、按大小排好，Python 里没有对应物 |
+| `set` | `std::unordered_set<T>` | 哈希、无序，不是 `std::set`（红黑树、按大小排好） |
 | `dict` | `std::unordered_map<K, V>` | 哈希；Python 从 3.7 起还保插入顺序，`unordered_map` 不保 |
 
 最容易套错的是第一行：`str` 对着 `std::string` 没错，可变性却正好相反。C++ 里 `std::string` 就是一个能改的字节数组，限制它的是 `const`；Python 的 `str` 是天生没有修改接口。这两件事不是一回事——`const` 管的是「这个引用不许改」，换个引用照样改得动；Python 的不可变是对象自己没长那只手，谁拿到都改不了。
-
-`bytes` 那一行看着别扭，是因为它没有一一对应的东西。`std::vector<uint8_t>` 里的 `uint8_t` 是 `<cstdint>` 里的别名，实测 `std::is_same<unsigned char, uint8_t>` 为真——它就是 `unsigned char`，只是名字把「8 位无符号」写死了，不会随平台变成 16 位。`vector<uint8_t>` 于是就是一串长度可变的字节。
-
-但取出来的元素并不是「数字」。`cout << v[0]` 打印的是字符 `A`，想看 65 得写 `+v[0]` 或 `int(v[0])`；Python 里 `b"abc"[0]` 反倒是天生的 97。这是两边第一处对不上的：C++ 的字节在类型上仍属字符类型，Python 的字节直接就是整数。
-
-再按「能不能改」分一次：`bytearray` 才是 `std::vector<uint8_t>`，因为它可以 `ba[0] = 100`；`bytes` 改不了，更接近 `const std::vector<uint8_t>`——读的时候一样，想动就得先拷一份。
-
-但方法上 `bytes` 又反过来像 `std::string`：`find` / `count` / `split` / `strip` / `startswith` 全都有，`vector` 一个都不带，同样的活得写 `std::find` 或者自己循环。所以它既不像 string 也不像 vector，是 **vector 的存储加上 string 的接口**。Python 敢把 `str` 和 `bytes` 拆成两个类型，底气就在这里：拆开之后 `bytes` 自己就能同时伺候这两拨需求。
-
-`set` 那一行值得单独说，名字撞了最容易顺手套过去。C++ 的 `std::set` 是红黑树，元素按大小排好：`lower_bound` 能找出第一个不小于 x 的位置，迭代从头到尾有序，插入和查询都是 O(log n)。Python 的 `set` 是哈希表，插入和查询平均 O(1)，换来的是元素之间彻底没有顺序，连「每次跑都一样的顺序」都保不住。
-
-同一份 `{"apple", "banana", "cherry", "date"}`，三个进程跑出来的迭代顺序实测是：
-
-| 进程 | 迭代顺序 |
-|---|---|
-| 1 | `['date', 'banana', 'cherry', 'apple']` |
-| 2 | `['cherry', 'date', 'apple', 'banana']` |
-| 3 | `['apple', 'cherry', 'banana', 'date']` |
-
-字符串哈希每次启动都换种子（`PYTHONHASHSEED`），落格位置跟着换。C++ 的 `unordered_set` 也不保顺序，但同一份数据通常固定在同一批桶里，不会每次跑都变——这个差别调试时很要命：依赖 set 迭代顺序输出的程序，在 Python 里表现为「每次结果不一样」，在 C++ 里只是「顺序不好看」。
-
-小整数看着有顺序是巧合。整数哈希就是它自己，四个元素时表长 8，按值除 8 的余数落格：`{100, 1, 50, 7}` 分别落在 4、1、2、7 号格，迭代按格子从小到大走，打印出来是 `[1, 50, 100, 7]`——既不是插入顺序，也不是大小顺序。
-
-同一组 `{3, 1, 2}` 分别塞进两个 C++ 容器：`std::set` 迭代出 `1 2 3`，`std::unordered_set` 出 `2 1 3`。两个 C++ 容器自己就先分了岔，Python 的 `set` 只跟着后面那个。
-
-要 `std::set` 那种「有序 + 范围查询」，标准库里没有现成的有序集合。只读的话 `sorted(s)` 排一次转成 list；要边插边查就用 `bisect`：`bisect_left` 相当于 `lower_bound`，`insort` 直接插进有序 list。代价是插入要挪元素，O(n)，只在查多插少时划算。
 
 竞赛里最常用的还是 `std::pair`：两个元素、类型可以不同，跟 Python 的二元 tuple 几乎能一一对上。`std::array` 则是定长同类型，更像「长度写死的 list」。
 
@@ -191,10 +165,16 @@ C++ 对照（用户点名要写的）：
 - 交并差：`& | - ^`，以及对应的 `intersection / union / difference`
 - add / discard / remove 的区别（discard 不报错）
 
-C++ 对照：上面「先跟 C++ 对一下」已经讲透了（哈希表 vs 红黑树、三次运行顺序不同的实测、
-用 bisect 代替 lower_bound），这里**不要重复铺开**，最多一句收口：
-它要的是哈希表不是有序集合，所以别依赖迭代顺序。
-另外：元素必须可哈希 ⇒ 不能放 list，可以放 tuple。
+C++ 对照（这里必须纠偏）：
+- Python 的 set 是**哈希表**，对应 `std::unordered_set`，**不是** `std::set`
+- 后果：Python 的 set 迭代顺序不保证（同一份数据不同次运行顺序可能不同），
+  而 `std::set` 是红黑树、天然有序
+- 所以「要一个有序集合」在 Python 标准库里没有直接对应，只能排序后转 list
+- 元素必须可哈希 ⇒ 不能放 list，可以放 tuple
+- 实测素材（写的时候用得上）：同一份 4 个字符串的 set，`PYTHONHASHSEED` 取 0 / 1 / 42 跑出三种顺序；
+  同一组 `{3, 1, 2}` 在 `std::set` 里迭代 `1 2 3`、在 `unordered_set` 里 `2 1 3`
+- 要 `lower_bound` 那种行为：`bisect_left`（对标 `lower_bound`）+ `insort`；
+  插入要挪元素 O(n)，查多插少才划算
 
 ⚠️ 两个必写的坑：
 1. `{}` 是空**字典**不是空集合，空集合得写 `set()`
@@ -249,15 +229,20 @@ CTF 里具体在哪遇到（写的时候挑两三个讲，别列清单）：
 - ⚠️ 和 C 字符串最大的不同：`b"A\x00B"` 长度是 3，`\0` 不截断
   （实测 `b"A\x00B".split(b"\x00")` 得到 `[b'A', b'B']`）
 
-C++ 对照：`vector<uint8_t>` 那层关系上面已经讲过，这里不重复，只留差异——
-C++ 里一个 `std::string` 兼装文本和二进制，靠长度而不是 `\0` 收尾；
-Python 分得更开，str 给人看，bytes 给机器看。
-想按长度造一串字节，写法也像 vector：`bytes(3)` 是三个 0（实测 `b'\x00\x00\x00'`），
-`bytearray(4)` 同理，而且能接着改。
+C++ 对照：已定稿，写在下面「和 vector<uint8_t> 怎么对」那一节，这里别重复。
+只留一句给正文用：C++ 的 std::string 靠长度而不是 `\0` 收尾，Python 分得更开。
 
 示例要能跑：取一个字节、切片、hex 往返、改 bytearray 的一个元素。
 ⚠️ 别在这里展开字符编码原理（UTF-8 怎么变长、BOM 之类），那是另一篇的量。
 -->
+
+### 和 `vector<uint8_t>` 怎么对
+
+`uint8_t` 是 `<cstdint>` 里的别名，实跑确认过 `std::is_same<unsigned char, uint8_t>` 为真——它就是 `unsigned char`，名字只是把「8 位无符号」写死了，不会随平台变成 16 位。所以 `std::vector<uint8_t>` 就是一串长度可变的字节，跟 `bytearray` 正好一对：两边都能 `v[0] = 100`。`bytes` 改不了，对应的是 `const std::vector<uint8_t>`，读法一样，想动得先拷一份。
+
+有一处跟直觉相反：`cout << v[0]` 打印出来是字符 `A`，不是 65，想看数字得写 `+v[0]` 或 `int(v[0])`。而 Python 里 `b"abc"[0]` 天生就是 97。C++ 的字节在类型上仍属字符类型，Python 的字节直接就是整数——这是两边第一处对不上的地方。
+
+但方法上 `bytes` 反倒像 `std::string`：`find` / `count` / `split` / `strip` 全都有，`vector` 一个都不带。所以它谁都不完全像，是 vector 的存储加上 string 的接口。也正因为如此，Python 才敢把 `str` 和 `bytes` 拆成两个类型。
 
 ## 用这些容器拼出常见的数据结构
 
