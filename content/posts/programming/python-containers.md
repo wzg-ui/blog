@@ -29,7 +29,7 @@ description: "PIEMM喜欢数据容器"
 | `str` / `list` / `tuple` / `bytes` / `range` | ✅ | ✅ | ✅ |
 | `set` / `dict` | ✅ | ❌ | ❌（`dict` 要按键取） |
 
-`bytes` 和 `range` 也是序列，但这篇不开节：`range` 是懒生成的等差数列，平时拿来数循环，跟这五种东西的用法差得远；`bytes` 是 `str` 的二进制双胞胎，差别只在「一格装的是字符还是字节」，放在 str 末尾带一句就够。
+`bytes` 和 `range` 也是序列。`bytes` 是 `str` 的二进制双胞胎，差别只在「一格装的是字符还是字节」，CTF 里几乎绕不开它，所以在 str 后面单开一节。`range` 是懒生成的等差数列，平时拿来数循环，跟这几种东西的用法差得远，这篇不展开。
 
 
 <!--more-->
@@ -75,14 +75,43 @@ C++ 对照（要具体）：
   这条值得写一句，处理中文时是真差别
 
 ⚠️ 不必写编码、Unicode 归一化，那是另一篇文章的量。
+-->
 
-末尾带一句 bytes（术语节已声明本篇不开节）：
-- `b"abc"` 与 `"abc"` 操作几乎一模一样：能切片、能 `in`、能 `len`
-- 但**一格装的是字节**：`b"abc"[0]` 是 `97`，不是 `"a"`
-- 同样不可变，所以也能当 dict 的 key；想改就用 `bytearray`
-- 什么时候遇到它：`open(..., "rb")`、`socket.recv()`、`.encode() / .decode()`
-实测：`97 in b"abc"` → True、`b"bc" in b"abc"` → True、`b[0] = 100` → TypeError
-（2026-10-18 用 Python 3.13.12 跑过）
+### bytes：一格装的是字节
+
+<!--
+为什么单开一节：CTF 里几乎每次都会撞上它——读文件、收包、hex 来回转。
+不用背 API，先把「一格是什么」记住，其余都是它的推论。
+
+是什么：
+- str 的一格是一个字符，bytes 的一格是一个 0~255 的整数（一个字节）
+- 所以 `b"abc"[0]` 是 97，不是 `"a"`（实测 `b"abc"[0] == "a"` 为 False）
+- 同样不可变，也能哈希 ⇒ 能当 dict 的 key、set 的元素
+- 想原地改就用 bytearray（可变版，其余用法一样）
+- 序列该有的它都有：下标、切片、`in`、`len`；`b"bc" in b"abc"` 和 `97 in b"abc"` 都是 True
+
+和 str 互转，也是最常用的两条：
+- `.encode() / .decode()`：文本 ↔ 字节。中文一个字变三字节
+  （实测 `len("中文")` 是 2，`.encode()` 之后是 6——顺手说明了 str 的 len 数的是字符）
+- `bytes.fromhex("41 42")` / `b"\x41\x42".hex()`：字节 ↔ 十六进制串，空格可有可无
+- 两者不能混着算：`"a" + b"b"` 直接 TypeError，
+  报错原文是 can only concatenate str (not "bytes") to str
+
+CTF 里具体在哪遇到（写的时候挑两三个讲，别列清单）：
+- `open("flag", "rb").read()` 拿到的是 bytes，不带 `b` 才是 str
+- 网络收包（socket.recv、pwntools 的 recv）一律是 bytes
+- 逆向题给的密文常是 hex 串，先 `bytes.fromhex()` 才能切片、逐字节异或
+- 结构体按字段拆用 struct.unpack：`b"\x01\x00\x00\x00"` 按小端读是 1（实测）
+- ⚠️ 和 C 字符串最大的不同：`b"A\x00B"` 长度是 3，`\0` 不截断
+  （实测 `b"A\x00B".split(b"\x00")` 得到 `[b'A', b'B']`）
+
+C++ 对照：
+- C++ 只有 std::string 一个类型，既能装文本也能装二进制，靠长度而不是 `\0` 决定结尾
+- 想强调「一串裸字节」时，C++ 里常写 `std::vector<uint8_t>` 或 `unsigned char*`
+- Python 反而分得更开：str 是给人看的，bytes 是给机器看的
+
+示例要能跑：取一个字节、切片、hex 往返、改 bytearray 的一个元素。
+⚠️ 别在这里展开字符编码原理（UTF-8 怎么变长、BOM 之类），那是另一篇的量。
 -->
 
 ## 列表 list
