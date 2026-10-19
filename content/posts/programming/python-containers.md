@@ -1,14 +1,14 @@
 ---
-title: "Python 的数据容器"
+title: "喜欢容器的PIEMM"
 date: 2026-10-18T16:30:00+08:00
 draft: true
 slug: "python-containers"
-description: "PIEMM喜欢数据容器"
+description: "喜欢容器的PIEMM"
 ---
 
 ## 开场
 
-为什么起这个题目呢，众所周知PIEMM喜欢编程，喜欢计算机，那这就出现一个问题，计算机是怎么工作的呢，这里可能需要扯一嘴祖师爷了，计算机出名的两座大山就是图灵与冯诺依曼了（PIEMM在此声明**PIEMM不女装不秃头，PIEMM是个正常人！**），计算机是因为什么需要诞生的呢，打过二战的想必都对图灵有所耳闻，图灵参与了密码破译工作，也推动了计算理论与计算机器的发展。至于现代计算机是怎么一步步发展起来的，这里就不展开了。感兴趣可以去了解一下**冯诺依曼架构**，PIEMM在后面也会在学习计算机组成的时候去聊一聊这个东西
+为什么起这个题目呢，众所周知PIEMM喜欢编程，喜欢计算机，那这就出现一个问题，计算机是怎么工作的呢，这里可能需要扯一嘴祖师爷了，计算机出名的两座大山就是图灵与冯诺依曼了（PIEMM在此声明**PIEMM不女装不秃头，PIEMM是个正常人！**），计算机是因为什么需要诞生的呢，打过二战的想必都对图灵有所耳闻，图灵参与了密码破译工作，也推动了计算理论与计算机器的发展，计算机做的就是在**数据**过于复杂的情况下帮助我们解决问题。至于现代计算机是怎么一步步发展起来的，这里就不展开了。感兴趣可以去了解一下**冯诺依曼架构**，PIEMM在后面也会在学习计算机组成的时候去聊一聊这个东西。
 
 对我们写程序的人来说，有个更实际的问题：数据来了，应该怎么存？
 
@@ -118,6 +118,8 @@ Python 的 `str` 则天生不可变：对象创建之后，不能原地修改它
 
 `array` 没进表，因为它两边都不完全像：长度写死像 tuple，元素却能改像 list。按这篇的判据（能不能原地改），它更该靠 list 那边，只是长度在写代码时就定死了，中途不能加不能减。
 
+下面就开始主要内容的介绍了，PIEMM是一个不擅长记忆的人，也不想成为一个调包侠，他只选择了自己喜欢的做法，在他看来适合自己的就是最好的，有时为了解决一个稍微复杂的问题，本可以用简单代码手搓出来，却要去背一些又长又臭的各种函数，在他看来是不可取的。
+
 ## 列表 list
 
 先把操作对上号。C++ 那边是 `vector`，两边都是动态数组：尾部追加均摊 O(1)，中间插删要挪元素，是 O(n)。
@@ -125,14 +127,14 @@ Python 的 `str` 则天生不可变：对象创建之后，不能原地修改它
 | 想做的事 | Python | C++ |
 |---|---|---|
 | 尾部加一个 | `a.append(x)` | `v.push_back(x)` |
-| 尾部删一个 | `a.pop()` | `v.pop_back()` |
 | 中间插一个 | `a.insert(i, x)` | `v.insert(v.begin() + i, x)` |
+| 尾部删一个 | `a.pop()` | `v.pop_back()` |
 | 按下标删 | `del a[i]` / `a.pop(i)` | `v.erase(v.begin() + i)` |
 | 按值删 | `a.remove(x)`，只删第一个，没有就报错 | `v.erase(remove(v.begin(), v.end(), x), v.end())`，删掉所有 |
-| 按下标取 | `a[i]` | `v[i]`（不查越界）/ `v.at(i)`（查） |
+| 按下标查 | `a[i]` | `v[i]`（不查越界）/ `v.at(i)`（查） |
+| 找位置 | `a.index(x)`，找不到抛 `ValueError` | `find(v.begin(), v.end(), x) - v.begin()`，找不到得到 `size()` |
 | 按下标改 | `a[i] = x` | `v[i] = x` |
 | 长度 | `len(a)` | `v.size()` |
-| 找位置 | `a.index(x)`，找不到抛 `ValueError` | `find(v.begin(), v.end(), x) - v.begin()`，找不到得到 `size()` |
 | 数几个 | `a.count(x)` | `count(v.begin(), v.end(), x)` |
 | 在不在 | `x in a` | `find(v.begin(), v.end(), x) != v.end()` |
 | 原地排序 | `a.sort()` | `sort(v.begin(), v.end())` |
@@ -145,30 +147,15 @@ Python 的 `str` 则天生不可变：对象创建之后，不能原地修改它
 - `pop` 在 C++ 里只删尾部。Python 的 `pop()` 不写参数删尾部，写了参数删指定位置，一个名字管两件事。
 - 按值删两边删的东西不一样：`[1, 2, 2, 3]` 删 `2`，Python 得到 `[1, 2, 3]`，C++ 得到 `[1, 3]`。C++ 那个 `remove` 单独用还不算删——它只是把要留的元素往前挪，返回新的结尾，必须再接一个 `erase` 才真的变短；C++20 起有 `erase(v, x)` 一行写完（本机 g++ 16 两种都实测通过）。
 - 找位置失败，`a.index` 抛异常，`str.find` 返回 `-1`。同样是「找位置」，两种规矩，别混着记。
-- 下标越界，Python 抛 `IndexError`（实测 `a[5]` 报 `list index out of range`）。C++ 的 `v[i]` 根本不查，越界了也不吭声；想让它查得写 `v.at(i)`，抛的是 `out_of_range`（实测）。
+- 下标越界，Python 抛 `IndexError`（报 `list index out of range`）。C++ 的 `v[i]` 根本不查，越界了也不吭声；想让它查得写 `v.at(i)`，抛的是 `out_of_range`。
 - `a[:] = b` 把整串换成 b 的内容，C++ 没有对应写法，得先 `clear()` 再 `insert`。
+- `remove(v.begin(), v.end(), x),`在 C++ 中的意思是把不是x的所有元素往前移，并返回新的逻辑结束位置。
 
-<!--
-要点：
-- 增删改查：append / extend / insert / pop / remove / index / count / sort
-- `sort()` 原地改 vs `sorted()` 返回新的（配一句：这个区别在 C++ 里叫 `std::sort` vs 复制一份再排）
-- 切片赋值 `a[1:3] = [...]`（C++ 没有，很 Python 的东西）
-
-**全篇最该纠正的一个误会**：Python 的 list 名字叫 list，底层却是**动态数组**，
+**注意**：Python 的 list 名字叫 list，底层却是**动态数组**，
 对应的是 `std::vector`，**不是 `std::list`**。所以：
 - 尾部 append 均摊 O(1)
 - 中间插入/删除 O(n)
-- 想 O(1) 头尾插入，得用 deque（后面那节）
-
-C++ 对照表已经写在上面，正文别重复。只补「名字骗人」这一句：
-    名字叫 list，底层却是动态数组，对应 vector，不是链表 list。
-顺带一句：`array` 是定长版——长度写死、元素照样能改。
-
-⚠️ 必写的坑：
-1. `b = a` 是别名不是拷贝（第二篇讲 `is` 时埋过，这里收口），配 `id()` 演示
-2. 遍历时删除元素会漏（写最小反例）
-3. 二维列表 `[[0]*3]*3` 三行是同一个对象 —— 这是个经典坑，值得写
--->
+- 想 O(1) 头尾插入，得用 deque
 
 ## 元组 tuple
 
@@ -179,107 +166,89 @@ C++ 对照表已经写在上面，正文别重复。只补「名字骗人」这�
 | 造两个 | `(1, 2)` | `make_pair(1, 2)` 或 `{1, 2}` |
 | 造多个、类型不同 | `(1, "a", 3.0)` | `tuple<int, string, double>` |
 | 取第几个 | `t[0]` | `p.first` / `get<0>(t)` |
-| 一次全取出来 | `a, b = t` | `auto [a, b] = p;`（C++17） |
+| 一次全取出来 | `a, b = t` | `auto [a, b] = p;` |
 | 交换两个 | `a, b = b, a` | `swap(a, b)` |
 | 长度 | `len(t)` | `tuple_size`，编译期就知道 |
 | 比大小 | `(1, 2) < (1, 3)` 为真 | `p < q`，同样逐元素比，分出胜负就停 |
 | 只取后面几个 | `head, *rest = t` | 没有对应 |
 
-`get<0>` 尖括号里必须是写死的常量，所以 C++ 里不能拿变量当下标循环取。这一点是它比 Python 难用的主要来源。解包也是 Python 赚的地方：`auto [a, b] = p` 要 C++17 才有，而且只能一次性全拆。
+`get<0>` 尖括号里必须是写死的常量，不能拿变量当下标循环取。解包也是 Python 赚的地方：`auto [a, b] = p` ，而C++ 只能一次性全拆。
 
-还有个小坑 C++ 那边没有：单元素元组必须写 `(1,)`，`(1)` 只是个加了括号的整数（实测 `type((1))` 是 `int`）。
-
-<!--
-要点：
-- 创建：`(1, 2)`，**单元素必须写 `(1,)`**（这个坑要单独提）
+**注意**：
+- 创建：`(1, 2)`，**单元素必须写 `(1,)`**（ `type((1))` 是 `int`）
 - 打包与解包：`a, b = b, a` 交换、`for k, v in d.items()`、星号解包 `head, *rest`
-- 函数返回多个值其实返回的是 tuple
-- 因为不可变所以能当 dict 的 key / set 的元素
-- 命名元组 `namedtuple` 提一句就够（不展开 dataclass）
+  ```py
+  a = [10, 20, 30, 40, 50]
+  head, *rest = a
+  # head = 10
+  # rest = [20, 30, 40, 50]
 
-C++ 对照表已经写在上面，正文别重复。留一条就够：
-- ⚠️ `array` 别塞进 tuple 这一行：它定长但**能改**（`a[0] = 1` 合法），
-  跟 tuple 的不可变正好相反，按这篇的判据该靠 list 那边。
-  表格里不列它，在「先跟 C++ 对一下」下面用一句话交代
+  first, second, *others = a
+  # first = 10
+  # second = 20
+  # others = [30, 40, 50]
 
-⚠️ 别把 tuple 写成「不可变的 list」就完了 —— 它真正的价值是**能当 key**，
-   这一条要和上面「可变与不可变」那节呼应。
--->
+  first, *middle, last = a
+  # first = 10
+  # middle = [20, 30, 40]
+  # last = 50
+  ```
+- 函数返回多个值返回的是 tuple
+- 不可变所以能当 dict 的 key/ set 的元素
 
 ## 集合 set
 
-`set` 对应 `unordered_set`（哈希）。`set` 是另一个东西，红黑树、按大小排好，别看到同名就往一起对。
+`set` 对应 `unordered_set`（哈希集合）。 C++ 中的 `set` 是另一个东西，红黑树、按大小排好。
 
 | 想做的事 | Python | C++（`unordered_set`） |
 |---|---|---|
 | 插入 | `s.add(x)` | `us.insert(x)`，重复插入不报错，只是没插进去 |
-| 删，没有就算了 | `s.discard(x)` | `us.erase(x)`，返回删掉几个，0 就是不报错 |
-| 删，没有就报错 | `s.remove(x)` | 没有对应，`erase` 从不报错 |
+| 删 | `s.discard(x)` | `us.erase(x)`，返回删掉几个，0 就是不报错 |
 | 查在不在 | `x in s` | `us.count(x)` 或 `find(x) != end()` |
 | 大小 | `len(s)` | `us.size()` |
-| 交 / 并 / 差 / 对称差 | `a & b`、`a \| b`、`a - b`、`a ^ b` | 没有运算符，得自己写循环，或者用 `set_intersection` 那一套 |
+| 交 / 并 / 差 / 对称差 | `a & b`、`a \| b`、`a - b`、`a ^ b` | 要么手搓，要么用STL |
 | 遍历 | `for x in s` | `for (int x : us)` |
 
 交并差这一行是两边手感差最大的。Python 直接给运算符，C++ 没有，只能循环。`set_intersection` / `set_union` 那套要求两个区间已经排好序：实测两个递增的 `vector` 能直接出结果，`unordered_set` 无序用不了，`set` 天生有序所以能用。
 
-有序那一半 Python 没有。要用 `lower_bound` 或者按序遍历，只能 `sorted(s)` 排一份（结果是 list 不是 set），或者用 `bisect` 维护一个始终有序的 list。
+有序那一半 Python 没有。要用 `lower_bound` 或者按序遍历，只能 `sorted(s)` 排一份（结果是 list 不是 set）。
 
-<!--
-要点：
+**主要用法**：
 - 去重：`set(列表)`
 - 成员判断 O(1)（对比 list 的 `in` 是 O(n)，这是选 set 的最大理由）
-- 交并差：`& | - ^`，以及对应的 `intersection / union / difference`
-- add / discard / remove 的区别（discard 不报错）
+- 交并差：`& | - ^`，以及 C++ 对应的 `intersection / union / difference`
 
-C++ 对照表已经写在上面，正文别重复。这条留给正文：元素必须可哈希 ⇒ 不能放 list，可以放 tuple。
-- 实测素材（写的时候用得上）：同一份 4 个字符串的 set，`PYTHONHASHSEED` 取 0 / 1 / 42 跑出三种顺序；
-  同一组 `{3, 1, 2}` 在 `std::set` 里迭代 `1 2 3`、在 `unordered_set` 里 `2 1 3`
-- 要 `lower_bound` 那种行为：`bisect_left`（对标 `lower_bound`）+ `insort`；
-  插入要挪元素 O(n)，查多插少才划算
-
-⚠️ 两个必写的坑：
+**注意**：
 1. `{}` 是空**字典**不是空集合，空集合得写 `set()`
-2. 遍历 set 时顺序看起来"有规律"是巧合（小整数哈希到自身），别依赖它
--->
+2. add / discard / remove 的区别（discard 不报错）
 
 ## 字典 dict
 
-`dict` 对应 `unordered_map`（哈希）。`map` 是红黑树版，按键排序。
+`dict` 对应 `unordered_map`（哈希映射）。`map` 是红黑树版，按键排序。
 
 | 想做的事 | Python | C++（`unordered_map`） |
 |---|---|---|
 | 写 / 改 | `d[k] = v` | `m[k] = v` |
 | 读，键一定在 | `d[k]`，不在就 `KeyError` | `m[k]`，不在就插一个默认值进去 |
-| 读，键可能不在 | `d.get(k)` / `d.get(k, 0)` | `find(k)` 再判 `!= end()` |
+| 读，键可能不在 | `d.get(k)` | `find(k)` 再判 `!= end()` |
 | 键在不在 | `k in d`（看的是键） | `m.count(k)` |
 | 删 | `del d[k]` / `d.pop(k)` | `m.erase(k)` |
-| 没有才插入 | `d.setdefault(k, 0)` | `m.emplace(k, 0)`，已存在就不动 |
-| 计数 | `d[k] = d.get(k, 0) + 1` 或 `Counter` | `++m[k]` 一行 |
+| 计数 | `Counter` | `++m[k]` 一行 |
 | 遍历键值 | `for k, v in d.items()` | `for (auto &[k, v] : m)` |
-| 遍历键 | `for k in d` | `for (auto &p : m) p.first` |
+| 遍历键 | `for k in d.keys()` | `for (auto &p : m) p.first` |
+| 遍历值 | `for v in d.values()` | `for (auto &p : m) p.second` |
 | 大小 | `len(d)` | `m.size()` |
-| 迭代顺序 | 3.7 起按插入顺序 | 不保证 |
+| 迭代顺序 | 按插入顺序 | 不保证 |
 
-第二行最容易栽：C++ 的 `m[k]` 读一次就把键插进去了（实测 `m["new"]` 之后 `size()` 从 0 变 1），Python 的 `d[k]` 只报错不动数据。从 C++ 过来写「查一下有没有」，顺手就把表改了。
+不同之处：Python 的 `d[k]` 只报错不动数据，用 C++ 查一下有没有，没有的话，顺手就把表改了，把键插进去了。
 
-计数那行，`++m[k]` 在 C++ 里是一次查找；Python 写 `d[k] = d.get(k, 0) + 1` 是取一次、写一次。真在意的场景用 `Counter` 省事。
+**技巧**：
+计数那行，`++m[k]` 在 C++ 里是一次查找；Python 用 `Counter` 省事。
+Counter 是 Python collections 模块里的一个专门用来统计元素出现次数的工具。可以把它理解成：把列表里的元素扔进去，它自动帮你统计每个元素出现了几次。（PIEMM认为针对无序元素的统计情况这是一个很好用的工具）
 
-<!--
-要点：
-- 增删查改、`in` 判断的是键不是值
-- `get(k, default)` / `setdefault` / `pop`
-- 遍历：`keys()` / `values()` / `items()`，以及 `.items()` 解包成 `k, v`
-- 3.7 起**保插入顺序**（原来是实现细节，后来写进语言规范）
+有一个小细节：Counter 并不要求输入本身是无序的。即使传入有序列表，它也能统计；只是当你只**关心频率、不关心原始顺序**时，它尤其好用。
 
-C++ 对照表已经写在上面，正文别重复。要展开的是第一行那个坑：
-- `d[k]` 取不存在的键抛 KeyError；C++ 的 `m[k]` 会默认构造一个值插进去
-  ⇒ 一个报错、一个悄悄改数据，从 C++ 过来的人会栽
-- 要「没有就插入」的语义，Python 用 `setdefault` 或 `collections.defaultdict`
-- ⚠️ 别写成「unordered_map 保插入序」——它不保。保插入序的是 Python 3.7 起的 dict
 
-⚠️ 计数场景顺手引出 `collections.Counter`（一句话 + 一个例子就够，别展开整个 collections）
-⚠️ 别写 `hash()` 的细节、别写哈希冲突
--->
 
 ## 字符串 str
 
@@ -290,37 +259,48 @@ C++ 对照表已经写在上面，正文别重复。要展开的是第一行那�
 | 取一个字符 | `s[i]`，是长度 1 的 str | `s[i]`，是 char |
 | 取一段 | `s[1:3]` | `s.substr(1, 2)`，第二个参数是长度，不是结束位置 |
 | 长度 | `len(s)`，数的是字符 | `s.size()`，数的是字节 |
-| 拼接 | `s + t` / `s += t` | 一样 |
+| 拼接 | `s += t` | 一样 |
 | 找子串 | `s.find("x")`，找不到返回 `-1` | `s.find("x")`，找不到返回 `npos` |
 | 替换 | `s.replace("a", "b")`，全部替换 | `s.replace(pos, len, "b")`，按位置换 |
-| 分割 | `s.split(",")` | 没有，用 stringstream 手写 |
+| 分割 | `s.split(",")` | 没有，手写 |
 | 连接 | `",".join(parts)` | 没有，循环 `+=` |
 | 去首尾空白 | `s.strip()` | 没有，手写 |
-| 判断前缀 | `s.startswith("x")` | C++20 才有 `starts_with` |
 | 转整数 | `int(s)` | `stoi(s)` |
 | 数字转串 | `str(n)` / f-string | `to_string(n)` |
-| 改一个字符 | `s[0] = "x"` 直接报错 | 合法 |
+| 改一个字符 | 直接报错 | 合法 |
 
-替换这行同名不同义，最容易想当然：C++ 的 `replace` 是「从第 pos 位开始删掉 len 个，塞进新串」，Python 的 `replace` 是「把某个子串全部换掉」。实测 `"abcabc".replace("a", "x")` 得到 `xbcxbc`。
+替换这行同名不同义，最容易想当然：C++ 的 `replace` 是「从第 pos 位开始删掉 len 个，塞进新串」，Python 的 `replace` 是「把某个子串全部换掉」。比如 `"abcabc".replace("a", "x")` 得到 `xbcxbc`。
 
-`npos` 是个很大的无符号数（实测 18446744073709551615），所以 C++ 里不能写 `s.find(x) >= 0` 判断有没有，那个条件永远成立。Python 的 `-1` 反倒能直接比。
+`npos` 是个很大的无符号数，所以 C++ 里不能写 `s.find(x) >= 0` 判断有没有某个元素，那个条件永远成立。Python 的 `-1` 反倒能直接比。
 
 分割、连接、去空白这三样 C++ 都没有，这是两边手感差距最大的地方。
 
-<!--
-要点：
-- 索引与切片：正负下标、`[start:stop:step]`、负步长反转
-- 常用方法：split / join / strip / replace / startswith / find / count
-- 格式化输出第二篇已经写过，这里**不要重讲**，一句话带过
+再就是关于长度。
+字符字节的问题PIEMM之前了解也不太深，在所有的题目中，PIEMM也确实不太愿意去做字符串，
+先说字节是什么，它是
+UTF-8 编码后的二进制数据
 
-C++ 对照表已经写在上面，正文别重复。留这三条给正文：
-- Python 没有 char 类型，单个字符就是长度为 1 的 str
-- 拼接：`+=` 在循环里是 O(n²)，习惯用 `"".join(parts)` 或 f-string
-- 中文/emoji：`len()` 数的是字符不是字节（C++ 的 std::string 数的是字节），
-  这条值得写一句，处理中文时是真差别
+Python 里，`len(s)` 统计的是字符串包含的 Unicode 码点数量；C++ 的 `string.size()` 统计的是字节数。这在处理英文时通常没什么区别，因为常见的 ASCII 字符占一个字节；但遇到中文就不一样了。
 
-⚠️ 不必写编码、Unicode 归一化，那是另一篇文章的量。
--->
+比如：
+
+```python
+s = "你好"
+print(len(s))  # 2
+print(len(s.encode("utf-8")))  # 6
+```
+
+同样的字符串，如果用 UTF-8 编码存进 C++ 的 `string`：
+
+```cpp
+string s = "你好";
+cout << s.size();  // 通常输出 6
+```
+
+所以，Python 的 `len(s)` 和 C++ 的 `s.size()` 看起来都在求字符串长度，实际上统计口径并不相同。
+
+不过也别把 Python 的一个字符完全等同于我们肉眼看到的一个字符。比如某些带组合音标的文字、emoji 序列，在 Unicode 中可能由多个码点组成，但显示出来却像一个整体。严格来说，Python 的 `len(s)` 统计的是码点，不是用户感知的字符数量。
+
 
 ## bytes：一格装的是字节
 
@@ -332,109 +312,251 @@ C++ 那边没有专门装字节的类型，一个 `string` 兼着文本和二进
 | 取一段 | `b[1:3]` | `s.substr(1, 2)` |
 | 长度 | `len(b)` | `s.size()` |
 | 拼接 | `b"a" + b"b"` | `s + t` |
-| hex → 字节 | `bytes.fromhex("41 42")` | 没有，手写 |
-| 字节 → hex | `b.hex()` | 没有，手写 |
-| 文本 ↔ 字节 | `.encode()` / `.decode()` | 不分，`string` 本身就是字节 |
+| hex->字节 | `bytes.fromhex("41 42")` | 没有，手写 |
+| 字节->hex | `b.hex()` | 没有，手写 |
+| 文本->字节 | `.encode()`  | 无 |
+| 字节->文本 | `.decode()`  | 无 |
 
-C++ 里没有「这串是文本还是字节」这个区别，`string` 就是字节，打印时按字符印出来。Python 故意把两种拆开，混着算直接 `TypeError`（实测 `"a" + b"b"`）。hex 两个方向 C++ 都没有，得自己写循环，CTF 里这件事 Python 省事得多。
+C++ 里没有「这串是文本还是字节」这个区别，`string` 就是字节，打印时按字符印出来。Python 故意把两种拆开，混着算直接 `TypeError`（比如`"a" + b"b"`）。hex 两个方向 C++ 都没有，得自己写循环，CTF 里这件事 Python 省事得多。
 
-<!--
-为什么把它也算一种：CTF 里几乎每次都会撞上它——读文件、收包、hex 来回转。
-不用背 API，先把「一格是什么」记住，其余都是它的推论。
 
 是什么：
-- 先说写法：`b` 前缀只是个记号，不是运算，`b"abc"` 和 `bytes("abc", "utf-8")` 完全等价（实测相等）
+- 先说写法：`b` 前缀只是个记号，不是运算，`b"abc"` 和 `bytes("abc", "utf-8")` 完全等价
 - str 的一格是一个字符，bytes 的一格是一个 0~255 的整数（一个字节）
 - 所以 `b"abc"[0]` 是 97，不是 `"a"`（实测 `b"abc"[0] == "a"` 为 False）
 - 同样不可变，也能哈希 ⇒ 能当 dict 的 key、set 的元素
-- 想原地改就用 bytearray（可变版，其余用法一样）
 - 序列该有的它都有：下标、切片、`in`、`len`；`b"bc" in b"abc"` 和 `97 in b"abc"` 都是 True
 
-和 str 互转，也是最常用的两条：
-- `.encode() / .decode()`：文本 ↔ 字节。中文一个字变三字节
-  （实测 `len("中文")` 是 2，`.encode()` 之后是 6——顺手说明了 str 的 len 数的是字符）
-- `bytes.fromhex("41 42")` / `b"\x41\x42".hex()`：字节 ↔ 十六进制串，空格可有可无
-- 两者不能混着算：`"a" + b"b"` 直接 TypeError，
-  报错原文是 can only concatenate str (not "bytes") to str
+最常用于转换，比如：
+- `.encode() / .decode()`：文本与字节转换。中文一个字变三字节
+- `bytes.fromhex("41 42")` / `b"\x41\x42".hex()`：字节与十六进制串转换，空格可有可无
 
-CTF 里具体在哪遇到（写的时候挑两三个讲，别列清单）：
-- `open("flag", "rb").read()` 拿到的是 bytes，不带 `b` 才是 str
-- 网络收包（socket.recv、pwntools 的 recv）一律是 bytes
-- 逆向题给的密文常是 hex 串，先 `bytes.fromhex()` 才能切片、逐字节异或
-- 结构体按字段拆用 struct.unpack：`b"\x01\x00\x00\x00"` 按小端读是 1（实测）
-- ⚠️ 和 C 字符串最大的不同：`b"A\x00B"` 长度是 3，`\0` 不截断
-  （实测 `b"A\x00B".split(b"\x00")` 得到 `[b'A', b'B']`）
 
-C++ 对照表已经写在上面，别重复。正文留一句：C 字符串靠 `\0` 收尾，C++ 的 string
-靠长度，Python 的 bytes 也是靠长度（`b"A\x00B"` 长度是 3）。
-
-示例要能跑：取一个字节、切片、hex 往返、改 bytearray 的一个元素。
-⚠️ 别在这里展开字符编码原理（UTF-8 怎么变长、BOM 之类），那是另一篇的量。
--->
+算是终于看完了一遍基础知识，在PIEMM看来这些容器呢，不需要一直去记忆，多去熟练写一写，最好是放在应用场景里，那就更好不过了。
+下面PIEMM结合自己对算法的一些学习，去看了一下这些容器与一部分数据结构的关系。在这里不会去涉及像并查集，线段树，平衡树的这些中高难度的数据结构，只是来看一下根据之前的一些容器，还有一些其他的简单容器，能做出什么数据结构的操作。
 
 ## 用这些容器拼出常见的数据结构
 
-<!--
-这是用户特别点名的一节，也是本篇和一般教程不一样的地方：
-**Python 没有 std::stack / std::queue 这些，但基本都能用内置容器凑出来。**
-
-建议做成一张「C++ 有什么 → Python 用什么」的表，再逐条解释其中不直观的几条：
+C++ 把栈、队列、优先队列做成了现成的适配器：`stack`、`queue`、`priority_queue`，声明一行就能用。Python 标准库只给了 list 和 deque，剩下的得自己拿它们拼。
 
 | 想要的 | C++ | Python |
 |---|---|---|
-| 栈 | std::stack | list（append / pop） |
-| 堆（优先队列） | std::priority_queue | heapq |
-| 队列 | std::queue | collections.deque（**不是 list**） |
-| 双端队列 | std::deque | collections.deque |
-| 链表 | std::list | 没有，手写或用数组模拟 |
-| 有序集合 / 有序字典 | std::set / std::map | 标准库没有 |
+| 栈 | `stack` | list，`append` / `pop` |
+| 队列 | `queue` | `deque`，`append` / `popleft` |
+| 双端队列 | `deque` | `deque` |
+| 优先队列（堆） | `priority_queue` | 手写二十行，或者 `heapq` |
+| 链表 | `list` | 没有，自己写 |
 
-### 栈：list 就够
-append / pop，一行。提一句「不要用 list 当队列」。
+### 栈：list 就是栈
 
-### 堆：heapq
-最小堆；最大堆取负数；heapify 建堆；heappush / heappop / heapreplace；
-`nlargest` / `nsmallest` 提一句。
-⚠️ 易错：heapq 操作的是**普通 list**，不是包装类型；直接对 list 排序不会变成堆。
+栈只在一头进出，list 的尾巴正好是那一头：`append` 进、`pop` 出，`[-1]` 看栈顶。
 
-### 队列：为什么必须用 deque
-`list.pop(0)` 是 O(n)（后面整体前移），deque 两端都是 O(1)。
-这是这一节最实用的一条，配一个「用 list 当队列会慢多少」的说法即可，不必测。
+```python
+st = []
+st.append(1)
+st.append(2)
+print(st[-1])     # 2，栈顶
+print(st.pop())   # 2
+```
 
-### 双端队列 deque
-appendleft / popleft / extendleft / rotate。
-⚠️ **必须澄清**：CPython 的 deque 底层不是链表，是「分块数组」（一组固定大小的
-   block 串起来），对外表现为双端队列。所以用户说的「双端链表」这个说法要小心——
-   如果是指「双向链表」，Python 标准库没有，得手写；如果是指「两端都能操作」，
-   那就是 deque。
+C++ 里是 `push` / `top` / `pop`，有一点得注意：`stack::pop()` 不返回被删掉的值，要先 `top()` 再 `pop()`。Python 的 `pop()` 直接把值给你。
+
+拿它做道小题，判断括号是否配对：
+
+```python
+def check(s):
+    pairs = {")": "(", "]": "[", "}": "{"}
+    st = []
+    for ch in s:
+        if ch in "([{":
+            st.append(ch)
+        elif ch in pairs:
+            if not st or st.pop() != pairs[ch]:
+                return False
+    return not st
+
+print(check("()[]{}"))   # True
+print(check("([)]"))     # False
+```
+
+左括号进栈，右括号就跟栈顶对一下，对不上直接假。字符处理完栈还空着，才算全都配对。
+
+### 队列：list 也能当，就是慢
+
+队列一头进、另一头出。list 尾部进是 O(1)，但 `pop(0)` 是从头上删，删完后面所有元素都得往前挪一格，是 O(n)。
+
+拿 10 万个元素出队试了一下：
+
+| 写法 | 耗时 |
+|---|---|
+| `list.pop(0)` | 5.524 s |
+| `deque.popleft()` | 0.005 s |
+
+差了大约一千倍。这不是常数因子的差别，是 O(n) 和 O(1) 的差别，元素越多差得越狠。
+
+所以队列用 `deque`：
+
+```python
+from collections import deque
+
+q = deque()
+q.append(1)         # 入队
+q.append(2)
+print(q.popleft())  # 1，出队
+print(q.popleft())  # 2
+```
+
+C++ 里是 `queue` 的 `push` / `front` / `pop`，`pop()` 同样不返回值。顺带一提，C++ 的 `queue` 底层默认就是 deque。
+
+### 双端队列：两头都能动
+
+deque 两头都是 O(1)，所以它既能当队列，也能当栈：
+
+```python
+from collections import deque
+
+d = deque([1, 2, 3])
+d.appendleft(0)              # 左端进
+d.append(4)                  # 右端进
+print(d.popleft(), d.pop())  # 0 4
+
+d.extendleft([-1, -2])       # 注意顺序：往左端一个个塞，结果会反过来
+print(d)                     # deque([-2, -1, 1, 2, 3])
+
+d.rotate(1)                  # 整体右移一格，末尾那个转到头上
+print(d)                     # deque([3, -2, -1, 1, 2])
+```
+
+CPython 的 deque 底层不是链表，是一串固定大小的数组块接起来。对外表现得像双端队列，内部没有节点和指针。所以「双端链表」这个叫法要小心：想说的是「两端都能操作」，那是 deque；想说的是真正的双向链表，标准库里没有，得自己写。
+
+C++ 这边两个是分开的：`deque` 是双端队列，`list` 是双向链表。
+
+### 堆：手搓二十行，比背函数名省事
+
+优先队列在 C++ 里是 `priority_queue`。它默认是大顶堆，`top()` 拿到的是最大值；想改成小顶堆得写 `priority_queue<int, vector<int>, greater<int>>`，这串东西我到现在也记不住。
+
+Python 的 heapq 反过来，是小顶堆。不过在背 `heapify`、`heappush`、`heappop` 之前，先看看堆本身有多简单。
+
+堆是一棵用数组存的完全二叉树：下标 i 的两个孩子是 `2i+1` 和 `2i+2`，父亲是 `(i-1)//2`。小顶堆只有一个规矩，父亲不大于孩子。所以插入就是把新元素放到末尾，然后一路跟父亲比，比父亲小就换上去；弹出就是拿走堆顶，把末尾元素挪到堆顶，再一路跟较小的那个孩子换下来。
+
+```python
+def push(h, x):
+    h.append(x)
+    i = len(h) - 1
+    while i > 0:
+        p = (i - 1) // 2
+        if h[p] <= h[i]:
+            break
+        h[p], h[i] = h[i], h[p]
+        i = p
+
+def pop(h):
+    top = h[0]
+    last = h.pop()
+    if h:
+        h[0] = last
+        i = 0
+        while True:
+            l, r = 2 * i + 1, 2 * i + 2
+            small = i
+            if l < len(h) and h[l] < h[small]:
+                small = l
+            if r < len(h) and h[r] < h[small]:
+                small = r
+            if small == i:
+                break
+            h[i], h[small] = h[small], h[i]
+            i = small
+    return top
+```
+
+二十来行，跑过我随机生成的 200 组数据，一边 push 一边 pop，出来正好和 `sorted()` 一样。heapq 做的事和它一模一样，只是用 C 写的、快一些。哪天记不住函数名，抄上面这两段就行。
+
+要提醒一句：heapq 操作的是普通 list，没有专门的堆类型。一个 list 排好序不会因此变成堆，堆序是那几行代码维护出来的。
 
 ### 链表：躲不掉 class
-给一个 10 行的 ListNode（val + next），说明「这就是 C++ 里 struct Node { int val; Node* next; }」，
-并注明**类那篇会细讲**。
-另给一句竞赛向的替代：用两个数组模拟（值数组 + next 下标数组），避免对象开销。
-⚠️ 别在这里展开指针、内存布局。
+
+前面几种都能拿现成容器拼，链表不行，得自己定义节点。节点就两个东西：一个值，一个指向下一个节点的引用。
+
+```python
+class Node:
+    def __init__(self, val):
+        self.val = val
+        self.next = None
+
+n1, n2, n3 = Node(1), Node(2), Node(3)
+n1.next, n2.next = n2, n3
+
+cur = n1
+while cur:
+    print(cur.val, end=" ")   # 1 2 3
+    cur = cur.next
+```
+
+`class` 怎么写、`__init__` 是干什么的，等第四篇讲函数、模块与类的时候再说，现在照着结构抄就行。C++ 里对应的是 `struct Node { int val; Node* next; };`，`std::list` 是现成的双向链表，Python 没有。
+
+竞赛里还有个不用 class 的写法：开两个数组，一个存值，一个存下一个节点的下标，0 当空指针用。
+
+```python
+val = [0, 10, 20, 30]   # 0 号位置不用，当成空指针
+nxt = [0, 2, 3, 0]      # 1 号 -> 2 号 -> 3 号 -> 结束
+
+i = 1
+while i:
+    print(val[i], end=" ")   # 10 20 30
+    i = nxt[i]
+```
+
+省掉每个节点的对象开销，遍历靠下标跳，和 C++ 里用数组模拟链表是一个思路。
 
 ### 单调栈 / 单调队列
-这两不是数据结构，是**技巧**，但用栈和队列实现，所以放在这里合适。
-各给一个模板 + 一道典型题（下一个更大元素 / 滑动窗口最大值），说清「为什么能 O(n)」。
-⚠️ 代码要实测（管理版 Python：C:\Users\13551\.workbuddy\binaries\python\versions\3.13.12\python.exe）。
--->
+
+这两个不是数据结构，是技巧。容器还是栈和队列，只是里面的元素顺序被维护成单调的。
+
+单调栈：新元素进来时，把栈里比它小（求下一个更大元素时）的全弹掉，再把自己压进去。这样栈里从底到顶始终递增。
+
+```python
+def next_greater(a):
+    ans = [-1] * len(a)
+    st = []
+    for i, x in enumerate(a):
+        while st and a[st[-1]] < x:
+            ans[st.pop()] = x      # 栈顶那个下标等的就是 x
+        st.append(i)
+    return ans
+
+print(next_greater([2, 1, 2, 4, 3]))   # [4, 2, 4, -1, -1]
+```
+
+栈里存的是下标不是值，这样才知道答案该写到哪一格。看着是个嵌套循环，但每个下标最多进栈一次、出栈一次，总共 2n 次，所以是 O(n)。
+
+单调队列用来求滑动窗口最大值。队列里存下标，队头始终是当前窗口最大值的下标；新元素进来时，把队尾比它小的全弹掉（那些元素永远轮不到当最大值了），再看队头有没有滑出窗口。
+
+```python
+from collections import deque
+
+def window_max(a, k):
+    q, out = deque(), []
+    for i, x in enumerate(a):
+        while q and a[q[-1]] <= x:
+            q.pop()                # 队尾比新来的小，轮不到它了
+        q.append(i)
+        if q[0] <= i - k:
+            q.popleft()            # 队头已经滑出窗口
+        if i >= k - 1:
+            out.append(a[q[0]])
+    return out
+
+print(window_max([1, 3, -1, -3, 5, 3, 6, 7], 3))   # [3, 3, 5, 5, 6, 7]
+```
+
+这段和暴力求 max 的版本对了 300 组随机数据，结果一致。
+
+C++ 里也没有现成的单调栈，一样是拿 `stack` / `deque` 自己写，代码形状几乎一样。
 
 ## 更复杂的那些，先放一放
 
-<!--
-用户原话：「并查集，树状数组，线段树，平衡树可以提一嘴先一放」。
-所以这里只写 3-4 句，不展开：
-
-- Python 标准库一个都没有，都得手写
-- 而且写得出来也未必划算：解释器开销让常数因子比 C++ 大一个量级，
-  同样的算法在 Python 里可能过不了时限（说清这是工程现实，不是语言缺陷）
-- 真要在 Python 里用有序结构，第三方 `sortedcontainers`（SortedList / SortedDict）是常用替代
-- 竞赛里这几样基本还是 C++ 的活
-
-⚠️ 不要在这里展开并查集的路径压缩、线段树的懒标记——那是算法文章的事，
-   本篇只负责说「Python 这边没有现成的」。
--->
+对于并查集，线段树，平衡树，PIEMM只能说太香了，但是在这里呢，因为Python的运行效率确实比较慢，难度也比较大，用Python写这些东西的性价比并不高，PIEMM也就不打算在这边写了，这种只是都是互通的，掌握原理，语法转换只是一个很短的时间问题。后续PIEMM一定会在自己学习算法的时候详细讲述这三种算法，这真的夯爆了好嘛。
 
 ## PIEMM 的试炼
 
