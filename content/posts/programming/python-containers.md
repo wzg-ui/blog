@@ -446,26 +446,9 @@ while i:
 
 省掉每个节点的对象开销，遍历靠下标跳，跟 C++ 里数组模拟链表一个思路。用 class 定义节点也写得出，但那要等第四篇讲类。
 
-### 单调栈 / 单调队列
+### 单调队列：滑动窗口最大值
 
-这两个不是新的数据结构，是拿栈和队列维护单调性的技巧。
-
-求「下一个更大元素」：从左往右扫，每个元素进栈之前，先把栈里比它小的全弹掉——它们等的就是当前这个数，答案现在能填了。于是栈里从底到顶递减，每个下标最多进出各一次，O(n)。
-
-```python
-a = [2, 1, 2, 4, 3]
-ans = [-1] * len(a)
-st = []
-for i, x in enumerate(a):
-    while st and a[st[-1]] < x:
-        ans[st.pop()] = x    # 栈顶那个下标等的就是 x
-    st.append(i)
-print(ans)                   # [4, 2, 4, -1, -1]
-```
-
-栈里存下标不存值，否则不知道答案该写回哪一格。
-
-滑动窗口最大值是一回事，只是还要能从头删，所以用 deque。队头始终是当前窗口最大值的下标；新元素进来时把队尾比它小的全弹掉（那些永远轮不到当最大值），再看队头有没有滑出窗口。
+单调队列不是新容器，就是 deque 加一条规矩：队头永远是当前窗口的最大值。新元素进来时，把队尾比它小的全弹掉——那些元素在它右边、又比它小，永远轮不到当最大值；再看队头有没有滑出窗口，滑出去就从头删。每个下标最多进一次出一次，O(n)。
 
 ```python
 from collections import deque
@@ -483,7 +466,71 @@ for i, x in enumerate(a):
 print(out)                   # [3, 3, 5, 5, 6, 7]
 ```
 
-两段都是 O(n)，因为每个下标最多进一次出一次。C++ 里也没有现成的单调栈，一样拿 `stack` / `deque` 自己维护。
+C++ 那个模板是同一个思路，`deque` 里也存下标，判断过期的写法几乎一样：
+
+```cpp
+#include <iostream>
+#include <deque>
+#include <vector>
+using namespace std;
+
+int main() {
+    vector<int> a = {1, 3, -1, -3, 5, 3, 6, 7};
+    int n = a.size(), k = 3;
+    deque<int> dq;                       // 存下标，不是值
+    for (int i = 0; i < n; i++) {
+        if (!dq.empty() && dq.front() <= i - k) dq.pop_front();
+        while (!dq.empty() && a[dq.back()] <= a[i]) dq.pop_back();
+        dq.push_back(i);
+        if (i >= k - 1) cout << a[dq.front()] << ' ';
+    }
+    cout << '\n';
+}
+```
+
+跑出来是 `3 3 5 5 6 7`，和 Python 一样。模板里还留了一段求窗口最小值的，把 `<=` 改成 `>=` 再跑一遍就是。
+
+### 单调栈：下一个更大元素
+
+单调栈的规矩是栈里从底到顶保持单调。求下一个更大元素时，每个元素进栈前先把栈里比它小的弹掉，那些元素等的就是眼前这个数。每个下标进出各一次，O(n)。
+
+```python
+a = [2, 1, 2, 4, 3]
+ans = [-1] * len(a)
+st = []
+for i, x in enumerate(a):
+    while st and a[st[-1]] < x:
+        ans[st.pop()] = x    # 栈顶那个下标等的就是 x
+    st.append(i)
+print(ans)                   # [4, 2, 4, -1, -1]
+```
+
+C++ 模板反着扫：从右往左，栈里留下的是右边还没被淘汰的候选，答案直接记它的下标：
+
+```cpp
+#include <iostream>
+#include <stack>
+#include <vector>
+using namespace std;
+
+int main() {
+    vector<int> a = {0, 2, 1, 2, 4, 3};   // 0 号位不用，从 1 开始
+    int n = a.size() - 1;
+    vector<int> ans(n + 1);
+    stack<int> st;
+    for (int i = n; i >= 1; i--) {
+        while (!st.empty() && a[st.top()] <= a[i]) st.pop();
+        ans[i] = st.empty() ? 0 : st.top();
+        st.push(i);
+    }
+    for (int i = 1; i <= n; i++) cout << ans[i] << ' ';
+    cout << '\n';
+}
+```
+
+输出 `4 3 4 0 0`，是下标：第 1 个元素的下一个更大元素在 4 号位。`0` 表示右边没有更大的，Python 那边写的 `-1` 是同一个意思。想要值就写 `a[ans[i]]`，得到 `4 2 4 0 0`，和 Python 的结果对得上。
+
+两边扫的方向相反，做的却是同一件事：把不可能成为答案的元素提前扔掉。
 
 ## 更复杂的那些，先放一放
 
