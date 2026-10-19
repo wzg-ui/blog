@@ -337,168 +337,105 @@ C++ 里没有「这串是文本还是字节」这个区别，`string` 就是字�
 
 ## 用这些容器拼出常见的数据结构
 
-C++ 把栈、队列、优先队列做成了现成的适配器：`stack`、`queue`、`priority_queue`，声明一行就能用。Python 标准库只给了 list 和 deque，剩下的得自己拿它们拼。
+C++ 把栈、队列、优先队列做成了现成的适配器：`stack`、`queue`、`priority_queue`，声明一行就能用。Python 标准库只给了 list 和 deque，堆是一组叫 heapq 的函数。所以这一章其实只说一件事：想要哪个结构，拿哪个容器去装。
 
 | 想要的 | C++ | Python |
 |---|---|---|
 | 栈 | `stack` | list，`append` / `pop` |
 | 队列 | `queue` | `deque`，`append` / `popleft` |
 | 双端队列 | `deque` | `deque` |
-| 优先队列（堆） | `priority_queue` | 手写二十行，或者 `heapq` |
-| 链表 | `list` | 没有，自己写 |
+| 优先队列（堆） | `priority_queue` | list + `heapq` |
+| 链表 | `list` | 没有现成的，用两个数组凑 |
 
-### 栈：list 就是栈
+### 栈：list 的尾巴就是栈顶
 
-栈只在一头进出，list 的尾巴正好是那一头：`append` 进、`pop` 出，`[-1]` 看栈顶。
-
-```python
-st = []
-st.append(1)
-st.append(2)
-print(st[-1])     # 2，栈顶
-print(st.pop())   # 2
-```
-
-C++ 里是 `push` / `top` / `pop`，有一点得注意：`stack::pop()` 不返回被删掉的值，要先 `top()` 再 `pop()`。Python 的 `pop()` 直接把值给你。
-
-拿它做道小题，判断括号是否配对：
+栈只在一头进出。list 尾部的追加和弹出都是 O(1)，正好拿来当这一头。
 
 ```python
-def check(s):
-    pairs = {")": "(", "]": "[", "}": "{"}
-    st = []
-    for ch in s:
-        if ch in "([{":
-            st.append(ch)
-        elif ch in pairs:
-            if not st or st.pop() != pairs[ch]:
-                return False
-    return not st
-
-print(check("()[]{}"))   # True
-print(check("([)]"))     # False
+st = [1, 2]
+st.append(3)
+print(st)        # [1, 2, 3]
+print(st[-1])    # 3，栈顶
+print(st.pop())  # 3
+print(st)        # [1, 2]
 ```
 
-左括号进栈，右括号就跟栈顶对一下，对不上直接假。字符处理完栈还空着，才算全都配对。
+C++ 的 `stack` 分 `push` / `top` / `pop` 三步，而且 `pop()` 只删不返回，得先 `top()` 再 `pop()`。Python 的 `pop()` 把值直接给你。
 
-### 队列：list 也能当，就是慢
+### 队列：出队要用 deque
 
-队列一头进、另一头出。list 尾部进是 O(1)，但 `pop(0)` 是从头上删，删完后面所有元素都得往前挪一格，是 O(n)。
-
-拿 10 万个元素出队试了一下：
+队列一头进、另一头出。list 尾部进是 O(1)，但 `pop(0)` 是从头上删，删完后面所有元素都得往前挪一格，是 O(n)。10 万个元素出队试了一下：
 
 | 写法 | 耗时 |
 |---|---|
 | `list.pop(0)` | 5.524 s |
 | `deque.popleft()` | 0.005 s |
 
-差了大约一千倍。这不是常数因子的差别，是 O(n) 和 O(1) 的差别，元素越多差得越狠。
-
-所以队列用 `deque`：
+差的不是常数因子，是一千倍。所以队列只有一句话：用 deque。
 
 ```python
 from collections import deque
 
-q = deque()
-q.append(1)         # 入队
-q.append(2)
-print(q.popleft())  # 1，出队
-print(q.popleft())  # 2
+q = deque([1, 2])
+q.append(3)
+print(q.popleft())   # 1
+print(q)             # deque([2, 3])
 ```
 
-C++ 里是 `queue` 的 `push` / `front` / `pop`，`pop()` 同样不返回值。顺带一提，C++ 的 `queue` 底层默认就是 deque。
+C++ 的 `queue` 底层默认就是 deque，`pop()` 同样不返回值。
 
-### 双端队列：两头都能动
+### 双端队列：两头都是 O(1)
 
-deque 两头都是 O(1)，所以它既能当队列，也能当栈：
+deque 两头都能进出，所以它既能当队列，也能当栈。
 
 ```python
 from collections import deque
 
 d = deque([1, 2, 3])
-d.appendleft(0)              # 左端进
-d.append(4)                  # 右端进
+d.appendleft(0)
+d.append(4)
+print(d)                     # deque([0, 1, 2, 3, 4])
 print(d.popleft(), d.pop())  # 0 4
 
-d.extendleft([-1, -2])       # 注意顺序：往左端一个个塞，结果会反过来
+d.extendleft([-1, -2])       # 往左端一个个塞，顺序会反过来
 print(d)                     # deque([-2, -1, 1, 2, 3])
 
 d.rotate(1)                  # 整体右移一格，末尾那个转到头上
 print(d)                     # deque([3, -2, -1, 1, 2])
 ```
 
-CPython 的 deque 底层不是链表，是一串固定大小的数组块接起来。对外表现得像双端队列，内部没有节点和指针。所以「双端链表」这个叫法要小心：想说的是「两端都能操作」，那是 deque；想说的是真正的双向链表，标准库里没有，得自己写。
+CPython 的 deque 底层是一串固定大小的数组块接起来的，不是链表，内部没有节点和指针。所以「双端队列」说的是两端都能动，跟「双向链表」不是一回事。C++ 那边这两个也分开：`deque` 是双端队列，`list` 是双向链表。
 
-C++ 这边两个是分开的：`deque` 是双端队列，`list` 是双向链表。
+### 堆：一个 list 加几个函数
 
-### 堆：手搓二十行，比背函数名省事
+堆在概念上是一棵完全二叉树，存在数组里：下标 i 的两个孩子是 `2i+1` 和 `2i+2`，父亲是 `(i-1)//2`。小顶堆只有一条规矩——父亲不大于孩子。于是堆顶就是整个数组的最小值，插入和弹出都只沿一条路径上下走，O(log n)。
 
-优先队列在 C++ 里是 `priority_queue`。它默认是大顶堆，`top()` 拿到的是最大值；想改成小顶堆得写 `priority_queue<int, vector<int>, greater<int>>`，这串东西我到现在也记不住。
-
-Python 的 heapq 反过来，是小顶堆。不过在背 `heapify`、`heappush`、`heappop` 之前，先看看堆本身有多简单。
-
-堆是一棵用数组存的完全二叉树：下标 i 的两个孩子是 `2i+1` 和 `2i+2`，父亲是 `(i-1)//2`。小顶堆只有一个规矩，父亲不大于孩子。所以插入就是把新元素放到末尾，然后一路跟父亲比，比父亲小就换上去；弹出就是拿走堆顶，把末尾元素挪到堆顶，再一路跟较小的那个孩子换下来。
+这套东西不用自己写，`heapq` 全做了，操作对象还是普通 list：
 
 ```python
-def push(h, x):
-    h.append(x)
-    i = len(h) - 1
-    while i > 0:
-        p = (i - 1) // 2
-        if h[p] <= h[i]:
-            break
-        h[p], h[i] = h[i], h[p]
-        i = p
+import heapq
 
-def pop(h):
-    top = h[0]
-    last = h.pop()
-    if h:
-        h[0] = last
-        i = 0
-        while True:
-            l, r = 2 * i + 1, 2 * i + 2
-            small = i
-            if l < len(h) and h[l] < h[small]:
-                small = l
-            if r < len(h) and h[r] < h[small]:
-                small = r
-            if small == i:
-                break
-            h[i], h[small] = h[small], h[i]
-            i = small
-    return top
+h = [3, 1, 2]
+heapq.heapify(h)
+print(h)                 # [1, 3, 2]，最小的换到 0 号位
+
+heapq.heappush(h, 0)
+print(h)                 # [0, 1, 2, 3]
+
+print(heapq.heappop(h))  # 0
+print(h)                 # [1, 3, 2]
 ```
 
-二十来行，跑过我随机生成的 200 组数据，一边 push 一边 pop，出来正好和 `sorted()` 一样。heapq 做的事和它一模一样，只是用 C 写的、快一些。哪天记不住函数名，抄上面这两段就行。
+注意 heapify 之后是 `[1, 3, 2]`，不是 `[1, 2, 3]`。它不是排序，只是让父亲不大于孩子：0 号位一定是最小值，其他位置谁在前谁在后没有保证。
 
-要提醒一句：heapq 操作的是普通 list，没有专门的堆类型。一个 list 排好序不会因此变成堆，堆序是那几行代码维护出来的。
+heapq 只有小顶堆，要最大值就把元素取负了放进去，取出来再变回来。C++ 的 `priority_queue` 反过来默认是大顶堆，想改小顶堆得写 `priority_queue<int, vector<int>, greater<int>>`，这串东西我到现在也记不住。
 
-### 链表：躲不掉 class
+### 链表：用两个数组凑
 
-前面几种都能拿现成容器拼，链表不行，得自己定义节点。节点就两个东西：一个值，一个指向下一个节点的引用。
-
-```python
-class Node:
-    def __init__(self, val):
-        self.val = val
-        self.next = None
-
-n1, n2, n3 = Node(1), Node(2), Node(3)
-n1.next, n2.next = n2, n3
-
-cur = n1
-while cur:
-    print(cur.val, end=" ")   # 1 2 3
-    cur = cur.next
-```
-
-`class` 怎么写、`__init__` 是干什么的，等第四篇讲函数、模块与类的时候再说，现在照着结构抄就行。C++ 里对应的是 `struct Node { int val; Node* next; };`，`std::list` 是现成的双向链表，Python 没有。
-
-竞赛里还有个不用 class 的写法：开两个数组，一个存值，一个存下一个节点的下标，0 当空指针用。
+链表每个节点只存两样：一个值，「下一个在哪」。Python 的 list 是动态数组，中间插一个要挪一片，所以只有频繁插删的地方才轮到链表。标准库没有现成的，竞赛里的写法是开两个数组，一个存值、一个存下标，0 当空指针：
 
 ```python
-val = [0, 10, 20, 30]   # 0 号位置不用，当成空指针
+val = [0, 10, 20, 30]   # 0 号位不用，当空指针
 nxt = [0, 2, 3, 0]      # 1 号 -> 2 号 -> 3 号 -> 结束
 
 i = 1
@@ -507,52 +444,46 @@ while i:
     i = nxt[i]
 ```
 
-省掉每个节点的对象开销，遍历靠下标跳，和 C++ 里用数组模拟链表是一个思路。
+省掉每个节点的对象开销，遍历靠下标跳，跟 C++ 里数组模拟链表一个思路。用 class 定义节点也写得出，但那要等第四篇讲类。
 
 ### 单调栈 / 单调队列
 
-这两个不是数据结构，是技巧。容器还是栈和队列，只是里面的元素顺序被维护成单调的。
+这两个不是新的数据结构，是拿栈和队列维护单调性的技巧。
 
-单调栈：新元素进来时，把栈里比它小（求下一个更大元素时）的全弹掉，再把自己压进去。这样栈里从底到顶始终递增。
+求「下一个更大元素」：从左往右扫，每个元素进栈之前，先把栈里比它小的全弹掉——它们等的就是当前这个数，答案现在能填了。于是栈里从底到顶递减，每个下标最多进出各一次，O(n)。
 
 ```python
-def next_greater(a):
-    ans = [-1] * len(a)
-    st = []
-    for i, x in enumerate(a):
-        while st and a[st[-1]] < x:
-            ans[st.pop()] = x      # 栈顶那个下标等的就是 x
-        st.append(i)
-    return ans
-
-print(next_greater([2, 1, 2, 4, 3]))   # [4, 2, 4, -1, -1]
+a = [2, 1, 2, 4, 3]
+ans = [-1] * len(a)
+st = []
+for i, x in enumerate(a):
+    while st and a[st[-1]] < x:
+        ans[st.pop()] = x    # 栈顶那个下标等的就是 x
+    st.append(i)
+print(ans)                   # [4, 2, 4, -1, -1]
 ```
 
-栈里存的是下标不是值，这样才知道答案该写到哪一格。看着是个嵌套循环，但每个下标最多进栈一次、出栈一次，总共 2n 次，所以是 O(n)。
+栈里存下标不存值，否则不知道答案该写回哪一格。
 
-单调队列用来求滑动窗口最大值。队列里存下标，队头始终是当前窗口最大值的下标；新元素进来时，把队尾比它小的全弹掉（那些元素永远轮不到当最大值了），再看队头有没有滑出窗口。
+滑动窗口最大值是一回事，只是还要能从头删，所以用 deque。队头始终是当前窗口最大值的下标；新元素进来时把队尾比它小的全弹掉（那些永远轮不到当最大值），再看队头有没有滑出窗口。
 
 ```python
 from collections import deque
 
-def window_max(a, k):
-    q, out = deque(), []
-    for i, x in enumerate(a):
-        while q and a[q[-1]] <= x:
-            q.pop()                # 队尾比新来的小，轮不到它了
-        q.append(i)
-        if q[0] <= i - k:
-            q.popleft()            # 队头已经滑出窗口
-        if i >= k - 1:
-            out.append(a[q[0]])
-    return out
-
-print(window_max([1, 3, -1, -3, 5, 3, 6, 7], 3))   # [3, 3, 5, 5, 6, 7]
+a, k = [1, 3, -1, -3, 5, 3, 6, 7], 3
+q, out = deque(), []
+for i, x in enumerate(a):
+    while q and a[q[-1]] <= x:
+        q.pop()              # 队尾比新来的小，轮不到它了
+    q.append(i)
+    if q[0] <= i - k:
+        q.popleft()          # 队头已经滑出窗口
+    if i >= k - 1:
+        out.append(a[q[0]])
+print(out)                   # [3, 3, 5, 5, 6, 7]
 ```
 
-这段和暴力求 max 的版本对了 300 组随机数据，结果一致。
-
-C++ 里也没有现成的单调栈，一样是拿 `stack` / `deque` 自己写，代码形状几乎一样。
+两段都是 O(n)，因为每个下标最多进一次出一次。C++ 里也没有现成的单调栈，一样拿 `stack` / `deque` 自己维护。
 
 ## 更复杂的那些，先放一放
 
