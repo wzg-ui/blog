@@ -190,23 +190,29 @@ $$|a_n|>|a|-\frac{|a|}{2}=\frac{|a|}{2}.$$
 ⚠️ 别把它写成「选择题小技巧」：这是定义题的标准动作，也是后面证明题的地基。
 -->
 
-### 二、0/0 与 1^∞：减法拆成乘法，幂拆成指数
+### 二、0/0 与 1^∞：减法拆成乘法，幂次按阶拆开
 
 先看这道：
 
 $$\lim_{x\to0}\frac{\sin^2x-x^2\cos^2x}{x^2\sin^2x}=\frac{2}{3}$$
 
-三步：
+分子是平方差，先拆：
 
-1. 分母里的 $\sin^2x$ 是乘除因子，直接换成 $x^2$，分母变 $x^4$。这一步合法，前提是它**整个**是个因子。
-2. 分子是平方差，拆开：$\sin^2x-x^2\cos^2x=(\sin x+x\cos x)(\sin x-x\cos x)$。减法变成乘法之后，每一块都能单独用等价或者展开。
-3. 两块各自看阶：
+$$\sin^2x-x^2\cos^2x=(\sin x+x\cos x)(\sin x-x\cos x)$$
 
-$$\sin x+x\cos x\sim 2x,\qquad \sin x-x\cos x=\left(x-\frac{x^3}{6}\right)-x\left(1-\frac{x^2}{2}\right)+o(x^3)=\frac{x^3}{3}$$
+两块阶不一样：$\sin x+x\cos x\sim2x$ 是一阶，$\sin x-x\cos x=\left(x-\frac{x^3}{6}\right)-x\left(1-\frac{x^2}{2}\right)+o(x^3)=\frac{x^3}{3}$ 是三阶。一阶配三阶，分母就得跟着按 1 比 3 分。
 
-合起来 $\dfrac{2x\cdot\frac{x^3}{3}}{x^4}=\dfrac{2}{3}$。
+分母 $x^2\sin^2x$ 一共四个一阶因子（$x,x,\sin x,\sin x$）。常规做法是整体换成 $x^4$，再把分子老实展到四阶 —— 两项的 $x^2$ 抵消，只剩四阶相减，能算出来，但要多展两阶，还容易漏项。按阶配则一次展开都不用：
 
-还有一个长得像、但不是同一道的式子：$\dfrac{1}{\sin^2x}-\dfrac{\cos^2x}{x^2}$，通分后是 $\dfrac{x^2-\sin^2x\cos^2x}{x^2\sin^2x}$。分子同样用平方差，$x^2-\frac14\sin^22x=\frac14(2x-\sin2x)(2x+\sin2x)$，配合 $2x-\sin2x\sim\dfrac{(2x)^3}{6}$，得 $\dfrac{4}{3}$。它和上面那道只差分子里两项的先后顺序，答案就从 $\frac{2}{3}$ 变成 $\frac{4}{3}$ —— 通分的时候先把分子抄对。
+$$\frac{2x\cdot\frac{x^3}{3}}{x^2\sin^2x}=\frac{2x}{\sin x}\cdot\frac{x^3/3}{x^2\sin x}\;\longrightarrow\;2\cdot\frac13=\frac23$$
+
+一个 $\sin x$ 配给一阶那块，剩下三个因子 $x^2\sin x$ 配给三阶那块。每块只用到自己那阶的等价，分母也没被整体换掉。
+
+通分之后的式子走同一个动作。$\dfrac{1}{\sin^2x}-\dfrac{\cos^2x}{x^2}=\dfrac{x^2-\sin^2x\cos^2x}{x^2\sin^2x}$，分子还是平方差：$x^2-\sin^2x\cos^2x=(x-\sin x\cos x)(x+\sin x\cos x)$，两块分别是三阶 $\frac{2x^3}{3}$ 与一阶 $2x$。分母照 1 比 3 拆：
+
+$$\frac{x-\sin x\cos x}{x^2\sin x}\cdot\frac{x+\sin x\cos x}{\sin x}\;\longrightarrow\;\frac23\cdot2=\frac43$$
+
+它和上一道只差分子里两项的先后顺序，答案就从 $\frac{2}{3}$ 变成 $\frac{4}{3}$ —— 通分的时候先把分子抄对。
 
 再看 $1^\infty$：
 
@@ -225,7 +231,8 @@ $$\ln\frac{\sin x}{x}\sim\frac{\sin x}{x}-1=\frac{\sin x-x}{x}\sim-\frac{x^2}{6}
 $1^\infty$ 不用背公式，全部走 $\exp(v\ln u)$，再把 $\ln u$ 换成 $u-1$，两个等价无穷小一除，指数自己就出来了。
 
 <!--
-⚠️ 这一节的两条底线：整因子才能换等价；加减里要拆成乘积或者展开到同阶。
+⚠️ 这一节的两条底线：整因子才能换等价；加减里要拆成乘积，再把分母按阶配上去。
+（本节的技巧点：分母不整体换 x^4，而是按 1:3 拆给分子拆出来的两块。）
 -->
 
 ### 三、连乘积：凑一个 (1−a) 裂项
