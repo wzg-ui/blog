@@ -190,29 +190,37 @@ $$|a_n|>|a|-\frac{|a|}{2}=\frac{|a|}{2}.$$
 ⚠️ 别把它写成「选择题小技巧」：这是定义题的标准动作，也是后面证明题的地基。
 -->
 
-### 二、0/0 与 1^∞：减法拆成乘法，幂次按阶拆开
+### 二、0/0 与 1^∞：减法拆成乘法，分母拆成 1 : 3
 
 先看这道：
 
 $$\lim_{x\to0}\frac{\sin^2x-x^2\cos^2x}{x^2\sin^2x}=\frac{2}{3}$$
 
-分子是平方差，先拆：
+分母里的 $\sin^2x$ 整个是因子，换成 $x^2$，分母变 $x^4$。这一步照常规走，没问题。
+
+分子是平方差，拆开：
 
 $$\sin^2x-x^2\cos^2x=(\sin x+x\cos x)(\sin x-x\cos x)$$
 
-两块阶不一样：$\sin x+x\cos x\sim2x$ 是一阶，$\sin x-x\cos x=\left(x-\frac{x^3}{6}\right)-x\left(1-\frac{x^2}{2}\right)+o(x^3)=\frac{x^3}{3}$ 是三阶。一阶配三阶，分母就得跟着按 1 比 3 分。
+两块阶不一样：$\sin x+x\cos x\sim2x$ 是一阶，$\sin x-x\cos x=\left(x-\frac{x^3}{6}\right)-x\left(1-\frac{x^2}{2}\right)+o(x^3)=\frac{x^3}{3}$ 是三阶。
 
-分母 $x^2\sin^2x$ 一共四个一阶因子（$x,x,\sin x,\sin x$）。常规做法是整体换成 $x^4$，再把分子老实展到四阶 —— 两项的 $x^2$ 抵消，只剩四阶相减，能算出来，但要多展两阶，还容易漏项。按阶配则一次展开都不用：
+$x^4$ 怎么分给这两块，才是整道题的关键。顺手拆成 $x^2\cdot x^2$（对称，看着最省事）会得到
 
-$$\frac{2x\cdot\frac{x^3}{3}}{x^2\sin^2x}=\frac{2x}{\sin x}\cdot\frac{x^3/3}{x^2\sin x}\;\longrightarrow\;2\cdot\frac13=\frac23$$
+$$\frac{2x}{x^2}\to\infty,\qquad\frac{x^3/3}{x^2}\to0$$
 
-一个 $\sin x$ 配给一阶那块，剩下三个因子 $x^2\sin x$ 配给三阶那块。每块只用到自己那阶的等价，分母也没被整体换掉。
+一头无穷一头零，仍是未定式，等于没算。按阶分，一阶那块配 $x$、三阶那块配 $x^3$，两块各自一次到底：
 
-通分之后的式子走同一个动作。$\dfrac{1}{\sin^2x}-\dfrac{\cos^2x}{x^2}=\dfrac{x^2-\sin^2x\cos^2x}{x^2\sin^2x}$，分子还是平方差：$x^2-\sin^2x\cos^2x=(x-\sin x\cos x)(x+\sin x\cos x)$，两块分别是三阶 $\frac{2x^3}{3}$ 与一阶 $2x$。分母照 1 比 3 拆：
+$$\frac{\sin x+x\cos x}{x}\cdot\frac{\sin x-x\cos x}{x^3}\;\longrightarrow\;2\cdot\frac13=\frac23$$
 
-$$\frac{x-\sin x\cos x}{x^2\sin x}\cdot\frac{x+\sin x\cos x}{\sin x}\;\longrightarrow\;\frac23\cdot2=\frac43$$
+后一块换洛必达也通：$\lim\dfrac{\sin x-x\cos x}{x^3}=\lim\dfrac{x\sin x}{3x^2}=\dfrac13\lim\dfrac{\sin x}{x}=\dfrac13$。
 
-它和上一道只差分子里两项的先后顺序，答案就从 $\frac{2}{3}$ 变成 $\frac{4}{3}$ —— 通分的时候先把分子抄对。
+另一道的式子是 $\dfrac{1}{\sin^2x}-\dfrac{\cos^2x}{x^2}$，通分后分母还是 $x^2\sin^2x\to x^4$，分子仍是平方差：$x^2-\sin^2x\cos^2x=(x+\sin x\cos x)\left(x-\frac12\sin2x\right)$。一阶那块 $\sim2x$，三阶那块 $x-\frac12\sin2x\sim\frac{2x^3}{3}$，分母照旧拆成 $x\cdot x^3$：
+
+$$\frac{x+\sin x\cos x}{x}\cdot\frac{x-\frac12\sin2x}{x^3}\;\longrightarrow\;2\cdot\frac23=\frac43$$
+
+后一块洛必达一次得 $\dfrac{1-\cos2x}{3x^2}$，配 $1-\cos2x\sim2x^2$ 就是 $\dfrac23$。
+
+它和上一道只差分子里两项的先后，答案就从 $\frac{2}{3}$ 变成 $\frac{4}{3}$，抄题时别弄反。这题另有一种拆法，拆的不是幂次而是项：写成 $\left(\dfrac{1}{\sin^2x}-\dfrac{1}{x^2}\right)+\dfrac{\sin^2x}{x^2}$，前者是熟结论 $\to\dfrac13$，后者 $\to1$，加起来也是 $\dfrac{4}{3}$。两种做法都通，但中间那步别混着用。
 
 再看 $1^\infty$：
 
@@ -231,8 +239,9 @@ $$\ln\frac{\sin x}{x}\sim\frac{\sin x}{x}-1=\frac{\sin x-x}{x}\sim-\frac{x^2}{6}
 $1^\infty$ 不用背公式，全部走 $\exp(v\ln u)$，再把 $\ln u$ 换成 $u-1$，两个等价无穷小一除，指数自己就出来了。
 
 <!--
-⚠️ 这一节的两条底线：整因子才能换等价；加减里要拆成乘积，再把分母按阶配上去。
-（本节的技巧点：分母不整体换 x^4，而是按 1:3 拆给分子拆出来的两块。）
+⚠️ 这一节的两条底线：整因子才能换等价；加减里拆成乘积之后，分母要按两块的阶去分。
+（本节真正的技巧点：分母照常规换成 x^4，但 x^4 拆成 x·x^3 而不是 x^2·x^2。
+ 对应书里第 51 题、第 62 题的解法 2。）
 -->
 
 ### 三、连乘积：凑一个 (1−a) 裂项
