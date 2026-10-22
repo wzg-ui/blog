@@ -10,6 +10,9 @@
   X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=()
+  # 一年内只用 HTTPS，防同网段的降级劫持（首次明文访问拦不住，之后一律走 https）。
+  # 故意不写 includeSubDomains：那样会连带 piemm.net 下的其他子域，这里只管本站。
+  Strict-Transport-Security: max-age=31536000
 
 # ------------------------------------------------------------
 # 自托管的大体积资源，内容变了文件名也会变，可以放心缓存一年
