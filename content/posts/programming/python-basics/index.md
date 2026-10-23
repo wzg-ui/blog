@@ -376,7 +376,7 @@ print("{}: {:.2f}".format(name, score))
 
 最大值max(),最小值min()，注意这个比较有一个key，也就是max(x[,key]),min(x[,key])
 
-排序函数sorted(x,key=,reversed=),逆序函数reversed(x,key=)
+排序函数sorted(x,key=,reverse=)，参数名是 reverse 不是 reversed；逆序函数reversed(x)只接受序列，没有 key，返回的是迭代器而不是列表，要列表得 list(reversed(x))
 
 range()函数，range(start,end,step),注意区间**左闭右开**。
 
