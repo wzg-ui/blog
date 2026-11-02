@@ -3,7 +3,7 @@ title: "Python 的类"
 date: 2026-11-02T23:55:00+08:00
 draft: false
 slug: "python-class"
-description: "self 是明写的参数，属性和方法都是运行时挂上去的"
+description: "PIEMM 还账之路"
 ---
 
 ## 开场
