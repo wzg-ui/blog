@@ -695,4 +695,4 @@ print(3 in lst, 9 in lst)     # True False
 
 `@property`、`@staticmethod`、`@classmethod`、`@dataclass` 那一组同样不动这套模型，只是把前面手写的东西换了个拿到的方式——手写和生成，走的还是同一个 `__dict__`。
 
-下一篇打算把这次压着的写法收一收：推导式、`lambda` 和 `key=`、`zip` 那几样，都属于「不学新语法，只换个写法」。
+下一篇打算写一写文件管理和异常，内容不会很多，但很实用。
