@@ -1,9 +1,9 @@
 ---
 title: "接下来写什么"
-date: 2026-10-15T22:10:00+08:00
+date: 2026-11-04T00:06:00+08:00
 weight: 0
 pinned: true
-draft: true
+draft: false
 slug: "roadmap"
 description: "这个站接下来打算写什么、写到哪一步了，先放这儿，省得自己写着写着就乱了"
 ---
