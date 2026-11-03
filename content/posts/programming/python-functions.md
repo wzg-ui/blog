@@ -377,6 +377,46 @@ print(actions[name](7, 2))    # 9
 
 `actions[name]` 取出来的是函数对象，后面直接接括号就是调用。写成 `if` 要两三条分支，而且加一个操作就得再添一条；写成字典只往里面塞一项，调用处一个字都不用动。
 
+### `lambda`：现造一个没名字的函数
+
+既然函数是对象、能当参数传，那「临时需要一个函数」就有点烦：为了一次使用专门 `def` 一个，还得起个名字。`lambda` 省掉这两样：
+
+```python
+double = lambda v: v * 2
+print(double(3))    # 6
+```
+
+冒号前面是参数，后面是返回值。
+
+它真正上场的地方是 `key=` 这类参数。`sorted(a)` 默认按元素本身比大小，`key` 让你指定「按什么比」：
+
+```python
+words = ['apple', 'fig', 'banana']
+print(sorted(words))                        # ['apple', 'banana', 'fig']
+print(sorted(words, key=len))               # ['fig', 'apple', 'banana']
+print(sorted(words, key=lambda w: w[-1]))   # ['banana', 'apple', 'fig']
+```
+
+`key` 收到每个元素，返回一个用来比大小的东西。`len` 是现成的函数，直接递名字，不用写 `key=lambda w: len(w)`；按最后一个字母排这种没有现成函数的，才用 `lambda` 现写一个。
+
+要多关键字排序，让 `key` 返回元组，按位比。「分数高的在前」用负号，不要用 `reverse=True`——那个是整体翻，会把第二关键字一起翻反：
+
+```python
+students = [('Amy', 90, 20), ('Bob', 90, 18), ('Cid', 85, 19)]
+print(sorted(students, key=lambda s: (-s[1], s[2])))
+# [('Bob', 90, 18), ('Amy', 90, 20), ('Cid', 85, 19)]
+```
+
+90 分的两个人按年龄小的在前，85 分的最后。排序是稳定的：`key` 算出来相同的时候，原来的先后不变。`max` 和 `min` 也吃 `key=`：
+
+```python
+print(max(students, key=lambda s: s[1]))    # ('Amy', 90, 20)
+```
+
+跟 C++ 最容易套错的就是这个：`sort` 的比较函数返回 `bool`，回答「a 该不该排在 b 前面」；Python 的 `key` 返回「排序依据」，两两怎么比是排序算法自己的事。真要写 C++ 那种两两比较，得包一层 `functools.cmp_to_key`，日常用不上。
+
+`lambda` 的边界：里面只能写表达式，不能赋值、不能 `return`、不能写 `for`。一行放不下就写普通函数，`def` 一下不丢人。
+
 ## 模块：一个 `.py` 文件
 
 函数解决的是「一段逻辑用两遍」，模块解决的是「一段逻辑在两个文件里用」。

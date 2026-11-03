@@ -8,7 +8,7 @@ description: "不学新语法，只把写法换短"
 
 ## 开场
 
-这篇是语法的最后一篇，把前面各章压着没收的写法快速过一遍：推导式、`lambda` 与 `key=`，还有 `zip` / `enumerate` / `map` / `reduce` 这几个一行写法。都不算新语法，只是换个写法。
+这篇是语法的最后一篇，把前面各章压着没收的写法快速过一遍：推导式，还有 `zip` / `enumerate` / `any` / `all` / `map` / `filter` / `reduce` 这几个一行写法。都不算新语法，只是换个写法，把循环和下标省掉。
 
 ## 推导式：把循环和 append 压成一句
 
@@ -44,39 +44,6 @@ print({w[0] for w in words})         # {'a', 'f', 'b'}（无序）
 集合没有顺序，打印出来什么样别当结论。
 
 方括号换成圆括号就是生成器表达式。装饰器篇讲过它不算列表、只能扫一遍。
-
-## lambda 与 `key=`：把「按什么排」抽出来
-
-之前说过函数是对象，`lambda` 就是这句话的直接后果：没有名字的一行函数。它本身没什么本事，值钱的地方是 `sorted` 的 `key=` 参数——排序时「按什么比」交给一个函数来算：
-
-```python
-words = ['apple', 'fig', 'banana']
-print(sorted(words))                        # ['apple', 'banana', 'fig']
-print(sorted(words, key=len))               # ['fig', 'apple', 'banana']
-print(sorted(words, key=lambda w: w[-1]))   # ['banana', 'apple', 'fig']
-```
-
-`key` 收到每个元素，返回一个用来比大小的东西。`len` 是现成的函数，直接递名字，不用写 `key=lambda w: len(w)`；按最后一个字母排这种没有现成函数的，才用 `lambda` 现写一个。
-
-要多关键字排序，让 `key` 返回元组，按位比。「分数高的在前」用负号，不要用 `reverse=True`——那个是整体翻，会把第二关键字一起翻反：
-
-```python
-students = [('Amy', 90, 20), ('Bob', 90, 18), ('Cid', 85, 19)]
-print(sorted(students, key=lambda s: (-s[1], s[2])))
-# [('Bob', 90, 18), ('Amy', 90, 20), ('Cid', 85, 19)]
-```
-
-90 分的两个人按年龄小的在前，85 分的最后。
-
-排序是稳定的：`key` 算出来相同的时候，原来的先后不变。`max` 和 `min` 也吃 `key=`：
-
-```python
-print(max(students, key=lambda s: s[1]))    # ('Amy', 90, 20)
-```
-
-最容易跟 C++ 套错的就是排序。C++ `sort` 的比较函数返回 `bool`，回答「a 该不该排在 b 前面」；Python 的 `key` 返回「排序依据」，两两怎么比是排序算法自己的事。真要写 C++ 那种两两比较，得包一层 `functools.cmp_to_key`，日常用不上。
-
-`lambda` 的边界：里面只能写表达式，不能赋值、不能 `return`、不能写 `for`。一行放不下就写普通函数，`def` 一下不丢人。
 
 ## 一行写法：zip、enumerate、any / all 与函数式那三个
 
@@ -129,7 +96,7 @@ print(list(filter(str.isdigit, ['1', 'a', '2'])))    # ['1', '2']
 
 `map(f, a)` 就是 `[f(x) for x in a]`，`filter(p, a)` 就是 `[x for x in a if p(x)]`。两个返回的都不是列表而是迭代器，所以得套一层 `list()`，也只能扫一遍，跟生成器一个道理。
 
-`reduce` 是第三个，把一串值压成一个。它不在内置里，得单独 import：
+`reduce` 是第三个，把一串值压成一个。它不在内置里，得单独 import（`lambda` 在函数篇讲过）：
 
 ```python
 from functools import reduce
@@ -156,14 +123,13 @@ print('大' if x > 3 else '小')    # 大，三元读作「值 if 条件 else �
 | 想干什么 | Python | C++ |
 |---|---|---|
 | 从旧序列造新序列 | `[x * x for x in a]` | 循环里 `push_back` |
-| 排序按自定义依据 | `sorted(a, key=...)` | `sort` 加比较函数 |
 | 换两个值 | `a, b = b, a` | `swap` |
 | 同时遍历两个序列 | `zip(a, b)` | 下标循环 |
 | 把一串值压成一个 | `reduce(f, a)` | `accumulate` |
 
 ## 收尾
 
-这篇的东西不用背，想起来「好像有个一行版」回头查就行。两个度顺手记一下：推导式别叠三层以上，读的人会疯；`lambda` 一行放不下就换函数。
+这篇的东西不用背，想起来「好像有个一行版」回头查就行。两个度顺手记一下：推导式别叠三层以上，读的人会疯；`map` / `filter` 只在套现成函数时用，其余都交给推导式。
 
 异常那块这篇不再写一遍，`try` / `except` / `else` / `finally` 和常见异常表都在文件篇里。
 
