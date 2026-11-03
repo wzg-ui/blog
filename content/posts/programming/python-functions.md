@@ -12,7 +12,7 @@ description: "逻辑的复用"
 
 ## 这一篇的定位
 
-只讲两件事：**函数**和**模块**。
+只讲两件事：**函数**和**模块**。函数那头会一路写到「函数是对象」——能赋值、能进字典、能当参数传，`lambda` 就是这条的后果；顺手再收几个省循环的内置函数（`zip`、`enumerate`、`map`、`filter`、`reduce` 那些）。
 
 几处跟 C++ 关系大的地方会做对照，但 C++ 只写行为，不写语法细节。
 
@@ -416,6 +416,73 @@ print(max(students, key=lambda s: s[1]))    # ('Amy', 90, 20)
 跟 C++ 最容易套错的就是这个：`sort` 的比较函数返回 `bool`，回答「a 该不该排在 b 前面」；Python 的 `key` 返回「排序依据」，两两怎么比是排序算法自己的事。真要写 C++ 那种两两比较，得包一层 `functools.cmp_to_key`，日常用不上。
 
 `lambda` 的边界：里面只能写表达式，不能赋值、不能 `return`、不能写 `for`。一行放不下就写普通函数，`def` 一下不丢人。
+
+## 几个省掉循环的内置函数
+
+写循环的时候，有几个现成的函数能直接省掉一层或者一个下标变量。它们都是内置的，`map` 和 `filter` 还正好用上前面「函数能当参数传」这条：
+
+这几个不是炫技，作用是省掉一个下标变量或者一层循环。
+
+`zip` 把两个序列并排走：
+
+```python
+names = ['a', 'b', 'c']
+scores = [80, 95, 70]
+print(list(zip(names, scores)))    # [('a', 80), ('b', 95), ('c', 70)]
+print(dict(zip(names, scores)))    # {'a': 80, 'b': 95, 'c': 70}
+print(list(zip([1, 2, 3], 'ab')))  # [(1, 'a'), (2, 'b')]，长度不齐按短的截断
+```
+
+`zip(*m)` 是转置，`*` 在这儿就是把外面的几行拆开递给 `zip`，跟前面 `*args` 那节是同一个符号的两个方向：参数表里是打包，调用和赋值时是拆开。
+
+```python
+m = [[1, 2, 3], [4, 5, 6]]
+print([list(col) for col in zip(*m)])    # [[1, 4], [2, 5], [3, 6]]
+```
+
+要下标的时候别写 `range(len(a))`，`enumerate` 同时给编号和元素：
+
+```python
+for i, w in enumerate(['a', 'b'], start=1):
+    print(i, w)
+# 1 a
+# 2 b
+```
+
+容器篇单调队列那行 `for i, x in enumerate(a)` 就是它。
+
+`any` 和 `all` 收一个序列，回答「有没有一个真」「是不是全真」：
+
+```python
+print(all(x % 2 == 0 for x in [2, 4, 6]))    # True
+print(any(x > 5 for x in [2, 4, 6]))         # True
+```
+
+括号里又是生成器表达式，理由跟容器篇推导式那节一样。
+
+再看三个函数式的老写法，跟容器篇的推导式干的是同一件事，只是写法老一点：
+
+```python
+strs = ['1', '2', '3']
+print(list(map(int, strs)))                          # [1, 2, 3]
+print(list(filter(str.isdigit, ['1', 'a', '2'])))    # ['1', '2']
+```
+
+`map(f, a)` 就是 `[f(x) for x in a]`，`filter(p, a)` 就是 `[x for x in a if p(x)]`。两个返回的都不是列表而是迭代器，所以得套一层 `list()`，也只能扫一遍，跟生成器一个道理。判据是：套现成函数就用 `map`，要写表达式就老实用推导式。
+
+`reduce` 是第三个，把一串值压成一个。它不在内置里，得单独 import，前面 `lambda` 那节的例子用得到：
+
+```python
+from functools import reduce
+
+nums = [1, 2, 3, 4]
+print(reduce(lambda a, b: a * b, nums))       # 24
+print(reduce(lambda a, b: a * b, nums, 10))   # 240，第三个参数是起点
+```
+
+拿头两个算一次，结果再跟第三个算，一路压到只剩一个。判据：手头有现成的函数（`sum`、`max`、`math.prod`）就别用 `reduce`；只有累积规则特殊，比如一边遍历一边往字典里塞，才轮到它。Python 当年把 `reduce` 从内置挪进 `functools`，理由就是多数场合一个循环更好读。
+
+这几样都不用背，想起来「好像有个一行版」的时候回来查一眼就行。
 
 ## 模块：一个 `.py` 文件
 
