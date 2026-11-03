@@ -362,6 +362,21 @@ print(ops['double'](4)) # 8
 
 放字典这一手，典型用法是「按名字选一个操作」：拿一个字符串当键，查出来直接调用，省掉一长串 `if`：
 
+```python
+def add(a, b):
+    return a + b
+
+def sub(a, b):
+    return a - b
+
+actions = {'add': add, 'sub': sub}
+
+name = 'add'
+print(actions[name](7, 2))    # 9
+```
+
+`actions[name]` 取出来的是函数对象，后面直接接括号就是调用。写成 `if` 要两三条分支，而且加一个操作就得再添一条；写成字典只往里面塞一项，调用处一个字都不用动。
+
 ## 模块：一个 `.py` 文件
 
 函数解决的是「一段逻辑用两遍」，模块解决的是「一段逻辑在两个文件里用」。
