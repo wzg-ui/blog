@@ -4,6 +4,7 @@ date: 2026-11-03T17:58:00+08:00
 draft: false
 slug: "python-files"
 description: "读文件、写文件，和出错之后怎么办"
+series: ["python"]
 ---
 
 ## 开场

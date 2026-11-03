@@ -4,6 +4,7 @@ date: 2026-10-15T14:35:00+08:00
 draft: false
 slug: "python-intro"
 description: "穿越之重拾 Python"
+series: ["python"]
 ---
 
 这是「重拾 Python」系列的第一篇。

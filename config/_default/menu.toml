@@ -39,6 +39,18 @@
         giftUnlock = "2026-10-15T00:00:00+08:00"
         giftExpire = "2026-10-16T00:00:00+08:00"
 
+# 专栏入口。weight 定在归档（-50，写在 archives 页 front matter 里）与投稿（-40）之间，
+# 最终顺序：主页 → 搜索 → 归档 → 专栏 → 投稿。
+# 点进去是 /series/，里面按专栏分组。
+[[main]]
+    identifier = "series"
+    name       = "专栏"
+    url        = "/series/"
+    weight     = -44
+
+    [main.params]
+        icon = "book-2"
+
 # 投稿入口。放主菜单而不是只放页脚 —— 页脚那行小字跟版权信息混在一起，
 # 没人会注意到，而这才是别人想写东西时唯一要找的地方。
 [[main]]

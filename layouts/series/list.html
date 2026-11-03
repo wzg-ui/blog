@@ -1,0 +1,27 @@
+{{- /* 专栏总览（taxonomy list）：/series/
+       现在只有一个专栏，但将来会有第二个，所以还是按「列表」写。
+       条目复用主题的 compact 卡片，description 取自 content/series/<name>/_index.md。
+*/ -}}
+{{ define "main" }}
+    <header>
+        <h3 class="section-title">专栏</h3>
+
+        <div class="section-card">
+            <div class="section-details">
+                <h3 class="section-count">{{ len .Pages }} 个专栏</h3>
+                <h1 class="section-term">{{ .Title }}</h1>
+                {{ with .Params.description }}
+                    <h2 class="section-description">{{ . }}</h2>
+                {{ end }}
+            </div>
+        </div>
+    </header>
+
+    <section class="article-list--compact">
+        {{ range .Pages }}
+            {{ partial "article-list/compact" . }}
+        {{ end }}
+    </section>
+
+    {{ partialCached "footer/footer" . }}
+{{ end }}

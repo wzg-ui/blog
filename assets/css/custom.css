@@ -2512,3 +2512,130 @@ html:has(body.gift-page) {
         transform: none;
     }
 }
+
+/* ============================================================
+   专栏（/series/ 与 /series/python/）
+   ------------------------------------------------------------
+   两个地方共用一套 .series-toc 列表样式：
+     - 专栏页：序号 + 标题 + 日期
+     - 文章底部：序号 + 标题，当前篇置灰
+   整站无彩色，所以只靠分隔线、明度、缩进表达层次。
+   ============================================================ */
+
+.series-intro {
+    max-width: 72em;
+    margin: -0.6em 0 2em;
+    color: var(--card-text-color-secondary);
+    line-height: 1.8;
+}
+
+.series-intro p {
+    margin: 0 0 0.6em;
+}
+
+ol.series-toc {
+    list-style: none;
+    margin: 0 0 2em;
+    padding: 0;
+    border-top: 1px solid var(--card-separator-color);
+}
+
+.series-toc-item {
+    margin: 0;
+    border-bottom: 1px solid var(--card-separator-color);
+}
+
+.series-toc-item a {
+    display: flex;
+    align-items: baseline;
+    gap: 0.9em;
+    padding: 0.85em 0.3em;
+    color: var(--card-text-color-main);
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+
+.series-toc-item a:hover {
+    background-color: var(--card-background-selected);
+}
+
+.series-index {
+    flex: none;
+    font-family: var(--code-font-family);
+    font-size: 0.9em;
+    font-variant-numeric: tabular-nums;
+    color: var(--card-text-color-tertiary);
+}
+
+.series-name {
+    flex: 1;
+}
+
+.series-date {
+    flex: none;
+    font-size: 0.85em;
+    color: var(--card-text-color-tertiary);
+}
+
+/* 当前正在读的这一篇 */
+.series-toc-item.is-current a {
+    font-weight: 600;
+    color: var(--card-text-color-tertiary);
+    cursor: default;
+}
+
+.series-toc-item.is-current a:hover {
+    background-color: transparent;
+}
+
+.series-toc-item.is-current .series-index {
+    color: var(--card-text-color-secondary);
+}
+
+/* 文章底部那一块 */
+.article-series {
+    margin: 2.5em 0 0;
+    padding: 1.3em 1.5em 0.6em;
+    border: 1px solid var(--card-separator-color);
+    border-radius: 4px;
+}
+
+.article-series-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-bottom: 0.7em;
+    font-size: 0.95em;
+    color: var(--card-text-color-secondary);
+}
+
+.article-series-head svg {
+    width: 1.1em;
+    height: 1.1em;
+}
+
+.article-series-name {
+    color: var(--card-text-color-main);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.article-series-progress {
+    margin-left: auto;
+    font-size: 0.85em;
+    color: var(--card-text-color-tertiary);
+}
+
+.article-series ol.series-toc {
+    margin: 0;
+    border-top: 0;
+}
+
+.article-series .series-toc-item:last-child {
+    border-bottom: 0;
+}
+
+.article-series .series-toc-item a {
+    padding: 0.45em 0.2em;
+    font-size: 0.95em;
+}

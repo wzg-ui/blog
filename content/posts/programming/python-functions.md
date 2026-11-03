@@ -4,6 +4,7 @@ date: 2026-10-23T23:53:00+08:00
 draft: false
 slug: "python-functions"
 description: "逻辑的复用"
+series: ["python"]
 ---
 
 ## 开场

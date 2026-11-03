@@ -4,6 +4,7 @@ date: 2026-10-19T17:48:00+08:00
 draft: false
 slug: "python-containers"
 description: "Python 里几种常用容器怎么用，以及它们和 C++ STL 的对照"
+series: ["python"]
 ---
 
 ## 开场

@@ -1,0 +1,49 @@
+{{- /* 专栏页（taxonomy term）：/series/python/
+       ============================================================
+       覆盖主题 list.html，只改三件事：
+         1. 顺序 —— 主题按日期倒序（最新在前），专栏得从第一篇读到最后一篇，
+            所以 ByDate 正序，前面加 01/02 这样的序号
+         2. 简介 —— 来自 content/series/<term>/_index.md 的正文
+         3. 条目 —— 标题 + 日期，不显示 description
+            （各篇的 description 是「初出茅庐的PIEMM」这种，放进目录不合适）
+
+       ⚠️ 私密文章（Params.secret）在这种页面也得挡住：
+          term 的 .Pages 是 Hugo 直接给的，不走 helper/pages.html。
+*/ -}}
+{{ define "main" }}
+    {{- $pages := .Pages -}}
+    {{- $pages = where $pages "Params.secret" "!=" "<no-value>" -}}
+    {{- $pages = $pages.ByDate -}}
+
+    <header>
+        <h3 class="section-title">专栏</h3>
+
+        <div class="section-card">
+            <div class="section-details">
+                <h3 class="section-count">{{ len $pages }} 篇</h3>
+                <h1 class="section-term">{{ .Title }}</h1>
+                {{ with .Params.description }}
+                    <h2 class="section-description">{{ . }}</h2>
+                {{ end }}
+            </div>
+        </div>
+    </header>
+
+    {{ with .Content }}
+        <div class="series-intro">{{ . }}</div>
+    {{ end }}
+
+    <ol class="series-toc">
+        {{- range $i, $p := $pages }}
+            <li class="series-toc-item">
+                <a href="{{ $p.RelPermalink }}">
+                    <span class="series-index">{{ printf "%02d" (add $i 1) }}</span>
+                    <span class="series-name">{{ $p.Title }}</span>
+                    <time class="series-date" datetime="{{ $p.Date.Format "2006-01-02" }}">{{ $p.Date.Format "2006-01-02" }}</time>
+                </a>
+            </li>
+        {{- end }}
+    </ol>
+
+    {{ partialCached "footer/footer" . }}
+{{ end }}

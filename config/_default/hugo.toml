@@ -21,13 +21,18 @@ enableRobotsTXT = true
 enableEmoji     = true
 summaryLength   = 120
 
-# 本站文章不分类，也不打标签 —— 关掉这两类页面的生成。
-# 不关的话 Hugo 会输出空的 /categories/ 与 /tags/ 列表页。
-# 将来要用标签时，删掉这一行即可（Stack 的 ShowTags 开关在 params.toml）。
+# 分类法只开 series 一个 —— 「专栏」靠它聚合。
 #
-# ⚠️ 这一行必须留在所有 [表头] 之前 —— TOML 里表头之后的键都属于那张表，
-#    放到 [pagination] 后面会被解析成 pagination.disableKinds，完全无效。
-disableKinds = ["taxonomy", "term"]
+# ⚠️ 写了 [taxonomies] 就是整体替换 Hugo 默认的 tag / category：
+#    没声明的分类法压根不存在，所以不需要 disableKinds 去关，
+#    也不会生成 /tags/ /categories/ 那两个空列表页。
+# 效果：/series/ 是专栏总览，/series/python/ 是「重拾 Python」专栏页。
+# 以后加新专栏，只在文章 front matter 里写 series: ["新名字"] 就行。
+#
+# ⚠️ 必须留在所有其他 [表头] 之前的理解依旧成立：TOML 里表头之后的键
+#    属于那张表，写错位置会被解析成 pagination.taxonomies，完全无效。
+[taxonomies]
+    series = "series"
 
 [pagination]
     pagerSize = 10

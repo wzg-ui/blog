@@ -4,6 +4,7 @@ date: 2026-10-17T00:30:00+08:00
 draft: false
 slug: "python-basics"
 description: "初出茅庐的PIEMM"
+series: ["python"]
 ---
 
 这是「重拾 Python」系列的第二篇。

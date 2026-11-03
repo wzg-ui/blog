@@ -1,0 +1,46 @@
+{{- /* 文章底部的专栏导航
+       ============================================================
+       只在 front matter 写了 series 的文章上出现：
+         series: ["python"]
+       取第一篇 series 作 key，拿 term 页的 Title 当显示名
+       （front matter 里写的是 URL 段，给人看的是「重拾 Python」）。
+
+       列表顺序与专栏页一致：ByDate 正序 + 序号，当前篇高亮不链接。
+       ⚠️ 这里用 site.RegularPages 而不是 term 页的 .Pages，
+          因为要全局排一遍；私密文章同样要挡掉。
+*/ -}}
+{{- with .Params.series -}}
+    {{- $key := index . 0 -}}
+    {{- $termPage := site.GetPage (printf "/series/%s" $key) -}}
+    {{- $name := $key -}}
+    {{- with $termPage }}{{ $name = .Title }}{{ end -}}
+
+    {{- $pages := where site.RegularPages "Params.series" "intersect" (slice $key) -}}
+    {{- $pages = where $pages "Params.secret" "!=" "<no-value>" -}}
+    {{- $pages = $pages.ByDate -}}
+
+    <section class="article-series">
+        <div class="article-series-head">
+            {{ partial "helper/icon" "book-2" }}
+            <span class="article-series-label">专栏</span>
+            {{ with $termPage }}
+                <a class="article-series-name" href="{{ .RelPermalink }}">{{ $name }}</a>
+            {{ else }}
+                <span class="article-series-name">{{ $name }}</span>
+            {{ end }}
+            <span class="article-series-progress">{{ len $pages }} 篇</span>
+        </div>
+
+        <ol class="series-toc">
+            {{- range $i, $p := $pages }}
+                {{- $isCurrent := eq $p.RelPermalink $.RelPermalink }}
+                <li class="series-toc-item{{ if $isCurrent }} is-current{{ end }}">
+                    <a href="{{ $p.RelPermalink }}">
+                        <span class="series-index">{{ printf "%02d" (add $i 1) }}</span>
+                        <span class="series-name">{{ $p.Title }}</span>
+                    </a>
+                </li>
+            {{- end }}
+        </ol>
+    </section>
+{{- end -}}
