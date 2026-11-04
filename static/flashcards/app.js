@@ -828,6 +828,10 @@
     $('#studyFront').textContent = readable(w.b);
     startSpell(w);
     $('#studySpell').hidden = false;
+    const si = $('#spellInput');
+    si.value = '';
+    si.disabled = false;
+    setTimeout(() => si.focus(), 50);
   }
 
   function pickOptions(w) {
@@ -920,7 +924,28 @@
     setTimeout(() => { if (study && study.stage === 'spell') el.textContent = meaning; }, 1400);
   });
 
-  $('#spellClear').addEventListener('click', () => { study.built = []; renderSpell(); });
+  $('#spellClear').addEventListener('click', () => {
+    study.built = [];
+    $('#spellInput').value = '';
+    $('#spellInput').focus();
+    renderSpell();
+  });
+
+  /* 直接输入：凑够字母数自动判，回车也行 */
+  function tryJudgeSpell() {
+    if (!study || study.stage !== 'spell') return;
+    const w = study.list[study.idx];
+    const val = $('#spellInput').value.trim();
+    if (!val) return;
+    if (val.replace(/\s+/g, '').length < w.f.replace(/\s+/g, '').length) return;
+    $('#spellInput').disabled = true;
+    studyFeed(norm(val) === norm(w.f), 'spell');
+  }
+
+  $('#spellInput').addEventListener('input', tryJudgeSpell);
+  $('#spellInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); tryJudgeSpell(); }
+  });
 
   /* 每关结束的小结 */
   function studyFeed(ok, stage) {

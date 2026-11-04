@@ -290,12 +290,16 @@
         </div>
 
         <div class="card-act" id="studySpell" hidden>
+          <div class="inputrow">
+            <input id="spellInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="直接打出单词，回车提交">
+          </div>
           <div class="slots" id="spellSlots"></div>
           <div class="tiles" id="spellTiles"></div>
           <div class="inputrow">
             <button class="btn tiny ghost" id="spellPeek">看一眼</button>
             <button class="btn tiny ghost" id="spellClear">重拼</button>
           </div>
+          <p class="hint">打字或点字母块都行，凑够字母自动判。</p>
         </div>
 
         <div class="card-act" id="studyFeed" hidden>
