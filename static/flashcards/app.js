@@ -84,6 +84,14 @@
 
   function norm(s) { return String(s || '').normalize('NFKC').trim().toLowerCase(); }
 
+  function shuffle(a) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
   function candidates(back) {
     return String(back || '').split('|').map(norm).filter(Boolean);
   }
@@ -137,9 +145,11 @@
 
   function speak(text) {
     if (!('speechSynthesis' in window)) return;
+    const s = String(text || '');
+    if (!s || /[\u4e00-\u9fff]/.test(s)) return;   // 英文语音读中文只会出怪音，直接不读
     try {
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(String(text));
+      const u = new SpeechSynthesisUtterance(s);
       u.lang = voiceEn ? voiceEn.lang : 'en-US';
       if (voiceEn) u.voice = voiceEn;
       u.rate = 0.85;
@@ -147,11 +157,11 @@
     } catch (e) { /* 读不了就算了 */ }
   }
 
-  function wordFace(card) {
-    let html = esc(card.front);
-    if (card.p) html += ' <span class="ph">/' + esc(card.p) + '/</span>';
-    if (!/[\u4e00-\u9fff]/.test(card.front)) {
-      html += ' <button class="spk" data-say="' + esc(card.front) + '" title="听读音">🔊</button>';
+  function wordFace(front, p) {
+    let html = esc(front);
+    if (p) html += ' <span class="ph">/' + esc(p) + '/</span>';
+    if (!/[\u4e00-\u9fff]/.test(front)) {
+      html += ' <button class="spk" data-say="' + esc(front) + '" title="听读音">🔊</button>';
     }
     return html;
   }
@@ -168,34 +178,29 @@
     if (card.src) pool = cards.filter((c) => c.src === card.src);
     if (pool.length < 6 && card.tags[0]) pool = cards.filter((c) => c.tags.indexOf(card.tags[0]) >= 0);
     if (pool.length < 6) pool = cards.filter((c) => c.type === 'en2cn');
-    const seen = new Set([norm(card.back)]);
+    return buildOptions(readable(card.back), pool, card.id);
+  }
+
+  /* 从候选里抽 3 个释义不同的干扰项，配正确项打乱返回；凑不够返回 null */
+  function buildOptions(correctText, pool, selfId) {
+    const seen = new Set([norm(correctText)]);
     const wrong = [];
-    const shuffled = pool.slice();
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t;
-    }
-    for (const c of shuffled) {
-      if (c.id === card.id) continue;
+    shuffle(pool.slice()).forEach((c) => {
+      if (wrong.length >= 3 || (selfId != null && c.id === selfId)) return;
       const key = norm(c.back);
-      if (!key || seen.has(key)) continue;
+      if (!key || seen.has(key)) return;
       seen.add(key);
-      wrong.push(readable(c.back));
-      if (wrong.length >= 3) break;
-    }
+      wrong.push({ text: readable(c.back), ok: false });
+    });
     if (wrong.length < 3) return null;
-    const all = [readable(card.back)].concat(wrong).map((t) => ({ text: t, ok: norm(t) === norm(card.back) }));
-    for (let i = all.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const t = all[i]; all[i] = all[j]; all[j] = t;
-    }
-    return all;
+    return shuffle([{ text: correctText, ok: true }].concat(wrong));
   }
 
   /* ---------------- 路由 ---------------- */
 
   function go(name) {
     view = name;
+    try { history.replaceState(null, '', '#' + name); } catch (e) { /* file:// 下会抛，忽略 */ }
     $$('.view').forEach((v) => { v.hidden = v.dataset.view !== name; });
     $$('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.go === name));
     window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
@@ -340,7 +345,7 @@
     if (opts) {
       /* 四选一：点选项判对错，不手打 */
       $('#cardFront').className = 'front';
-      $('#cardFront').innerHTML = wordFace(card);
+      $('#cardFront').innerHTML = wordFace(card.front, card.p);
       $('#cardCn').hidden = true;
       $('#optList').innerHTML = opts.map((o, i) =>
         '<button class="opt" data-i="' + i + '"><i>' + (i + 1) + '</i>' + esc(o.text) + '</button>').join('');
@@ -353,7 +358,7 @@
 
     /* 兜底：翻面自评 */
     $('#cardFront').className = 'front';
-    $('#cardFront').innerHTML = wordFace(card);
+    $('#cardFront').innerHTML = wordFace(card.front, card.p);
     $('#cardCn').hidden = true;
     $('#actAsk').hidden = false;
     speak(card.front);
@@ -556,10 +561,17 @@
     if (DICT_WORDS) return DICT_WORDS;
     const list = await loadDicts();
     const out = [];
+    const qSeen = new Set();
     for (const d of list) {
       try {
         const deck = await fetch(d.file, { cache: 'force-cache' }).then((r) => r.json());
-        (deck.words || []).forEach((w) => { if (w.f && w.b) out.push({ f: w.f, p: w.p || '', b: w.b, dict: d }); });
+        (deck.words || []).forEach((w) => {
+          if (!w.f || !w.b) return;
+          const k = norm(w.f);
+          if (qSeen.has(k)) return;   // 跨库同词只留第一本
+          qSeen.add(k);
+          out.push({ f: w.f, p: w.p || '', b: w.b, dict: d });
+        });
       } catch (e) { /* 单本失败不影响别的 */ }
     }
     DICT_WORDS = out;
@@ -567,6 +579,7 @@
   }
 
   let qTimer = null;
+  let qSeq = 0;
   $('#qSearch').addEventListener('input', () => {
     clearTimeout(qTimer);
     qTimer = setTimeout(renderQHits, 150);
@@ -574,11 +587,13 @@
 
   async function renderQHits() {
     const q = norm($('#qSearch').value);
+    const seq = ++qSeq;
     const hits = $('#qHits');
     if (q.length < 2) { hits.innerHTML = ''; return; }
     hits.innerHTML = '<li class="hint" style="display:block;border:0">翻词库里…</li>';
     try {
       const words = await allDictWords();
+      if (seq !== qSeq) return;   // 期间又输入了，这轮作废
       const found = [];
       for (const w of words) {
         if (norm(w.f).startsWith(q)) found.push(w);
@@ -625,11 +640,15 @@
       const res = await fetch('/challenge/deck.json');
       const deck = await res.json();
       const words = Array.isArray(deck.words) ? deck.words : [];
+      const have = new Set(cards.map((c) => norm(c.front)));
+      initWordSeq();
       let n = 0;
-      words.forEach((w, i) => {
-        const id = 'W' + String(i + 1).padStart(3, '0');
-        if (!w || !w.f || cards.some((c) => c.id === id)) return;
-        cards.push({ id: id, type: 'en2cn', front: w.f, back: w.b, cn: '', p: w.p || '', tags: ['考研'], box: 1, ok: 0, bad: 0, last: 0 });
+      words.forEach((w) => {
+        const key = w && w.f ? norm(w.f) : '';
+        if (!key || have.has(key)) return;
+        have.add(key);
+        wordSeq += 1;
+        cards.push({ id: 'W' + String(wordSeq).padStart(4, '0'), type: 'en2cn', front: w.f, back: w.b, cn: '', p: w.p || '', tags: ['考研'], box: 1, ok: 0, bad: 0, last: 0 });
         n += 1;
       });
       save();
@@ -799,8 +818,7 @@
     $('#studyFront').className = 'front';
 
     if (study.stage === 'show') {
-      $('#studyFront').innerHTML = esc(w.f) + (w.p ? ' <span class="ph">/' + esc(w.p) + '/</span>' : '')
-        + ' <button class="spk" data-say="' + esc(w.f) + '" title="听读音">🔊</button>';
+      $('#studyFront').innerHTML = wordFace(w.f, w.p);
       $('#studyMean').textContent = readable(w.b);
       $('#studyShow').hidden = false;
       speak(w.f);
@@ -809,8 +827,7 @@
 
     if (study.stage === 'pick' || study.stage === 'hear') {
       if (study.stage === 'pick') {
-        $('#studyFront').innerHTML = esc(w.f) + (w.p ? ' <span class="ph">/' + esc(w.p) + '/</span>' : '')
-          + ' <button class="spk" data-say="' + esc(w.f) + '" title="听读音">🔊</button>';
+        $('#studyFront').innerHTML = wordFace(w.f, w.p);
         speak(w.f);
       } else {
         $('#studyFront').innerHTML = '<button class="spk big" data-say="' + esc(w.f) + '">🔊 点我重听</button>';
@@ -835,26 +852,10 @@
   }
 
   function pickOptions(w) {
-    const seen = new Set([norm(w.b)]);
-    const wrong = [];
-    const pool = study.words.filter((x) => x.f !== w.f);
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
-    }
-    for (const x of pool) {
-      const key = norm(x.b);
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      wrong.push({ text: readable(x.b), ok: false });
-      if (wrong.length >= 3) break;
-    }
-    const all = [{ text: readable(w.b), ok: true }].concat(wrong);
-    for (let i = all.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const t = all[i]; all[i] = all[j]; all[j] = t;
-    }
-    return all;
+    const pool = study.words
+      .filter((x) => x.f !== w.f)
+      .map((x) => ({ id: null, back: x.b }));   // buildOptions 吃的是 {id, back}
+    return buildOptions(readable(w.b), pool, null);
   }
 
   $('#studyOptList').addEventListener('click', (e) => {
@@ -902,6 +903,7 @@
   $('#spellTiles').addEventListener('click', (e) => {
     const btn = e.target.closest('.tile');
     if (!btn || btn.classList.contains('used')) return;
+    $('#spellInput').value = '';
     study.built.push(Number(btn.dataset.tile));
     renderSpell();
     checkSpell();
@@ -918,10 +920,13 @@
 
   $('#spellPeek').addEventListener('click', () => {
     const w = study.list[study.idx];
+    const idx = study.idx;
     const el = $('#studyFront');
     const meaning = el.textContent;
     el.textContent = w.f;
-    setTimeout(() => { if (study && study.stage === 'spell') el.textContent = meaning; }, 1400);
+    setTimeout(() => {
+      if (study && study.stage === 'spell' && study.idx === idx) el.textContent = meaning;
+    }, 1400);
   });
 
   $('#spellClear').addEventListener('click', () => {
@@ -942,7 +947,10 @@
     studyFeed(norm(val) === norm(w.f), 'spell');
   }
 
-  $('#spellInput').addEventListener('input', tryJudgeSpell);
+  $('#spellInput').addEventListener('input', () => {
+    if (study && study.built.length) { study.built = []; renderSpell(); }
+    tryJudgeSpell();
+  });
   $('#spellInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); tryJudgeSpell(); }
   });
