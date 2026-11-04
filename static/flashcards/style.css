@@ -255,6 +255,7 @@ h1 { margin: 0 0 10px; font-size: clamp(28px, 4.2vw, 40px); line-height: 1.2; le
   display: flex; align-items: center; justify-content: space-between;
   padding-top: 12px; border-top: 1px solid var(--line); margin-top: 4px;
 }
+.dc-btns { display: flex; gap: 8px; }
 
 /* ---------- 表格 ---------- */
 .tablewrap { padding: 0; overflow-x: auto; }
@@ -269,6 +270,23 @@ h1 { margin: 0 0 10px; font-size: clamp(28px, 4.2vw, 40px); line-height: 1.2; le
 .tbl td.front-cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tbl td .boxbadge { min-width: 20px; height: 20px; font-size: 11px; }
 .tbl .tagcell { color: var(--faint); font-size: 12px; }
+.tbl .ops { text-align: right; white-space: nowrap; }
+.boxsel {
+  width: 46px; padding: 4px 2px 4px 6px;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 6px;
+  font-size: 12.5px; font-family: var(--mono); outline: none;
+  cursor: pointer; transition: border-color .12s;
+}
+.boxsel:hover, .boxsel:focus { border-color: var(--mute); }
+.takebtn {
+  border: 0; background: transparent; color: var(--faint);
+  font-size: 12px; cursor: pointer; padding: 2px 4px;
+  border-bottom: 1px dashed var(--line);
+  transition: color .12s;
+}
+.takebtn:hover { color: #b4553f; border-color: #b4553f; }
+.newbadge { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .progressbar { display: flex; align-items: center; gap: 10px; }
 .progressbar .bar { width: 90px; flex: none; }
 .progressbar .mono { font-size: 11.5px; color: var(--mute); }

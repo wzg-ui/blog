@@ -134,6 +134,7 @@
     if (name === 'list') renderList();
     if (name === 'lookup') renderLookup();
     if (name === 'dicts') renderDicts();
+    if (name === 'study') renderStudy();
     if (name === 'stats') renderStats();
     if (name === 'add') prepareAddForm();
   }
@@ -290,6 +291,16 @@
 
   $('#knowBtn').addEventListener('click', () => selfAnswer(true));
   $('#dontBtn').addEventListener('click', () => selfAnswer(false));
+
+  $('#takeBtn').addEventListener('click', () => {
+    const card = current();
+    if (!card) return;
+    if (!confirm('把「' + card.front + '」从卡池拿走？它就不进任何复习了。')) return;
+    cards = cards.filter((x) => x.id !== card.id);
+    save();
+    toast('已拿走 ' + card.id);
+    next();
+  });
 
   function submitAnswer() {
     const card = current();
@@ -458,8 +469,11 @@
       return '<div class="dictcard">'
         + '<div class="dc-top"><b>' + esc(d.name) + '</b><span class="mono">' + d.count + ' 词</span></div>'
         + '<p class="dc-note">' + esc(d.note || '') + '</p>'
-        + '<div class="dc-foot"><span class="hint">' + (got ? '已导入 ' + got + ' 词' : '还没导入') + '</span>'
-        + '<button class="btn tiny" data-import="' + d.id + '">' + (got ? '补新词' : '导入') + '</button></div>'
+        + '<div class="dc-foot"><span class="hint">' + (got ? '已入池 ' + got + ' 词' : '还没开始') + '</span>'
+        + '<div class="dc-btns">'
+        + '<button class="btn tiny primary" data-study="' + d.id + '">开始学</button>'
+        + '<button class="btn tiny ghost" data-import="' + d.id + '">导入全部</button>'
+        + '</div></div>'
         + '</div>';
     }).join('');
   }
@@ -514,6 +528,8 @@
   }
 
   $('#dictGrid').addEventListener('click', (e) => {
+    const study = e.target.closest('[data-study]');
+    if (study) { startStudy(study.dataset.study); return; }
     const btn = e.target.closest('[data-import]');
     if (btn) doImport(btn.dataset.import);
   });
@@ -539,9 +555,131 @@
     }
   });
 
+  /* ---------------- 学新词（百词斩式） ---------------- */
+
+  const STUDY_BATCH = 10;
+  let study = null;
+
+  async function startStudy(dictId) {
+    try {
+      await loadDicts();
+      const dict = DICTS.find((d) => d.id === dictId);
+      if (!dict) { toast('没有这本词库'); return; }
+      const deck = await fetch(dict.file, { cache: 'force-cache' }).then((r) => r.json());
+      const have = new Set(cards.map((c) => norm(c.front)));
+      const fresh = (deck.words || []).filter((w) => w.f && !have.has(norm(w.f))).slice(0, STUDY_BATCH);
+      if (!fresh.length) { toast(dict.name + '的词都入池了，直接复习吧'); return; }
+      study = { dict: dict, list: fresh, idx: 0, know: 0, dont: 0 };
+      showStudyPane('run');
+      renderStudyCard();
+      go('study');
+    } catch (err) {
+      toast('词库读不出来：' + err.message);
+    }
+  }
+
+  function showStudyPane(which) {
+    $('#studyRun').hidden = which !== 'run';
+    $('#studyDone').hidden = which !== 'done';
+  }
+
+  function renderStudy() {
+    if (!study) { go('dicts'); return; }
+    showStudyPane(study.idx >= study.list.length ? 'done' : 'run');
+    if (study.idx < study.list.length) renderStudyCard();
+  }
+
+  function renderStudyCard() {
+    const w = study.list[study.idx];
+    $('#studyProgress').textContent = (study.idx + 1) + ' / ' + study.list.length;
+    $('#studyFill').style.width = Math.round((study.idx / study.list.length) * 100) + '%';
+    $('#studyMeta').textContent = study.dict.name;
+    $('#studyTag').textContent = '还剩 ' + (study.list.length - study.idx) + ' 个';
+    $('#studyFront').className = 'front';
+    $('#studyFront').textContent = w.f;
+    $('#studyAsk').hidden = false;
+    $('#studySelf').hidden = true;
+  }
+
+  $('#studyReveal').addEventListener('click', () => {
+    if (!study) return;
+    const w = study.list[study.idx];
+    $('#studyBack').textContent = readable(w.b);
+    $('#studyAsk').hidden = true;
+    $('#studySelf').hidden = false;
+  });
+
+  function commitStudy(known) {
+    if (!study) return;
+    const w = study.list[study.idx];
+    initWordSeq();
+    wordSeq += 1;
+    cards.push({
+      id: 'W' + String(wordSeq).padStart(4, '0'),
+      type: 'en2cn', front: w.f, back: w.b, cn: '',
+      tags: [study.dict.name], box: known ? 2 : 1, ok: 0, bad: 0, last: 0, src: study.dict.id
+    });
+    save();
+    if (known) study.know += 1; else study.dont += 1;
+    toast(known ? '「' + w.f + '」进了 2 号盒' : '「' + w.f + '」进了 1 号盒');
+    nextStudy();
+  }
+
+  $('#studyKnow').addEventListener('click', () => commitStudy(true));
+  $('#studyDont').addEventListener('click', () => commitStudy(false));
+  $('#studySkip').addEventListener('click', (e) => {
+    e.preventDefault();
+    nextStudy();
+  });
+
+  function nextStudy() {
+    if (!study) return;
+    study.idx += 1;
+    if (study.idx >= study.list.length) return finishStudy();
+    renderStudyCard();
+  }
+
+  function finishStudy() {
+    const total = study.know + study.dont;
+    $('#studyNum').textContent = total;
+    $('#studyDoneNote').textContent = '认识 ' + study.know + ' 个（2 号盒），不认识 ' + study.dont
+      + ' 个（1 号盒），跳过 ' + (study.list.length - total) + ' 个。过几天复习会自动爬盒子。';
+    showStudyPane('done');
+    renderDicts();
+  }
+
+  $('#studyMore').addEventListener('click', () => startStudy(study.dict.id));
+  $('#quitStudy').addEventListener('click', () => { study = null; go('dicts'); });
+
   /* ---------------- 清单 ---------------- */
 
   $('#listFilter').addEventListener('change', renderList);
+
+  $('#listTable').addEventListener('change', (e) => {
+    const sel = e.target.closest('.boxsel');
+    if (!sel) return;
+    const c = byId(sel.dataset.id);
+    if (!c) return;
+    const from = c.box;
+    c.box = Number(sel.value) || 1;
+    save();
+    toast(esc(c.id) + '：' + from + ' 号盒 → ' + c.box + ' 号盒');
+  });
+
+  $('#listTable').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-take]');
+    if (!btn) return;
+    const c = byId(btn.dataset.take);
+    if (!c) return;
+    if (!confirm('把「' + c.front + '」从卡池拿走？它就不进任何复习了。')) {
+      renderList();  // 恢复 select
+      return;
+    }
+    cards = cards.filter((x) => x.id !== c.id);
+    save();
+    renderList();
+    toast('已拿走 ' + c.id);
+  });
 
   function renderList() {
     const f = Number($('#listFilter').value) || 0;
@@ -555,12 +693,15 @@
       : rows.length + ' / ' + cards.length + ' 张';
     const shown = rows.slice(0, 400);
     $('#listTable').querySelector('tbody').innerHTML = shown.length
-      ? shown.map((c) => '<tr><td><span class="boxbadge">' + c.box + '</span></td>'
+      ? shown.map((c) => '<tr><td><select class="boxsel" data-id="' + esc(c.id) + '" aria-label="换盒">'
+        + [1, 2, 3, 4, 5].map((n) => '<option value="' + n + '"' + (c.box === n ? ' selected' : '') + '>' + n + '</option>').join('')
+        + '</select></td>'
         + '<td class="mono">' + esc(c.id) + '</td>'
         + '<td class="front-cell" title="' + esc(c.front) + '">' + esc(c.front) + '</td>'
         + '<td class="front-cell">' + esc(readable(c.back)) + '</td>'
-        + '<td class="tagcell">' + esc(c.tags.join(' · ')) + '</td></tr>').join('')
-      : '<tr><td colspan="5" class="empty">没有卡</td></tr>';
+        + '<td class="tagcell">' + esc(c.tags.join(' · ')) + '</td>'
+        + '<td class="ops"><button class="takebtn" data-take="' + esc(c.id) + '">拿走</button></td></tr>').join('')
+      : '<tr><td colspan="6" class="empty">没有卡</td></tr>';
   }
 
   /* ---------------- 查词 ---------------- */
@@ -685,6 +826,6 @@
     cards = SAMPLE.map((c) => normalizeCard(c));
     save();
   }
-  const VIEWS = ['home', 'review', 'add', 'list', 'lookup', 'dicts', 'stats'];
+  const VIEWS = ['home', 'review', 'add', 'list', 'lookup', 'dicts', 'study', 'stats'];
   go(VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home');
 })();

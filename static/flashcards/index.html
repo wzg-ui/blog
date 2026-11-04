@@ -40,8 +40,11 @@
         <p class="eyebrow">今天</p>
         <h1><span id="dueNum">0</span> 张卡等着复习</h1>
         <p class="lede" id="dueNote">从最生的盒子开始，答对升一盒，答错回 1 号盒。</p>
+        <div class="row" style="margin-top:18px">
+          <button class="btn primary big" id="startQuick">开始复习</button>
+          <button class="btn big ghost" data-go="dicts">学新词</button>
+        </div>
       </div>
-      <button class="btn primary big" id="startQuick">开始复习</button>
     </div>
 
     <div class="boxes" id="boxStrip"></div>
@@ -93,6 +96,7 @@
           <span class="boxbadge" id="cardBox">1</span>
           <span class="mono mute" id="cardId">K000</span>
           <span class="tag" id="cardTags"></span>
+          <button class="takebtn" id="takeBtn">拿走</button>
         </div>
 
         <div class="card-main">
@@ -198,7 +202,7 @@
     </div>
     <div class="panel tablewrap">
       <table class="tbl" id="listTable">
-        <thead><tr><th>盒</th><th>编号</th><th>正面</th><th>背面</th><th>标签</th></tr></thead>
+        <thead><tr><th>盒</th><th>编号</th><th>正面</th><th>背面</th><th>标签</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -220,7 +224,7 @@
   <section class="view" data-view="dicts" hidden>
     <p class="eyebrow">词库</p>
     <h1 class="h1-sm">按考试挑一本</h1>
-    <p class="lede">四本大纲词库，导入后整批进 1 号盒。已有的单词自动跳过，几本一起导也不会重复。</p>
+    <p class="lede">选一本，点「开始学」：看单词、想意思、翻面，认识的直接进 2 号盒，不认识进 1 号盒。不想一个个学就用「导入全部」。</p>
 
     <div class="dictgrid" id="dictGrid">
       <p class="empty" style="border:0">正在取词库清单…</p>
@@ -232,6 +236,50 @@
     </div>
 
     <p class="hint" style="margin-top:26px">词库来自 Qwerty Learner 的公开词表，只取了单词和释义，音标没搬。</p>
+  </section>
+
+  <!-- 学新词 -->
+  <section class="view" data-view="study" hidden>
+    <div id="studyRun">
+      <div class="runbar">
+        <span class="mono" id="studyProgress">0 / 0</span>
+        <div class="bar"><i id="studyFill"></i></div>
+        <button class="btn tiny" id="quitStudy">结束</button>
+      </div>
+
+      <article class="card">
+        <div class="card-top">
+          <span class="boxbadge newbadge">新</span>
+          <span class="mono mute" id="studyMeta"></span>
+          <span class="tag" id="studyTag"></span>
+        </div>
+        <div class="card-main">
+          <div class="front" id="studyFront"></div>
+        </div>
+        <div class="card-act" id="studyAsk">
+          <button class="btn primary" id="studyReveal">看意思</button>
+        </div>
+        <div class="card-act" id="studySelf" hidden>
+          <div class="back" id="studyBack"></div>
+          <div class="inputrow">
+            <button class="btn primary" id="studyKnow">认识 · 进 2 号盒</button>
+            <button class="btn ghost" id="studyDont">不认识 · 进 1 号盒</button>
+          </div>
+          <p class="hint" style="margin-top:12px">都不想背？<a href="#" class="text-link" id="studySkip">跳过这个</a>，不入卡池。</p>
+        </div>
+      </article>
+    </div>
+
+    <div id="studyDone" hidden>
+      <p class="eyebrow">这一批学完</p>
+      <div class="done-num"><span id="studyNum">0</span><span class="of">个新词入池</span></div>
+      <p class="lede" id="studyDoneNote"></p>
+      <div class="row">
+        <button class="btn primary" id="studyMore">再来一批</button>
+        <button class="btn ghost" data-go="review">去复习</button>
+        <button class="btn ghost" data-go="dicts">换一本</button>
+      </div>
+    </div>
   </section>
 
   <!-- 统计 -->
