@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>卡片盒 · PIEMM</title>
+<meta name="description" content="Leitner 五盒单词卡片盒：录入、复习、清单、查词、统计。">
+<link rel="stylesheet" href="/flashcards/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="shell topbar-in">
+    <a class="brand" href="/flashcards/">
+      <span class="dot"></span>卡片盒
+      <span class="brand-sub">Leitner · 5 盒</span>
+    </a>
+    <nav class="tabs" id="tabs">
+      <button data-go="home" class="on">概览</button>
+      <button data-go="review">复习</button>
+      <button data-go="add">录卡</button>
+      <button data-go="list">清单</button>
+      <button data-go="lookup">查词</button>
+      <button data-go="stats">统计</button>
+      <a class="tabs-link" href="/challenge/">联机挑战</a>
+    </nav>
+    <div class="topbar-right">
+      <button class="icon-btn" id="menuBtn" title="数据" aria-label="数据">···</button>
+    </div>
+  </div>
+</header>
+
+<main class="shell" id="main">
+
+  <!-- 概览 -->
+  <section class="view" data-view="home">
+    <div class="hero">
+      <div>
+        <p class="eyebrow">今天</p>
+        <h1><span id="dueNum">0</span> 张卡等着复习</h1>
+        <p class="lede" id="dueNote">从最生的盒子开始，答对升一盒，答错回 1 号盒。</p>
+      </div>
+      <button class="btn primary big" id="startQuick">开始复习</button>
+    </div>
+
+    <div class="boxes" id="boxStrip"></div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2 class="panel-title">现在可以做</h2>
+        <div class="entries">
+          <button class="entry" data-go="review"><b>复习</b><span>选一个盒，逐张过</span></button>
+          <button class="entry" data-go="add"><b>录一张卡</b><span>四种题型</span></button>
+          <button class="entry" data-go="lookup"><b>查词</b><span>打前几个字母</span></button>
+          <button class="entry" data-go="list"><b>清单</b><span>看每张在哪一盒</span></button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2 class="panel-title">最近录入</h2>
+        <ul class="recent" id="recentList"></ul>
+        <div class="panel-foot">
+          <a class="text-link" href="/challenge/">和朋友比一轮 →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 复习 -->
+  <section class="view" data-view="review" hidden>
+    <div id="reviewStart">
+      <p class="eyebrow">复习</p>
+      <h1 class="h1-sm">先选一个盒</h1>
+      <p class="lede">越靠后越熟。1 号盒全是生词，考前只想过一遍 4、5 号盒也行。</p>
+      <div class="boxpick" id="boxPick"></div>
+      <div class="row">
+        <button class="btn primary" id="startReview">开始</button>
+        <span class="hint" id="pickHint"></span>
+      </div>
+    </div>
+
+    <div id="reviewRun" hidden>
+      <div class="runbar">
+        <span class="mono" id="progress">0 / 0</span>
+        <div class="bar"><i id="barFill"></i></div>
+        <button class="btn tiny" id="quitReview">结束</button>
+      </div>
+
+      <article class="card" id="cardFace">
+        <div class="card-top">
+          <span class="boxbadge" id="cardBox">1</span>
+          <span class="mono mute" id="cardId">K000</span>
+          <span class="tag" id="cardTags"></span>
+        </div>
+
+        <div class="card-main">
+          <div class="front" id="cardFront"></div>
+          <p class="cn" id="cardCn" hidden></p>
+        </div>
+
+        <div class="card-act" id="actAsk">
+          <button class="btn primary" id="revealBtn">看背面</button>
+        </div>
+
+        <div class="card-act" id="actInput" hidden>
+          <div class="inputrow">
+            <input id="answerInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入英文">
+            <button class="btn primary" id="submitBtn">判定</button>
+          </div>
+          <p class="hint">回车也行</p>
+        </div>
+
+        <div class="card-act" id="actSelf" hidden>
+          <div class="back" id="cardBack"></div>
+          <div class="inputrow">
+            <button class="btn" id="knowBtn">认识</button>
+            <button class="btn ghost" id="dontBtn">不认识</button>
+          </div>
+        </div>
+
+        <div class="card-act" id="actResult" hidden>
+          <div class="verdict" id="verdict"></div>
+          <p class="answer" id="answerLine"></p>
+          <div class="inputrow">
+            <button class="btn primary" id="nextBtn">下一张</button>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <div id="reviewDone" hidden>
+      <p class="eyebrow">这一轮完了</p>
+      <div class="done-num"><span id="doneOk">0</span><span class="of">对 / <span id="doneTotal">0</span></span></div>
+      <p class="lede" id="doneNote"></p>
+      <div class="row">
+        <button class="btn primary" id="againBtn">再来一轮</button>
+        <button class="btn ghost" data-go="home">回概览</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 录卡 -->
+  <section class="view" data-view="add" hidden>
+    <p class="eyebrow">录入</p>
+    <h1 class="h1-sm">录一张卡</h1>
+    <p class="lede">编号统一成 K001 这种形状。答案有多个形式，用竖线隔开：<code>persist|persevere</code>。</p>
+
+    <form class="panel form" id="addForm">
+      <div class="frow">
+        <label>编号<input id="fId" placeholder="K021" maxlength="8" autocomplete="off"></label>
+        <label>题型
+          <select id="fType">
+            <option value="en2cn">英译汉（自评）</option>
+            <option value="cn2en">汉译英（精确）</option>
+            <option value="cloze">句子填空（精确）</option>
+            <option value="phrase">词组（自评）</option>
+          </select>
+        </label>
+      </div>
+      <label>正面<textarea id="fFront" rows="2" placeholder="abandon / 坚持 / He ___ to finish the report by Friday."></textarea></label>
+      <label>背面<input id="fBack" placeholder="放弃；抛弃"></label>
+      <label id="cnRow" hidden>译文<input id="fCn" placeholder="他在周五之前完成了那份报告。"></label>
+      <label>标签<input id="fTags" placeholder="unit3, 高频"></label>
+      <div class="row">
+        <button class="btn primary" type="submit">入库</button>
+        <span class="hint" id="addMsg"></span>
+      </div>
+    </form>
+
+    <div class="panel">
+      <h2 class="panel-title">没有卡？</h2>
+      <p class="hint" style="margin:0 0 14px">载入一批示例卡（四种题型、五个盒子都有），或者把 409 个考研词整批导进来。</p>
+      <div class="row">
+        <button class="btn" id="loadSample">载入示例卡组</button>
+        <button class="btn ghost" id="loadDeck">导入考研词库</button>
+        <span class="hint" id="loadMsg"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 清单 -->
+  <section class="view" data-view="list" hidden>
+    <p class="eyebrow">清单</p>
+    <h1 class="h1-sm">每张卡在哪一盒</h1>
+    <p class="lede">按盒号排。盒号取的是卡片自己的 <code>box</code> 字段，不是在列表里的位置。</p>
+    <div class="row" style="margin-bottom:18px">
+      <select id="listFilter">
+        <option value="0">全部盒</option>
+        <option value="1">1 号盒</option>
+        <option value="2">2 号盒</option>
+        <option value="3">3 号盒</option>
+        <option value="4">4 号盒</option>
+        <option value="5">5 号盒</option>
+      </select>
+      <span class="hint" id="listCount"></span>
+    </div>
+    <div class="panel tablewrap">
+      <table class="tbl" id="listTable">
+        <thead><tr><th>盒</th><th>编号</th><th>正面</th><th>背面</th><th>标签</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 查词 -->
+  <section class="view" data-view="lookup" hidden>
+    <p class="eyebrow">查阅</p>
+    <h1 class="h1-sm">打前几个字母就够</h1>
+    <p class="lede">前缀匹配，中文也行。命中几张全列出来，带释义和盒号。</p>
+    <div class="inputrow lookup">
+      <input id="lookupInput" placeholder="aban / 坚持" autocomplete="off" spellcheck="false">
+      <button class="btn" id="lookupBtn">查</button>
+    </div>
+    <ul class="hits" id="lookupHits"></ul>
+  </section>
+
+  <!-- 统计 -->
+  <section class="view" data-view="stats" hidden>
+    <p class="eyebrow">统计</p>
+    <h1 class="h1-sm">存量与掌握率</h1>
+    <p class="lede">4、5 号盒算掌握。一张卡都没有时按 0 算，不出 <code>ZeroDivisionError</code>。</p>
+
+    <div class="statrow">
+      <div class="stat"><b id="statTotal">0</b><span>总卡数</span></div>
+      <div class="stat"><b id="statRate">0%</b><span>掌握率</span></div>
+      <div class="stat"><b id="statRight">0</b><span>累计答对</span></div>
+      <div class="stat"><b id="statWrong">0</b><span>累计答错</span></div>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel-title">五盒存量</h2>
+      <div class="bars" id="statBars"></div>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel-title">按标签还差哪几张</h2>
+      <p class="hint" style="margin:0 0 12px">每个标签下，还没进 4 号盒的就是欠账。</p>
+      <div class="tablewrap">
+        <table class="tbl" id="tagTable">
+          <thead><tr><th>标签</th><th>总数</th><th>已掌握</th><th>进度</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- 数据弹层 -->
+<div class="sheet-mask" id="sheetMask" hidden>
+  <div class="sheet">
+    <h2 class="panel-title">数据</h2>
+    <p class="hint" style="margin:0 0 16px">存在浏览器 localStorage 里。换设备就拿 JSON 手动搬。</p>
+    <div class="sheet-row"><button class="btn" id="exportBtn">导出 JSON</button><button class="btn ghost" id="importBtn">导入 JSON</button></div>
+    <div class="sheet-row"><button class="btn ghost" id="wipeBtn">清空全部</button></div>
+    <input type="file" id="fileInput" accept="application/json" hidden>
+    <div class="sheet-foot"><button class="btn tiny" id="closeSheet">关闭</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/flashcards/app.js"></script>
+</body>
+</html>
