@@ -31,7 +31,7 @@
     { id: 'K020', type: 'en2cn', front: 'subtle', back: '微妙的；细微的', tags: ['unit7'], box: 1 }
   ];
 
-  const TYPE_LABEL = { en2cn: '英译汉 · 自评', cn2en: '汉译英 · 精确', cloze: '句子填空 · 精确', phrase: '词组 · 自评' };
+  const TYPE_LABEL = { en2cn: '英译汉', cn2en: '汉译英 · 自评', cloze: '句子填空', phrase: '词组' };
 
   let cards = [];
   let session = null;
@@ -64,7 +64,8 @@
       ok: Number(c.ok) || 0,
       bad: Number(c.bad) || 0,
       last: Number(c.last) || 0,
-      src: c.src ? String(c.src) : ''
+      src: c.src ? String(c.src) : '',
+      p: c.p ? String(c.p) : ''
     };
   }
 
@@ -93,7 +94,7 @@
 
   function byId(id) { return cards.find((c) => c.id === id) || null; }
 
-  function isSelfCheck(card) { return card.type === 'en2cn' || card.type === 'phrase'; }
+  function isSelfCheck(card) { return card.type !== 'cloze'; }
 
   function judge(card, raw) {
     if (isSelfCheck(card)) return null;
@@ -120,6 +121,76 @@
 
   function boxCount(n) { return cards.filter((c) => c.box === n).length; }
   function dueCount() { return cards.filter((c) => c.box < 5).length; }
+
+  /* ---------------- 读音 ---------------- */
+
+  let voiceEn = null;
+  function pickVoice() {
+    if (!('speechSynthesis' in window)) return;
+    const vs = window.speechSynthesis.getVoices();
+    voiceEn = vs.find((v) => v.lang === 'en-US') || vs.find((v) => /^en/i.test(v.lang)) || null;
+  }
+  if ('speechSynthesis' in window) {
+    pickVoice();
+    window.speechSynthesis.onvoiceschanged = pickVoice;
+  }
+
+  function speak(text) {
+    if (!('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(String(text));
+      u.lang = voiceEn ? voiceEn.lang : 'en-US';
+      if (voiceEn) u.voice = voiceEn;
+      u.rate = 0.85;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* 读不了就算了 */ }
+  }
+
+  function wordFace(card) {
+    let html = esc(card.front);
+    if (card.p) html += ' <span class="ph">/' + esc(card.p) + '/</span>';
+    if (!/[\u4e00-\u9fff]/.test(card.front)) {
+      html += ' <button class="spk" data-say="' + esc(card.front) + '" title="听读音">🔊</button>';
+    }
+    return html;
+  }
+
+  document.addEventListener('click', (e) => {
+    const s = e.target.closest('[data-say]');
+    if (s) { e.stopPropagation(); speak(s.dataset.say); }
+  });
+
+  /* ---------------- 四选一的选项池 ---------------- */
+
+  function optionPool(card) {
+    let pool = [];
+    if (card.src) pool = cards.filter((c) => c.src === card.src);
+    if (pool.length < 6 && card.tags[0]) pool = cards.filter((c) => c.tags.indexOf(card.tags[0]) >= 0);
+    if (pool.length < 6) pool = cards.filter((c) => c.type === 'en2cn');
+    const seen = new Set([norm(card.back)]);
+    const wrong = [];
+    const shuffled = pool.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t;
+    }
+    for (const c of shuffled) {
+      if (c.id === card.id) continue;
+      const key = norm(c.back);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      wrong.push(readable(c.back));
+      if (wrong.length >= 3) break;
+    }
+    if (wrong.length < 3) return null;
+    const all = [readable(card.back)].concat(wrong).map((t) => ({ text: t, ok: norm(t) === norm(card.back) }));
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = all[i]; all[i] = all[j]; all[j] = t;
+    }
+    return all;
+  }
 
   /* ---------------- 路由 ---------------- */
 
@@ -242,30 +313,75 @@
     $('#cardId').textContent = card.id;
     $('#cardTags').textContent = card.tags.join(' · ');
 
+    $('#actAsk').hidden = true;
+    $('#actChoice').hidden = true;
+    $('#actInput').hidden = true;
+    $('#actSelf').hidden = true;
+    $('#actResult').hidden = true;
+    $('#choiceNext').hidden = true;
+    $('#choiceHint').hidden = false;
+
     if (card.type === 'cloze') {
       $('#cardFront').className = 'front sentence';
       $('#cardFront').innerHTML = esc(card.front).replace(/_{2,}/g, '<mark>___</mark>');
       $('#cardCn').textContent = card.cn || '';
       $('#cardCn').hidden = !card.cn;
-    } else {
-      $('#cardFront').className = 'front';
-      $('#cardFront').textContent = card.front;
-      $('#cardCn').hidden = true;
-    }
 
-    $('#actAsk').hidden = !isSelfCheck(card);
-    $('#actInput').hidden = isSelfCheck(card);
-    $('#actSelf').hidden = true;
-    $('#actResult').hidden = true;
-
-    if (!isSelfCheck(card)) {
       const input = $('#answerInput');
       input.value = '';
       input.disabled = false;
       $('#submitBtn').disabled = false;
+      $('#actInput').hidden = false;
       setTimeout(() => input.focus(), 30);
+      return;
     }
+
+    const opts = card.type === 'en2cn' ? optionPool(card) : null;
+    if (opts) {
+      /* 四选一：点选项判对错，不手打 */
+      $('#cardFront').className = 'front';
+      $('#cardFront').innerHTML = wordFace(card);
+      $('#cardCn').hidden = true;
+      $('#optList').innerHTML = opts.map((o, i) =>
+        '<button class="opt" data-i="' + i + '"><i>' + (i + 1) + '</i>' + esc(o.text) + '</button>').join('');
+      session.opts = opts;
+      session.phase = 'choice';
+      $('#actChoice').hidden = false;
+      speak(card.front);
+      return;
+    }
+
+    /* 兜底：翻面自评 */
+    $('#cardFront').className = 'front';
+    $('#cardFront').innerHTML = wordFace(card);
+    $('#cardCn').hidden = true;
+    $('#actAsk').hidden = false;
+    speak(card.front);
   }
+
+  $('#optList').addEventListener('click', (e) => {
+    const btn = e.target.closest('.opt');
+    if (!btn || session.phase !== 'choice') return;
+    const card = current();
+    const ok = session.opts[Number(btn.dataset.i)].ok;
+    $$('#optList .opt').forEach((el, i) => {
+      el.disabled = true;
+      if (session.opts[i].ok) el.classList.add('correct');
+      else if (el === btn && !ok) el.classList.add('wrong');
+    });
+    const r = grade(card, ok);
+    session.ok += ok ? 1 : 0;
+    session.bad += ok ? 0 : 1;
+    toast(ok
+      ? (r.from === r.to ? '保持在 ' + r.to + ' 号盒' : '升到 ' + r.to + ' 号盒')
+      : (r.from === 1 ? '退回 1 号盒' : '从 ' + r.from + ' 号盒退回 1 号盒'));
+    session.phase = 'result';
+    $('#choiceNext').hidden = false;
+    $('#choiceHint').hidden = true;
+    setTimeout(() => $('#choiceNextBtn').focus(), 20);
+  });
+
+  $('#choiceNextBtn').addEventListener('click', () => next());
 
   $('#revealBtn').addEventListener('click', () => {
     const card = current();
@@ -356,6 +472,15 @@
 
   document.addEventListener('keydown', (e) => {
     if (view !== 'review' || $('#reviewRun').hidden) return;
+    if (!$('#actChoice').hidden) {
+      if (session && session.phase === 'choice' && /^[1-4]$/.test(e.key)) {
+        const btns = $$('#optList .opt');
+        const btn = btns[Number(e.key) - 1];
+        if (btn) btn.click();
+      }
+      if (session && session.phase === 'result' && e.key === 'Enter') { e.preventDefault(); next(); }
+      return;
+    }
     if (!$('#actSelf').hidden) {
       if (e.key === 'y' || e.key === '1') selfAnswer(true);
       if (e.key === 'n' || e.key === '2') selfAnswer(false);
@@ -368,16 +493,28 @@
   /* ---------------- 录卡 ---------------- */
 
   function prepareAddForm() {
-    if ($('#fId').value.trim()) return;
-    const nums = cards
-      .map((c) => { const m = /^([A-Z]+)(\d{3,4})$/.exec(c.id); return m && m[1] === 'K' ? Number(m[2]) : 0; })
-      .filter((n) => n > 0);
-    const nxt = (nums.length ? Math.max.apply(null, nums) : 0) + 1;
-    $('#fId').value = 'K' + String(nxt).padStart(3, '0');
+    if (!$('#fId').value.trim()) {
+      const nums = cards
+        .map((c) => { const m = /^([A-Z]+)(\d{3,4})$/.exec(c.id); return m && m[1] === 'K' ? Number(m[2]) : 0; })
+        .filter((n) => n > 0);
+      const nxt = (nums.length ? Math.max.apply(null, nums) : 0) + 1;
+      $('#fId').value = 'K' + String(nxt).padStart(3, '0');
+    }
+    /* 标签建议：已有的标签全列上 */
+    const tagSet = new Set();
+    cards.forEach((c) => c.tags.forEach((t) => tagSet.add(t)));
+    $('#tagList').innerHTML = Array.from(tagSet).sort().map((t) => '<option value="' + esc(t) + '">').join('');
   }
 
-  $('#fType').addEventListener('change', () => {
-    $('#cnRow').hidden = $('#fType').value !== 'cloze';
+  function selectChip(type) {
+    $$('#typeChips .chip').forEach((x) => x.classList.toggle('on', x.dataset.type === type));
+    $('#fType').value = type;
+    $('#cnRow').hidden = type !== 'cloze';
+  }
+
+  $('#typeChips').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (chip) selectChip(chip.dataset.type);
   });
 
   function addMsg(text, bad) {
@@ -406,9 +543,70 @@
     save();
     addMsg('已入库 ' + id + '，在 1 号盒。');
     $('#addForm').reset();
-    $('#cnRow').hidden = true;
+    selectChip('en2cn');
     prepareAddForm();
     $('#fFront').focus();
+  });
+
+  /* ---------------- 从词库挑词 ---------------- */
+
+  let DICT_WORDS = null;
+
+  async function allDictWords() {
+    if (DICT_WORDS) return DICT_WORDS;
+    const list = await loadDicts();
+    const out = [];
+    for (const d of list) {
+      try {
+        const deck = await fetch(d.file, { cache: 'force-cache' }).then((r) => r.json());
+        (deck.words || []).forEach((w) => { if (w.f && w.b) out.push({ f: w.f, p: w.p || '', b: w.b, dict: d }); });
+      } catch (e) { /* 单本失败不影响别的 */ }
+    }
+    DICT_WORDS = out;
+    return out;
+  }
+
+  let qTimer = null;
+  $('#qSearch').addEventListener('input', () => {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(renderQHits, 150);
+  });
+
+  async function renderQHits() {
+    const q = norm($('#qSearch').value);
+    const hits = $('#qHits');
+    if (q.length < 2) { hits.innerHTML = ''; return; }
+    hits.innerHTML = '<li class="hint" style="display:block;border:0">翻词库里…</li>';
+    try {
+      const words = await allDictWords();
+      const found = [];
+      for (const w of words) {
+        if (norm(w.f).startsWith(q)) found.push(w);
+        if (found.length >= 8) break;
+      }
+      hits.innerHTML = found.length
+        ? found.map((w) => '<li class="qhit" data-wf="' + esc(w.f) + '"><b>' + esc(w.f) + '</b>'
+          + (w.p ? '<span class="ph">/' + esc(w.p) + '/</span>' : '')
+          + '<span class="qb">' + esc(w.b) + '</span><span class="qd">' + esc(w.dict.name) + '</span></li>').join('')
+        : '<li class="hint" style="display:block;border:0">没有以 ' + esc(q) + ' 开头的词。</li>';
+    } catch (e) {
+      hits.innerHTML = '<li class="hint" style="display:block;border:0">词库读不出来：' + esc(e.message) + '</li>';
+    }
+  }
+
+  $('#qHits').addEventListener('click', (e) => {
+    const li = e.target.closest('.qhit');
+    if (!li || !DICT_WORDS) return;
+    const w = DICT_WORDS.find((x) => x.f === li.dataset.wf);
+    if (!w) return;
+    $('#fFront').value = w.f;
+    $('#fBack').value = w.b;
+    if (!$('#fTags').value.trim()) $('#fTags').value = w.dict.name;
+    selectChip('en2cn');
+    $('#qSearch').value = '';
+    $('#qHits').innerHTML = '';
+    toast('「' + w.f + '」填好了，入库就成卡');
+    $('#addForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
 
   $('#loadSample').addEventListener('click', () => {
@@ -431,7 +629,7 @@
       words.forEach((w, i) => {
         const id = 'W' + String(i + 1).padStart(3, '0');
         if (!w || !w.f || cards.some((c) => c.id === id)) return;
-        cards.push({ id: id, type: 'en2cn', front: w.f, back: w.b, cn: '', tags: ['考研'], box: 1, ok: 0, bad: 0, last: 0 });
+        cards.push({ id: id, type: 'en2cn', front: w.f, back: w.b, cn: '', p: w.p || '', tags: ['考研'], box: 1, ok: 0, bad: 0, last: 0 });
         n += 1;
       });
       save();
@@ -500,7 +698,7 @@
       wordSeq += 1;
       cards.push({
         id: 'W' + String(wordSeq).padStart(4, '0'),
-        type: 'en2cn', front: w.f, back: w.b, cn: '',
+        type: 'en2cn', front: w.f, back: w.b, cn: '', p: w.p || '',
         tags: [dict.name], box: 1, ok: 0, bad: 0, last: 0, src: dict.id
       });
       added += 1;
@@ -555,9 +753,10 @@
     }
   });
 
-  /* ---------------- 学新词（百词斩式） ---------------- */
+  /* ---------------- 学新词（百词斩闯关：认词 → 选义 → 听音 → 拼写） ---------------- */
 
-  const STUDY_BATCH = 10;
+  const STUDY_BATCH = 6;
+  const STAGE_LABEL = { show: '认词', pick: '选义', hear: '听音', spell: '拼写' };
   let study = null;
 
   async function startStudy(dictId) {
@@ -566,90 +765,234 @@
       const dict = DICTS.find((d) => d.id === dictId);
       if (!dict) { toast('没有这本词库'); return; }
       const deck = await fetch(dict.file, { cache: 'force-cache' }).then((r) => r.json());
+      const words = (deck.words || []).filter((w) => w.f && w.b);
       const have = new Set(cards.map((c) => norm(c.front)));
-      const fresh = (deck.words || []).filter((w) => w.f && !have.has(norm(w.f))).slice(0, STUDY_BATCH);
+      const fresh = words.filter((w) => !have.has(norm(w.f))).slice(0, STUDY_BATCH);
       if (!fresh.length) { toast(dict.name + '的词都入池了，直接复习吧'); return; }
-      study = { dict: dict, list: fresh, idx: 0, know: 0, dont: 0 };
-      showStudyPane('run');
-      renderStudyCard();
+      study = { dict: dict, words: words, list: fresh, idx: 0, stage: 'show', pass: true, know: 0, dont: 0, built: [], tiles: [] };
       go('study');
     } catch (err) {
       toast('词库读不出来：' + err.message);
     }
   }
 
-  function showStudyPane(which) {
-    $('#studyRun').hidden = which !== 'run';
-    $('#studyDone').hidden = which !== 'done';
-  }
-
   function renderStudy() {
     if (!study) { go('dicts'); return; }
-    showStudyPane(study.idx >= study.list.length ? 'done' : 'run');
-    if (study.idx < study.list.length) renderStudyCard();
+    if (study.idx >= study.list.length) { finishStudy(); return; }
+    $('#studyRun').hidden = false;
+    $('#studyDone').hidden = true;
+    showStudyStage();
   }
 
-  function renderStudyCard() {
+  function showStudyStage() {
     const w = study.list[study.idx];
     $('#studyProgress').textContent = (study.idx + 1) + ' / ' + study.list.length;
     $('#studyFill').style.width = Math.round((study.idx / study.list.length) * 100) + '%';
-    $('#studyMeta').textContent = study.dict.name;
+    $('#studyMeta').textContent = study.dict.name + ' · 新词';
     $('#studyTag').textContent = '还剩 ' + (study.list.length - study.idx) + ' 个';
+    $('#studyStage').textContent = STAGE_LABEL[study.stage];
+
+    $('#studyShow').hidden = true;
+    $('#studyOpts').hidden = true;
+    $('#studySpell').hidden = true;
+    $('#studyFeed').hidden = true;
     $('#studyFront').className = 'front';
-    $('#studyFront').textContent = w.f;
-    $('#studyAsk').hidden = false;
-    $('#studySelf').hidden = true;
+
+    if (study.stage === 'show') {
+      $('#studyFront').innerHTML = esc(w.f) + (w.p ? ' <span class="ph">/' + esc(w.p) + '/</span>' : '')
+        + ' <button class="spk" data-say="' + esc(w.f) + '" title="听读音">🔊</button>';
+      $('#studyMean').textContent = readable(w.b);
+      $('#studyShow').hidden = false;
+      speak(w.f);
+      return;
+    }
+
+    if (study.stage === 'pick' || study.stage === 'hear') {
+      if (study.stage === 'pick') {
+        $('#studyFront').innerHTML = esc(w.f) + (w.p ? ' <span class="ph">/' + esc(w.p) + '/</span>' : '')
+          + ' <button class="spk" data-say="' + esc(w.f) + '" title="听读音">🔊</button>';
+        speak(w.f);
+      } else {
+        $('#studyFront').innerHTML = '<button class="spk big" data-say="' + esc(w.f) + '">🔊 点我重听</button>';
+        speak(w.f);
+      }
+      const opts = pickOptions(w);
+      $('#studyOptList').innerHTML = opts.map((o, i) =>
+        '<button class="opt" data-i="' + i + '"><i>' + (i + 1) + '</i>' + esc(o.text) + '</button>').join('');
+      study.opts = opts;
+      $('#studyOpts').hidden = false;
+      return;
+    }
+
+    /* 拼写 */
+    $('#studyFront').textContent = readable(w.b);
+    startSpell(w);
+    $('#studySpell').hidden = false;
   }
 
-  $('#studyReveal').addEventListener('click', () => {
-    if (!study) return;
-    const w = study.list[study.idx];
-    $('#studyBack').textContent = readable(w.b);
-    $('#studyAsk').hidden = true;
-    $('#studySelf').hidden = false;
+  function pickOptions(w) {
+    const seen = new Set([norm(w.b)]);
+    const wrong = [];
+    const pool = study.words.filter((x) => x.f !== w.f);
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    }
+    for (const x of pool) {
+      const key = norm(x.b);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      wrong.push({ text: readable(x.b), ok: false });
+      if (wrong.length >= 3) break;
+    }
+    const all = [{ text: readable(w.b), ok: true }].concat(wrong);
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = all[i]; all[i] = all[j]; all[j] = t;
+    }
+    return all;
+  }
+
+  $('#studyOptList').addEventListener('click', (e) => {
+    const btn = e.target.closest('.opt');
+    if (!btn || !study || (study.stage !== 'pick' && study.stage !== 'hear')) return;
+    const ok = study.opts[Number(btn.dataset.i)].ok;
+    $$('#studyOptList .opt').forEach((el, i) => {
+      el.disabled = true;
+      if (study.opts[i].ok) el.classList.add('correct');
+      else if (el === btn && !ok) el.classList.add('wrong');
+    });
+    studyFeed(ok, study.stage);
   });
 
-  function commitStudy(known) {
-    if (!study) return;
+  /* 拼写：字母块 */
+  function startSpell(w) {
+    const letters = w.f.replace(/\s+/g, '').split('');
+    const tiles = letters.slice();
+    for (let i = tiles.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = tiles[i]; tiles[i] = tiles[j]; tiles[j] = t;
+    }
+    study.tiles = tiles;
+    study.built = [];
+    renderSpell();
+  }
+
+  function renderSpell() {
+    $('#spellSlots').innerHTML = study.tiles.map((_, i) => {
+      const ti = study.built[i];
+      return '<span class="slot' + (ti != null ? ' filled' : '') + '" data-slot="' + i + '">'
+        + (ti != null ? esc(study.tiles[ti]) : '') + '</span>';
+    }).join('');
+    $('#spellTiles').innerHTML = study.tiles.map((ch, i) =>
+      '<button class="tile' + (study.built.indexOf(i) >= 0 ? ' used' : '') + '" data-tile="' + i + '">' + esc(ch) + '</button>').join('');
+  }
+
+  function checkSpell() {
     const w = study.list[study.idx];
+    const guess = study.built.map((ti) => study.tiles[ti]).join('');
+    if (guess.length !== study.tiles.length) return;
+    studyFeed(guess === w.f.replace(/\s+/g, ''), 'spell');
+  }
+
+  $('#spellTiles').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tile');
+    if (!btn || btn.classList.contains('used')) return;
+    study.built.push(Number(btn.dataset.tile));
+    renderSpell();
+    checkSpell();
+  });
+
+  $('#spellSlots').addEventListener('click', (e) => {
+    const slot = e.target.closest('.slot.filled');
+    if (!slot) return;
+    const i = Number(slot.dataset.slot);
+    study.tiles[study.built[i]] = study.tiles[study.built[i]]; // 占位，tile 恢复靠 indexOf
+    study.built.splice(i, 1);
+    renderSpell();
+  });
+
+  $('#spellPeek').addEventListener('click', () => {
+    const w = study.list[study.idx];
+    const el = $('#studyFront');
+    const meaning = el.textContent;
+    el.textContent = w.f;
+    setTimeout(() => { if (study && study.stage === 'spell') el.textContent = meaning; }, 1400);
+  });
+
+  $('#spellClear').addEventListener('click', () => { study.built = []; renderSpell(); });
+
+  /* 每关结束的小结 */
+  function studyFeed(ok, stage) {
+    const w = study.list[study.idx];
+    if (!ok) study.pass = false;
+    $('#studyVerdict').className = 'verdict ' + (ok ? 'ok' : 'no');
+    $('#studyVerdict').textContent = ok ? '对' : (stage === 'spell' ? '拼错了' : '错');
+    $('#studyAnswer').innerHTML = '<b>' + esc(w.f) + '</b>' + (w.p ? ' <span class="ph">/' + esc(w.p) + '/</span>' : '')
+      + '　' + esc(readable(w.b));
+    $('#studyOpts').hidden = true;
+    $('#studySpell').hidden = true;
+    $('#studyFeed').hidden = false;
+    speak(w.f);
+    setTimeout(() => $('#studyNextBtn').focus(), 20);
+  }
+
+  $('#studyStartBtn').addEventListener('click', () => { study.stage = 'pick'; showStudyStage(); });
+  $('#studyNextBtn').addEventListener('click', () => {
+    if (!study) return;
+    if (study.stage === 'spell') { commitWord(); return; }
+    study.stage = study.stage === 'pick' ? 'hear' : 'spell';
+    showStudyStage();
+  });
+
+  function commitWord() {
+    const w = study.list[study.idx];
+    const known = study.pass;
     initWordSeq();
     wordSeq += 1;
     cards.push({
       id: 'W' + String(wordSeq).padStart(4, '0'),
-      type: 'en2cn', front: w.f, back: w.b, cn: '',
+      type: 'en2cn', front: w.f, back: w.b, cn: '', p: w.p || '',
       tags: [study.dict.name], box: known ? 2 : 1, ok: 0, bad: 0, last: 0, src: study.dict.id
     });
     save();
     if (known) study.know += 1; else study.dont += 1;
     toast(known ? '「' + w.f + '」进了 2 号盒' : '「' + w.f + '」进了 1 号盒');
-    nextStudy();
-  }
-
-  $('#studyKnow').addEventListener('click', () => commitStudy(true));
-  $('#studyDont').addEventListener('click', () => commitStudy(false));
-  $('#studySkip').addEventListener('click', (e) => {
-    e.preventDefault();
-    nextStudy();
-  });
-
-  function nextStudy() {
-    if (!study) return;
     study.idx += 1;
+    study.pass = true;
     if (study.idx >= study.list.length) return finishStudy();
-    renderStudyCard();
+    study.stage = 'show';
+    showStudyStage();
   }
 
   function finishStudy() {
     const total = study.know + study.dont;
     $('#studyNum').textContent = total;
-    $('#studyDoneNote').textContent = '认识 ' + study.know + ' 个（2 号盒），不认识 ' + study.dont
-      + ' 个（1 号盒），跳过 ' + (study.list.length - total) + ' 个。过几天复习会自动爬盒子。';
-    showStudyPane('done');
+    $('#studyDoneNote').textContent = '全对 ' + study.know + ' 个（2 号盒），有错 ' + study.dont
+      + ' 个（1 号盒），中途退出 ' + (study.list.length - total) + ' 个。过几天复习会自动爬盒子。';
+    $('#studyRun').hidden = true;
+    $('#studyDone').hidden = false;
     renderDicts();
   }
 
   $('#studyMore').addEventListener('click', () => startStudy(study.dict.id));
-  $('#quitStudy').addEventListener('click', () => { study = null; go('dicts'); });
+  $('#quitStudy').addEventListener('click', () => {
+    if (study && study.idx > 0 && study.idx < study.list.length) finishStudy();
+    else { study = null; go('dicts'); }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (view !== 'study' || !study || study.idx >= study.list.length) return;
+    if (!$('#studyShow').hidden && e.key === 'Enter') { e.preventDefault(); $('#studyStartBtn').click(); return; }
+    if (!$('#studyOpts').hidden) {
+      if (/^[1-4]$/.test(e.key)) {
+        const btn = $$('#studyOptList .opt')[Number(e.key) - 1];
+        if (btn) btn.click();
+      }
+      return;
+    }
+    if (!$('#studyFeed').hidden && e.key === 'Enter') { e.preventDefault(); $('#studyNextBtn').click(); }
+  });
 
   /* ---------------- 清单 ---------------- */
 
@@ -717,6 +1060,8 @@
     hits.innerHTML = found.length
       ? found.map((c) => '<li><span class="hid">' + esc(c.id) + '</span>'
         + '<span><span class="hfront">' + esc(c.front) + '</span>'
+        + (c.p ? ' <span class="ph">/' + esc(c.p) + '/</span>' : '')
+        + (!/[\u4e00-\u9fff]/.test(c.front) ? ' <button class="spk tiny" data-say="' + esc(c.front) + '">🔊</button>' : '')
         + '<div class="hback">' + esc(readable(c.back)) + (c.cn ? '　' + esc(c.cn) : '') + '</div></span>'
         + '<span class="hbox">' + c.box + ' 号盒</span></li>').join('')
       : '<li class="empty" style="display:block;border:0">没有找到「' + esc(q) + '」。</li>';

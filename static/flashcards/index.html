@@ -116,6 +116,14 @@
           <p class="hint">回车也行</p>
         </div>
 
+        <div class="card-act" id="actChoice" hidden>
+          <div class="opts" id="optList"></div>
+          <div class="inputrow" id="choiceNext" hidden>
+            <button class="btn primary" id="choiceNextBtn">下一张</button>
+          </div>
+          <p class="hint" id="choiceHint">键盘 1-4 也行</p>
+        </div>
+
         <div class="card-act" id="actSelf" hidden>
           <div class="back" id="cardBack"></div>
           <div class="inputrow">
@@ -149,24 +157,36 @@
   <section class="view" data-view="add" hidden>
     <p class="eyebrow">录入</p>
     <h1 class="h1-sm">录一张卡</h1>
-    <p class="lede">编号统一成 K001 这种形状。答案有多个形式，用竖线隔开：<code>persist|persevere</code>。</p>
+    <p class="lede">最快的路：从词库挑词直接填。自己录的话，答案有多个形式用竖线隔开：<code>persist|persevere</code>。</p>
+
+    <div class="panel">
+      <h2 class="panel-title">从词库挑词</h2>
+      <div class="inputrow">
+        <input id="qSearch" placeholder="打几个字母，比如 aban / persis" autocomplete="off" spellcheck="false">
+        <span class="hint">点结果直接填进下面的表</span>
+      </div>
+      <ul class="qhits" id="qHits"></ul>
+    </div>
 
     <form class="panel form" id="addForm">
       <div class="frow">
         <label>编号<input id="fId" placeholder="K021" maxlength="8" autocomplete="off"></label>
-        <label>题型
-          <select id="fType">
-            <option value="en2cn">英译汉（自评）</option>
-            <option value="cn2en">汉译英（精确）</option>
-            <option value="cloze">句子填空（精确）</option>
-            <option value="phrase">词组（自评）</option>
-          </select>
-        </label>
+        <div>
+          <span class="flabel">题型</span>
+          <div class="chips" id="typeChips">
+            <button type="button" class="chip on" data-type="en2cn">英译汉</button>
+            <button type="button" class="chip" data-type="cn2en">汉译英</button>
+            <button type="button" class="chip" data-type="cloze">句子填空</button>
+            <button type="button" class="chip" data-type="phrase">词组</button>
+          </div>
+          <input type="hidden" id="fType" value="en2cn">
+        </div>
       </div>
       <label>正面<textarea id="fFront" rows="2" placeholder="abandon / 坚持 / He ___ to finish the report by Friday."></textarea></label>
       <label>背面<input id="fBack" placeholder="放弃；抛弃"></label>
       <label id="cnRow" hidden>译文<input id="fCn" placeholder="他在周五之前完成了那份报告。"></label>
-      <label>标签<input id="fTags" placeholder="unit3, 高频"></label>
+      <label>标签<input id="fTags" list="tagList" placeholder="unit3, 高频"></label>
+      <datalist id="tagList"></datalist>
       <div class="row">
         <button class="btn primary" type="submit">入库</button>
         <span class="hint" id="addMsg"></span>
@@ -224,7 +244,7 @@
   <section class="view" data-view="dicts" hidden>
     <p class="eyebrow">词库</p>
     <h1 class="h1-sm">按考试挑一本</h1>
-    <p class="lede">选一本，点「开始学」：看单词、想意思、翻面，认识的直接进 2 号盒，不认识进 1 号盒。不想一个个学就用「导入全部」。</p>
+    <p class="lede">选一本，点「开始学」直接闯关：认词 → 选义 → 听音 → 拼写，全对进 2 号盒，有错进 1 号盒。不想闯就用「导入全部」。</p>
 
     <div class="dictgrid" id="dictGrid">
       <p class="empty" style="border:0">正在取词库清单…</p>
@@ -235,10 +255,10 @@
       <span class="hint" id="dictMsg"></span>
     </div>
 
-    <p class="hint" style="margin-top:26px">词库来自 Qwerty Learner 的公开词表，只取了单词和释义，音标没搬。</p>
+    <p class="hint" style="margin-top:26px">词库来自 Qwerty Learner 的公开词表，带美式音标，点小喇叭听真人合成读音。</p>
   </section>
 
-  <!-- 学新词 -->
+  <!-- 学新词（百词斩闯关：认词 → 选义 → 听音 → 拼写） -->
   <section class="view" data-view="study" hidden>
     <div id="studyRun">
       <div class="runbar">
@@ -249,23 +269,41 @@
 
       <article class="card">
         <div class="card-top">
-          <span class="boxbadge newbadge">新</span>
+          <span class="boxbadge newbadge" id="studyStage">认词</span>
           <span class="mono mute" id="studyMeta"></span>
           <span class="tag" id="studyTag"></span>
         </div>
         <div class="card-main">
           <div class="front" id="studyFront"></div>
         </div>
-        <div class="card-act" id="studyAsk">
-          <button class="btn primary" id="studyReveal">看意思</button>
-        </div>
-        <div class="card-act" id="studySelf" hidden>
-          <div class="back" id="studyBack"></div>
+
+        <div class="card-act" id="studyShow">
+          <div class="back" id="studyMean"></div>
           <div class="inputrow">
-            <button class="btn primary" id="studyKnow">认识 · 进 2 号盒</button>
-            <button class="btn ghost" id="studyDont">不认识 · 进 1 号盒</button>
+            <button class="btn primary" id="studyStartBtn">记住了，考我</button>
           </div>
-          <p class="hint" style="margin-top:12px">都不想背？<a href="#" class="text-link" id="studySkip">跳过这个</a>，不入卡池。</p>
+        </div>
+
+        <div class="card-act" id="studyOpts" hidden>
+          <div class="opts" id="studyOptList"></div>
+          <p class="hint">键盘 1-4 也行</p>
+        </div>
+
+        <div class="card-act" id="studySpell" hidden>
+          <div class="slots" id="spellSlots"></div>
+          <div class="tiles" id="spellTiles"></div>
+          <div class="inputrow">
+            <button class="btn tiny ghost" id="spellPeek">看一眼</button>
+            <button class="btn tiny ghost" id="spellClear">重拼</button>
+          </div>
+        </div>
+
+        <div class="card-act" id="studyFeed" hidden>
+          <div class="verdict" id="studyVerdict"></div>
+          <p class="answer" id="studyAnswer"></p>
+          <div class="inputrow">
+            <button class="btn primary" id="studyNextBtn">下一个</button>
+          </div>
         </div>
       </article>
     </div>

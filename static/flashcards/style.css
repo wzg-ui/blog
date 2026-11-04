@@ -358,3 +358,73 @@ h1 { margin: 0 0 10px; font-size: clamp(28px, 4.2vw, 40px); line-height: 1.2; le
   .hits li { grid-template-columns: 54px 1fr; }
   .hits .hbox { grid-column: 2; }
 }
+
+/* ---------- 四选一 ---------- */
+.opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.opt {
+  display: flex; align-items: baseline; gap: 10px; text-align: left;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); color: var(--fg); font-size: 15px; line-height: 1.5; cursor: pointer;
+}
+.opt:hover { border-color: var(--fg); }
+.opt i { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--faint); flex: none; }
+.opt.correct { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.opt.correct i { color: var(--bg); opacity: .7; }
+.opt.wrong { border-style: dashed; border-color: var(--mute); color: var(--mute); text-decoration: line-through; }
+.opt:disabled { cursor: default; }
+.opt:disabled:not(.correct):not(.wrong) { opacity: .55; }
+
+/* ---------- 音标与读音 ---------- */
+.ph { font-size: 15px; color: var(--mute); font-weight: 400; }
+.front .ph { font-size: 16px; }
+.spk {
+  border: 0; background: none; cursor: pointer; font-size: 18px; padding: 0 2px;
+  vertical-align: middle; line-height: 1;
+}
+.spk:hover { transform: scale(1.15); }
+.spk.big { font-size: 34px; padding: 18px 26px; border: 1px solid var(--line); border-radius: 12px; }
+.spk.tiny { font-size: 14px; }
+
+/* ---------- 拼写 ---------- */
+.slots { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 16px; min-height: 44px; }
+.slot {
+  width: 38px; height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: 8px; font-size: 20px; font-weight: 600;
+  background: var(--card); cursor: pointer;
+}
+.slot.filled { border-color: var(--fg); }
+.tiles { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
+.tile {
+  width: 42px; height: 46px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--soft); color: var(--fg); font-size: 20px; font-weight: 600; cursor: pointer;
+}
+.tile:hover { border-color: var(--fg); }
+.tile.used { opacity: .25; cursor: default; }
+
+/* ---------- 题型点选 ---------- */
+.flabel { display: block; font-size: 13px; color: var(--mute); margin-bottom: 8px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--card); color: var(--fg); font-size: 14px; cursor: pointer;
+}
+.chip:hover { border-color: var(--fg); }
+.chip.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+/* ---------- 词库挑词 ---------- */
+.qhits { list-style: none; margin: 12px 0 0; padding: 0; }
+.qhit {
+  display: flex; align-items: baseline; gap: 10px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; cursor: pointer;
+  background: var(--card);
+}
+.qhit:hover { border-color: var(--fg); }
+.qhit b { font-size: 16px; }
+.qhit .qb { flex: 1; color: var(--mute); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qhit .qd { color: var(--faint); font-size: 12px; flex: none; }
+
+@media (max-width: 640px) {
+  .opts { grid-template-columns: 1fr; }
+  .slot { width: 30px; height: 38px; font-size: 16px; }
+  .tile { width: 34px; height: 40px; font-size: 16px; }
+}
