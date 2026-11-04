@@ -3,6 +3,7 @@ title: "Python 的类"
 date: 2026-11-02T23:55:00+08:00
 draft: false
 slug: "python-class"
+url: "/posts/programming/python-class/"
 description: "PIEMM 还账之路"
 series: ["python"]
 ---

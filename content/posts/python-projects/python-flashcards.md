@@ -5,6 +5,7 @@ description: "八篇语法过完，拿一个背英语单词真能用上的卡片
 series: ["python"]
 draft: true
 slug: "python-flashcards"
+url: "/posts/programming/python-flashcards/"
 ---
 
 <!--more-->

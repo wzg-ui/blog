@@ -3,6 +3,7 @@ title: "Python 的字符串与正则"
 date: 2026-10-27T20:18:00+08:00
 draft: false
 slug: "python-strings-regex"
+url: "/posts/programming/python-strings-regex/"
 description: "字符串的方法按表记，正则的规则按块记"
 series: ["python"]
 ---

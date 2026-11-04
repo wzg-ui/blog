@@ -3,6 +3,7 @@ title: "Python 的函数、模块与类"
 date: 2026-10-17T10:00:00+08:00
 draft: true
 slug: "python-organization"
+url: "/posts/programming/python-organization/"
 description: "把 Python 里组织代码的三层工具过一遍：函数、模块、类"
 ---
 

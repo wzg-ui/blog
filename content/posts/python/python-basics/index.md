@@ -3,6 +3,7 @@ title: "Python 基础语法"
 date: 2026-10-17T00:30:00+08:00
 draft: false
 slug: "python-basics"
+url: "/posts/programming/python-basics/"
 description: "初出茅庐的PIEMM"
 series: ["python"]
 ---

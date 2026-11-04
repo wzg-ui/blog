@@ -3,6 +3,7 @@ title: "Python 的文件与异常"
 date: 2026-11-03T17:58:00+08:00
 draft: false
 slug: "python-files"
+url: "/posts/programming/python-files/"
 description: "读文件、写文件，和出错之后怎么办"
 series: ["python"]
 ---

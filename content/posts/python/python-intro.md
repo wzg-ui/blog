@@ -3,6 +3,7 @@ title: "重拾 Python"
 date: 2026-10-15T14:35:00+08:00
 draft: false
 slug: "python-intro"
+url: "/posts/programming/python-intro/"
 description: "穿越之重拾 Python"
 series: ["python"]
 ---

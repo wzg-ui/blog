@@ -3,6 +3,7 @@ title: "Python 的装饰器与生成器"
 date: 2026-11-03T20:29:00+08:00
 draft: false
 slug: "python-decorators"
+url: "/posts/programming/python-decorators/"
 description: "揭开 @ 和 yield 的底"
 series: ["python"]
 ---
