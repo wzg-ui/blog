@@ -24,6 +24,9 @@ Thumbs.db
 *.log
 *.tmp
 
+# 卡片盒的实际数据：跑起来才会生成，属于本机使用记录
+/projects/flashcards/cards.json
+
 # ---------- WorkBuddy 本机状态 ----------
 # .workbuddy/ 下是本机资料：memory/（项目笔记）、shots/（验收截图）、
 # trash/（删改前的备份）。都是这台机器上的状态，不进仓库。
