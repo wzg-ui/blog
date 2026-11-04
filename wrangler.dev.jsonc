@@ -1,0 +1,13 @@
+{
+  // 联机挑战的本地开发配置（上线前不合并进 wrangler.jsonc）
+  // 用法：npx wrangler dev --config wrangler.dev.jsonc --port 8788
+  // 没绑 D1 时成绩存在内存里，进程重启即清空 —— 正好够调试。
+  "name": "piemm-blog-dev",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-11-03",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  }
+}

@@ -61,3 +61,4 @@ deploy/site/
 # docs/ 是写给自己看的执行清单和部署手册，属于本机资料，不随站点一起发布
 /docs/
 node_modules/
+.wrangler/

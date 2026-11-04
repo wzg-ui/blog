@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>单词挑战 · PIEMM</title>
+<style>
+  :root {
+    --bg: #f6f6f7;
+    --fg: #15171b;
+    --mute: #6d727b;
+    --line: #e2e3e7;
+    --card: #ffffff;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c;
+      --fg: #e9eaee;
+      --mute: #93999f;
+      --line: #2b2f36;
+      --card: #1c1f25;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans SC", "PingFang SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 44px 24px 72px; }
+
+  .top {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding-bottom: 14px; border-bottom: 1px solid var(--line);
+    font-size: 13.5px; color: var(--mute);
+  }
+  .brand { color: var(--fg); font-weight: 600; letter-spacing: .01em; }
+  .brand .room { font-family: var(--mono); color: var(--mute); font-weight: 400; }
+  .brand .sep { color: var(--line); margin: 0 6px; }
+  .meta { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .meta span + span { margin-left: 14px; }
+
+  .view { animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+  .lead { margin: 40px 0 22px; font-size: 15.5px; line-height: 1.8; color: var(--mute); }
+  .ask { margin: 0 0 22px; font-size: 14px; color: var(--mute); }
+  .hint { font-size: 13px; color: var(--mute); line-height: 1.7; }
+  .hint b { color: var(--fg); font-weight: 600; }
+
+  .startrow, .submitrow { display: flex; gap: 10px; }
+  input {
+    flex: 1; min-width: 0;
+    background: transparent; color: var(--fg);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; font-size: 16px; font-family: inherit;
+    outline: none; transition: border-color .15s;
+  }
+  input:focus { border-color: var(--fg); }
+  #roomInput { text-transform: uppercase; font-family: var(--mono); letter-spacing: .22em; font-size: 18px; }
+  button {
+    background: var(--fg); color: var(--bg); border: 0; border-radius: 8px;
+    padding: 12px 22px; font-size: 15px; font-family: inherit; font-weight: 500;
+    cursor: pointer; transition: opacity .15s;
+  }
+  button:hover { opacity: .86; }
+  button:disabled { opacity: .4; cursor: default; }
+
+  .word {
+    margin: 54px 0 6px; font-size: clamp(38px, 9vw, 62px); font-weight: 600;
+    letter-spacing: -.02em; line-height: 1.1; word-break: break-word;
+  }
+  .word.small { font-size: clamp(26px, 6vw, 40px); }
+  .ask + .options { margin-top: 26px; }
+
+  .options { display: grid; gap: 10px; margin-top: 26px; }
+  .option {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; text-align: left; cursor: pointer;
+    background: var(--card); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 13px 16px; font-size: 15.5px; font-family: inherit;
+    transition: border-color .12s, background .12s;
+  }
+  .option:hover { border-color: var(--mute); }
+  .option .key {
+    flex: none; width: 22px; height: 22px; line-height: 20px; text-align: center;
+    border: 1px solid var(--line); border-radius: 5px;
+    font-family: var(--mono); font-size: 12px; color: var(--mute);
+  }
+  .option.correct { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+  .option.correct .key { border-color: var(--bg); color: var(--bg); }
+  .option.wrong { border-style: dashed; color: var(--mute); text-decoration: line-through; }
+  .option.wrong .key { text-decoration: none; }
+  .options.locked .option { cursor: default; }
+
+  .score { margin-top: 34px; font-size: 68px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .score .of { font-size: 22px; color: var(--mute); font-weight: 400; margin-left: 6px; }
+  #scoreMeta { margin-top: 6px; }
+  .submitrow { margin: 26px 0 10px; }
+
+  .boardtitle {
+    margin: 36px 0 4px; font-size: 13px; font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--mute);
+  }
+  .boardtitle span { font-weight: 400; letter-spacing: 0; text-transform: none; }
+  ol.board { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  ol.board li {
+    display: grid; grid-template-columns: 2.2em 1fr auto auto; gap: 12px;
+    align-items: baseline; padding: 11px 2px;
+    border-bottom: 1px solid var(--line); font-size: 15px;
+  }
+  ol.board li .rk { color: var(--mute); font-family: var(--mono); font-size: 13px; }
+  ol.board li .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ol.board li .sc { font-variant-numeric: tabular-nums; }
+  ol.board li .tm { color: var(--mute); font-size: 13px; font-variant-numeric: tabular-nums; }
+  ol.board li.me .nm { font-weight: 600; }
+  ol.board li.me .rk { color: var(--fg); }
+
+  .actions { display: flex; gap: 22px; margin-top: 30px; }
+  .ghost {
+    color: var(--mute); text-decoration: none; font-size: 13.5px;
+    border-bottom: 1px solid var(--line); padding-bottom: 1px;
+  }
+  .ghost:hover { color: var(--fg); border-color: var(--mute); }
+
+  footer { margin-top: 64px; font-size: 12px; color: var(--mute); line-height: 1.8; }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <div class="brand">单词挑战<span class="sep">/</span><span class="room" id="roomLabel">—</span></div>
+    <div class="meta"><span id="progress">0 / 20</span><span id="timer">00:00</span></div>
+  </header>
+
+  <section class="view" id="view-start">
+    <p class="lead">输一个房间码，今天这 20 道题就定了。<br>同一个码，同一套题——和朋友各做一遍，比谁又快又准。</p>
+    <div class="startrow">
+      <input id="roomInput" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <button id="startBtn">开始</button>
+    </div>
+    <p class="hint" style="margin-top:14px">4 位，字母和数字都有，<b>没有 I O 0 1</b>（念不清也抄不错）。</p>
+  </section>
+
+  <section class="view" id="view-play" hidden>
+    <div class="word" id="word"></div>
+    <p class="ask">选出正确的中文意思</p>
+    <div class="options" id="options"></div>
+    <p class="hint" id="tip" style="margin-top:22px">按 1–4 也可以选</p>
+  </section>
+
+  <section class="view" id="view-done" hidden>
+    <div class="score"><span id="scoreNum">0</span><span class="of">/ 20</span></div>
+    <p class="ask" id="scoreMeta"></p>
+    <div class="submitrow">
+      <input id="nameInput" maxlength="12" placeholder="昵称，上榜用" autocomplete="nickname">
+      <button id="submitBtn">上榜</button>
+    </div>
+    <p class="hint" id="resultMsg"></p>
+    <div id="boardWrap" hidden>
+      <h2 class="boardtitle">今日榜 <span id="boardCount"></span></h2>
+      <ol class="board" id="board"></ol>
+    </div>
+    <div class="actions">
+      <a class="ghost" id="shareLink" href="#">复制邀请链接</a>
+      <a class="ghost" href="/challenge/">再开一局</a>
+    </div>
+  </section>
+
+  <footer>
+    词库 <span id="deckMeta">—</span> · 北京时间每天换题 · 朋友之间玩，不设防
+  </footer>
+</main>
+<script src="/challenge/app.js"></script>
+</body>
+</html>
