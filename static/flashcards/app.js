@@ -63,7 +63,8 @@
       box: Math.min(5, Math.max(1, Number(c.box) || 1)),
       ok: Number(c.ok) || 0,
       bad: Number(c.bad) || 0,
-      last: Number(c.last) || 0
+      last: Number(c.last) || 0,
+      src: c.src ? String(c.src) : ''
     };
   }
 
@@ -132,6 +133,7 @@
     if (name === 'review') renderReviewStart();
     if (name === 'list') renderList();
     if (name === 'lookup') renderLookup();
+    if (name === 'dicts') renderDicts();
     if (name === 'stats') renderStats();
     if (name === 'add') prepareAddForm();
   }
@@ -357,7 +359,7 @@
   function prepareAddForm() {
     if ($('#fId').value.trim()) return;
     const nums = cards
-      .map((c) => { const m = /^([A-Z]+)(\d{3})$/.exec(c.id); return m && m[1] === 'K' ? Number(m[2]) : 0; })
+      .map((c) => { const m = /^([A-Z]+)(\d{3,4})$/.exec(c.id); return m && m[1] === 'K' ? Number(m[2]) : 0; })
       .filter((n) => n > 0);
     const nxt = (nums.length ? Math.max.apply(null, nums) : 0) + 1;
     $('#fId').value = 'K' + String(nxt).padStart(3, '0');
@@ -382,7 +384,7 @@
     const cn = $('#fCn').value.trim();
     const tags = Array.from(new Set($('#fTags').value.split(',').map((s) => s.trim()).filter(Boolean)));
 
-    if (!/^[A-Z]+\d{3}$/.test(id)) { addMsg('编号要像 K001 这样：字母 + 三位数字', true); $('#fId').focus(); return; }
+    if (!/^[A-Z]+\d{3,4}$/.test(id)) { addMsg('编号要像 K001 这样：字母 + 三到四位数字', true); $('#fId').focus(); return; }
     if (cards.some((c) => c.id === id)) { addMsg('编号 ' + id + ' 已经有了', true); $('#fId').focus(); return; }
     if (!front) { addMsg('正面不能空着', true); $('#fFront').focus(); return; }
     if (!back) { addMsg('背面不能空着', true); $('#fBack').focus(); return; }
@@ -431,6 +433,112 @@
     }
   });
 
+  /* ---------------- 词库 ---------------- */
+
+  let DICTS = null;
+  let wordSeq = 0;
+
+  async function loadDicts() {
+    if (DICTS) return DICTS;
+    const idx = await fetch('/dicts/index.json', { cache: 'force-cache' }).then((r) => r.json());
+    DICTS = Array.isArray(idx) ? idx : [];
+    return DICTS;
+  }
+
+  async function renderDicts() {
+    const grid = $('#dictGrid');
+    try {
+      await loadDicts();
+    } catch (e) {
+      grid.innerHTML = '<p class="empty" style="border:0">词库清单取不到，看看 /dicts/index.json 在不在。</p>';
+      return;
+    }
+    grid.innerHTML = DICTS.map((d) => {
+      const got = cards.filter((c) => c.src === d.id).length;
+      return '<div class="dictcard">'
+        + '<div class="dc-top"><b>' + esc(d.name) + '</b><span class="mono">' + d.count + ' 词</span></div>'
+        + '<p class="dc-note">' + esc(d.note || '') + '</p>'
+        + '<div class="dc-foot"><span class="hint">' + (got ? '已导入 ' + got + ' 词' : '还没导入') + '</span>'
+        + '<button class="btn tiny" data-import="' + d.id + '">' + (got ? '补新词' : '导入') + '</button></div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function initWordSeq() {
+    wordSeq = 0;
+    cards.forEach((c) => {
+      const m = /^W(\d{3,4})$/.exec(c.id);
+      if (m) wordSeq = Math.max(wordSeq, Number(m[1]));
+    });
+  }
+
+  async function importDict(id) {
+    const dict = (DICTS || []).find((d) => d.id === id);
+    if (!dict) return 0;
+    const deck = await fetch(dict.file, { cache: 'force-cache' }).then((r) => r.json());
+    const have = new Set(cards.map((c) => norm(c.front)));
+    initWordSeq();
+    let added = 0;
+    (deck.words || []).forEach((w) => {
+      const key = norm(w.f);
+      if (!key || have.has(key)) return;
+      have.add(key);
+      wordSeq += 1;
+      cards.push({
+        id: 'W' + String(wordSeq).padStart(4, '0'),
+        type: 'en2cn', front: w.f, back: w.b, cn: '',
+        tags: [dict.name], box: 1, ok: 0, bad: 0, last: 0, src: dict.id
+      });
+      added += 1;
+    });
+    save();
+    return added;
+  }
+
+  async function doImport(id) {
+    const dict = (DICTS || []).find((d) => d.id === id);
+    const msg = $('#dictMsg');
+    msg.textContent = '正在读' + (dict ? dict.name : '') + '词库…';
+    const btns = $$('[data-import]');
+    btns.forEach((b) => { b.disabled = true; });
+    try {
+      const n = await importDict(id);
+      msg.textContent = n ? ('加进 ' + n + ' 张，都在 1 号盒。') : '这本的词已经全在卡池里了。';
+      await renderDicts();
+      toast(n ? '+' + n + ' 张卡' : '没有新词');
+    } catch (err) {
+      msg.textContent = '导入失败：' + err.message;
+    } finally {
+      btns.forEach((b) => { b.disabled = false; });
+    }
+  }
+
+  $('#dictGrid').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-import]');
+    if (btn) doImport(btn.dataset.import);
+  });
+
+  $('#importAll').addEventListener('click', async () => {
+    const btn = $('#importAll');
+    const msg = $('#dictMsg');
+    btn.disabled = true;
+    let sum = 0;
+    try {
+      const list = await loadDicts();
+      for (const d of list) {
+        msg.textContent = '正在导入' + d.name + '…';
+        try { sum += await importDict(d.id); } catch (err) { /* 单本失败不影响其它 */ }
+      }
+      msg.textContent = sum ? ('四本合起来新增 ' + sum + ' 张。') : '词都已经在卡池里了。';
+      await renderDicts();
+      toast('+' + sum + ' 张卡');
+    } catch (err) {
+      msg.textContent = '导入失败：' + err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   /* ---------------- 清单 ---------------- */
 
   $('#listFilter').addEventListener('change', renderList);
@@ -442,9 +550,12 @@
       .sort((a, b) => a.box - b.box || a.id.localeCompare(b.id))
       .filter((c) => !f || c.box === f);
 
-    $('#listCount').textContent = rows.length + ' / ' + cards.length + ' 张';
-    $('#listTable').querySelector('tbody').innerHTML = rows.length
-      ? rows.map((c) => '<tr><td><span class="boxbadge">' + c.box + '</span></td>'
+    $('#listCount').textContent = rows.length > 400
+      ? '共 ' + rows.length + ' 张，只显示前 400——用上面的筛选缩小范围'
+      : rows.length + ' / ' + cards.length + ' 张';
+    const shown = rows.slice(0, 400);
+    $('#listTable').querySelector('tbody').innerHTML = shown.length
+      ? shown.map((c) => '<tr><td><span class="boxbadge">' + c.box + '</span></td>'
         + '<td class="mono">' + esc(c.id) + '</td>'
         + '<td class="front-cell" title="' + esc(c.front) + '">' + esc(c.front) + '</td>'
         + '<td class="front-cell">' + esc(readable(c.back)) + '</td>'
@@ -574,6 +685,6 @@
     cards = SAMPLE.map((c) => normalizeCard(c));
     save();
   }
-  const VIEWS = ['home', 'review', 'add', 'list', 'lookup', 'stats'];
+  const VIEWS = ['home', 'review', 'add', 'list', 'lookup', 'dicts', 'stats'];
   go(VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'home');
 })();

@@ -12,16 +12,25 @@ import { saveScore, topBoard, countBoard, rankOf } from "./store.js";
 const ROOM_RE = /^[A-HJ-NP-Z2-9]{4}$/;
 const TICKET_TTL = 2 * 3600e3; // 一局两小时内有效
 
-let deckSizeCache = 0;
+// 只认白名单，词库内容不进 Worker，大小从静态文件读一次
+const DECKS = {
+  "kaoyan-core": "/challenge/deck.json",
+  kaoyan: "/dicts/kaoyan.json",
+  cet4: "/dicts/cet4.json",
+  cet6: "/dicts/cet6.json",
+  ielts: "/dicts/ielts.json",
+};
 
-async function deckSize(env, origin) {
-  if (deckSizeCache) return deckSizeCache;
-  // 词库是静态文件，从 assets 里读一次就缓存住，避免尺寸写死在两个地方
-  const res = await env.ASSETS.fetch(new Request(new URL("/challenge/deck.json", origin)));
+const deckSizeCache = new Map();
+
+async function deckSize(env, origin, file) {
+  if (deckSizeCache.has(file)) return deckSizeCache.get(file);
+  // 从 assets 里读一次就缓存住，避免尺寸写死在两个地方
+  const res = await env.ASSETS.fetch(new Request(new URL(file, origin)));
   if (!res.ok) throw new Error("deck not found");
   const deck = await res.json();
-  deckSizeCache = deck.words.length;
-  return deckSizeCache;
+  deckSizeCache.set(file, deck.words.length);
+  return deck.words.length;
 }
 
 const json = (data, status = 200) =>
@@ -77,8 +86,9 @@ export default {
 
 async function getRoom(env, url, room, round) {
   const deck = url.searchParams.get("deck") || DECK_ID;
-  if (deck !== DECK_ID) return fail("词库不存在");
-  const size = await deckSize(env, url.origin);
+  const file = DECKS[deck];
+  if (!file) return fail("词库不存在");
+  const size = await deckSize(env, url.origin, file);
   const issuedAt = Date.now();
   const seed = fnv1a(`${room}:${round}:${deck}`);
   return json({

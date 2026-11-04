@@ -52,6 +52,15 @@
   .hint b { color: var(--fg); font-weight: 600; }
 
   .startrow, .submitrow { display: flex; gap: 10px; }
+  .deckrow { display: flex; align-items: center; gap: 12px; margin-top: 24px; font-size: 13px; color: var(--mute); }
+  .deckrow select {
+    flex: 1; min-width: 0;
+    background: transparent; color: var(--fg);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; font-size: 14px; font-family: inherit;
+    outline: none; transition: border-color .15s;
+  }
+  .deckrow select:focus { border-color: var(--fg); }
   input {
     flex: 1; min-width: 0;
     background: transparent; color: var(--fg);
@@ -145,6 +154,10 @@
       <button id="startBtn">开始</button>
     </div>
     <p class="hint" style="margin-top:14px">4 位，字母和数字都有，<b>没有 I O 0 1</b>（念不清也抄不错）。</p>
+    <div class="deckrow">
+      <label for="deckSelect">词库</label>
+      <select id="deckSelect"><option value="kaoyan-core">考研精简 · 409 词</option></select>
+    </div>
   </section>
 
   <section class="view" id="view-play" hidden>

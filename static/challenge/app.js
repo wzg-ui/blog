@@ -9,6 +9,7 @@ const state = {
   round: "",
   picks: [],
   ticket: "",
+  deck: "kaoyan-core",
   words: [],
   i: 0,
   correct: 0,
@@ -18,6 +19,27 @@ const state = {
   timer: 0,
   wrong: [],
 };
+
+// 可选的词库：精简库随页面走，其余从 /dicts/ 按需取
+let DECKS = [{ id: "kaoyan-core", name: "考研精简", file: "/challenge/deck.json", count: 409 }];
+
+async function loadDecks(pick) {
+  try {
+    const idx = await fetch("/dicts/index.json", { cache: "force-cache" }).then((r) => r.json());
+    if (Array.isArray(idx)) {
+      DECKS = DECKS.concat(idx.map((d) => ({ id: d.id, name: d.name, file: d.file, count: d.count })));
+    }
+  } catch (e) { /* 索引取不到就只留精简库 */ }
+  $("deckSelect").innerHTML = DECKS.map((d) =>
+    `<option value="${d.id}">${d.name} · ${d.count} 词</option>`).join("");
+  if (pick && DECKS.some((d) => d.id === pick)) $("deckSelect").value = pick;
+}
+
+// 选项只显示第一个义项，判定仍按完整释义
+function shortMeaning(text) {
+  const first = String(text).split("；")[0].trim();
+  return first.length > 24 ? first.slice(0, 24) + "…" : first;
+}
 
 const pad = (v) => String(v).padStart(2, "0");
 const secs = (ms) => (ms / 1000).toFixed(1) + " 秒";
@@ -45,17 +67,20 @@ async function start(code) {
   $("startBtn").textContent = "出题…";
 
   try {
-    const res = await fetch(`/api/room/${code}?deck=kaoyan-core`);
+    const deckId = $("deckSelect").value || "kaoyan-core";
+    const meta = DECKS.find((d) => d.id === deckId) || DECKS[0];
+    const res = await fetch(`/api/room/${code}?deck=${encodeURIComponent(meta.id)}`);
     const r = await res.json();
     if (!r.ok) throw new Error(r.error || "出题失败");
 
-    const deck = await fetch("/challenge/deck.json", { cache: "force-cache" }).then((x) => x.json());
+    const deck = await fetch(meta.file, { cache: "force-cache" }).then((x) => x.json());
 
     Object.assign(state, {
       room: code,
       round: r.round,
       picks: r.picks,
       ticket: r.ticket,
+      deck: meta.id,
       words: deck.words,
       i: 0,
       correct: 0,
@@ -89,13 +114,17 @@ function tickTimer() {
 // ---------- 出题 ----------
 
 function optionsFor(word) {
-  const seen = new Set([word.b]);
+  const seenFull = new Set([word.b]);
+  const seenText = new Set([shortMeaning(word.b)]);
   const pool = [];
   let guard = 0;
-  while (pool.length < 3 && guard++ < 2000) {
+  while (pool.length < 3 && guard++ < 3000) {
     const w = state.words[Math.floor(Math.random() * state.words.length)];
-    if (seen.has(w.b)) continue;
-    seen.add(w.b);
+    if (!w || seenFull.has(w.b)) continue;
+    const short = shortMeaning(w.b);
+    if (seenText.has(short)) continue;
+    seenFull.add(w.b);
+    seenText.add(short);
     pool.push(w.b);
   }
   const opts = [word.b, ...pool].map((text) => ({ text, ok: text === word.b }));
@@ -127,7 +156,8 @@ function render() {
 
     const text = document.createElement("span");
     text.className = "txt";
-    text.textContent = opt.text;
+    text.textContent = shortMeaning(opt.text);
+    btn.dataset.ok = opt.ok ? "1" : "0";
 
     btn.append(key, text);
     btn.addEventListener("click", () => answer(idx));
@@ -148,14 +178,14 @@ function answer(idx) {
   state.locked = true;
   box.classList.add("locked");
 
-  const isRight = chosen.querySelector(".txt").textContent === word.b;
+  const isRight = chosen.dataset.ok === "1";
   if (isRight) {
     state.correct++;
     chosen.classList.add("correct");
     tip("对");
   } else {
     chosen.classList.add("wrong");
-    btns.find((b) => b.querySelector(".txt").textContent === word.b)?.classList.add("correct");
+    btns.find((b) => b.dataset.ok === "1")?.classList.add("correct");
     state.wrong.push(word.f);
     tip(`错，${word.f} 是 ${word.b}`);
   }
@@ -275,7 +305,7 @@ $("submitBtn").addEventListener("click", submit);
 
 $("shareLink").addEventListener("click", async (e) => {
   e.preventDefault();
-  const url = `${location.origin}/challenge/?room=${state.room}`;
+  const url = `${location.origin}/challenge/?room=${state.room}&deck=${state.deck}`;
   try {
     await navigator.clipboard.writeText(url);
     $("resultMsg").textContent = "链接已复制，发给朋友";
@@ -284,6 +314,9 @@ $("shareLink").addEventListener("click", async (e) => {
   }
 });
 
-// 带 ?room= 直接开局
-const room = new URLSearchParams(location.search).get("room");
-if (room) start(room);
+// 带 ?room= / ?deck= 直接开局
+const params = new URLSearchParams(location.search);
+loadDecks(params.get("deck")).then(() => {
+  const room = params.get("room");
+  if (room) start(room);
+});

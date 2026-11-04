@@ -21,6 +21,7 @@
       <button data-go="add">录卡</button>
       <button data-go="list">清单</button>
       <button data-go="lookup">查词</button>
+      <button data-go="dicts">词库</button>
       <button data-go="stats">统计</button>
       <a class="tabs-link" href="/challenge/">联机挑战</a>
     </nav>
@@ -51,8 +52,10 @@
         <div class="entries">
           <button class="entry" data-go="review"><b>复习</b><span>选一个盒，逐张过</span></button>
           <button class="entry" data-go="add"><b>录一张卡</b><span>四种题型</span></button>
+          <button class="entry" data-go="dicts"><b>词库</b><span>考研 / 四级 / 六级 / 雅思</span></button>
           <button class="entry" data-go="lookup"><b>查词</b><span>打前几个字母</span></button>
           <button class="entry" data-go="list"><b>清单</b><span>看每张在哪一盒</span></button>
+          <button class="entry" data-go="stats"><b>统计</b><span>掌握率和欠账</span></button>
         </div>
       </div>
       <div class="panel">
@@ -211,6 +214,24 @@
       <button class="btn" id="lookupBtn">查</button>
     </div>
     <ul class="hits" id="lookupHits"></ul>
+  </section>
+
+  <!-- 词库 -->
+  <section class="view" data-view="dicts" hidden>
+    <p class="eyebrow">词库</p>
+    <h1 class="h1-sm">按考试挑一本</h1>
+    <p class="lede">四本大纲词库，导入后整批进 1 号盒。已有的单词自动跳过，几本一起导也不会重复。</p>
+
+    <div class="dictgrid" id="dictGrid">
+      <p class="empty" style="border:0">正在取词库清单…</p>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <button class="btn primary" id="importAll">全部导入</button>
+      <span class="hint" id="dictMsg"></span>
+    </div>
+
+    <p class="hint" style="margin-top:26px">词库来自 Qwerty Learner 的公开词表，只取了单词和释义，音标没搬。</p>
   </section>
 
   <!-- 统计 -->
