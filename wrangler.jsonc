@@ -1,0 +1,10 @@
+{
+  // 博客部署配置：wrangler deploy 一条命令上传 public/ 到 Cloudflare Worker
+  // 替代后台手动拖文件（91 个文件逐个上传容易被代理抖动打断）。
+  // name 必须是 piemm-blog —— 覆盖已有 Worker，blog.piemm.net 的域名绑定不受影响。
+  "name": "piemm-blog",
+  "compatibility_date": "2026-11-03",
+  "assets": {
+    "directory": "./public"
+  }
+}
