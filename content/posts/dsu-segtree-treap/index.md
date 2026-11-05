@@ -1,6 +1,6 @@
 ---
 title: "先上硬菜：并查集、线段树、平衡树"
-date: 2026-11-04T18:10:00+08:00
+date: 2026-11-06T00:40:00+08:00
 draft: false
 series: ["algo"]
 description: "数据结构三小只"
