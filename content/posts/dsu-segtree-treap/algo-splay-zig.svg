@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 486" width="680" height="486" role="img" aria-label="zig：只转一次。x 的父亲 y 已经在目标位置（最典型就是 y 是根），转完就停">
+  <rect width="680" height="486" fill="#ffffff"/>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a8a8a"/>
+    </marker>
+  </defs>
+  <g font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+    <text x="20" y="26" font-size="12.5" fill="#3a3a3a">zig：只转一次。x 的父亲 y 已经在目标位置（最典型就是 y 是根），转完就停</text>
+    <text x="20" y="46" font-size="10.5" fill="#8a8a8a">橙框是 x，另一个是「换父亲的子树」；灰框是 y（父亲）。zig 时 y 已在目标位置，再往上不看</text>
+    <line x1="20" y1="58" x2="660" y2="58" stroke="#e4e4e4" stroke-width="1"/>
+    <text x="20" y="78" font-size="11.5" fill="#3a3a3a">右旋：x 是 y 的左儿子</text>
+    <line x1="248.0" y1="112" x2="164.0" y2="142" stroke="#8a8a8a" stroke-width="1.3"/>
+    <line x1="248.0" y1="112" x2="290.0" y2="142" stroke="#8a8a8a" stroke-width="1.3"/>
+    <line x1="164.0" y1="166" x2="206.0" y2="196" stroke="#8a8a8a" stroke-width="1.3"/>
+    <rect x="146.0" y="142" width="36" height="24" rx="4" fill="#ffffff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="164.0" y="158" text-anchor="middle" font-size="11.5" fill="#c8823a">10</text>
+    <rect x="188.0" y="196" width="36" height="24" rx="4" fill="#ffffff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="206.0" y="212" text-anchor="middle" font-size="11.5" fill="#c8823a">15</text>
+    <rect x="230.0" y="88" width="36" height="24" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.3"/>
+    <text x="248.0" y="104" text-anchor="middle" font-size="11.5" fill="#3a3a3a">20</text>
+    <rect x="272.0" y="142" width="36" height="24" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.3"/>
+    <text x="290.0" y="158" text-anchor="middle" font-size="11.5" fill="#3a3a3a">25</text>
+    <line x1="390.0" y1="112" x2="474.0" y2="142" stroke="#8a8a8a" stroke-width="1.3"/>
+    <line x1="474.0" y1="166" x2="432.0" y2="196" stroke="#8a8a8a" stroke-width="1.3"/>
+    <line x1="474.0" y1="166" x2="516.0" y2="196" stroke="#8a8a8a" stroke-width="1.3"/>
+    <rect x="372.0" y="88" width="36" height="24" rx="4" fill="#ffffff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="390.0" y="104" text-anchor="middle" font-size="11.5" fill="#c8823a">10</text>
+    <rect x="414.0" y="196" width="36" height="24" rx="4" fill="#ffffff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="432.0" y="212" text-anchor="middle" font-size="11.5" fill="#c8823a">15</text>
+    <rect x="456.0" y="142" width="36" height="24" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.3"/>
+    <text x="474.0" y="158" text-anchor="middle" font-size="11.5" fill="#3a3a3a">20</text>
+    <rect x="498.0" y="196" width="36" height="24" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.3"/>
+    <text x="516.0" y="212" text-anchor="middle" font-size="11.5" fill="#3a3a3a">25</text>
+    <line x1="314.0" y1="154" x2="366.0" y2="154" stroke="#8a8a8a" stroke-width="1.3" marker-end="url(#ar)"/>
+    <text x="20" y="240" font-size="10.5" fill="#c8823a">x 从左儿子升成根，y 落到右边；x 的右子树 15 过继给 y 当左子树</text>
+    <text x="20" y="266" font-size="11.5" fill="#3a3a3a">左旋：x 是 y 的右儿子</text>
+    <line x1="206.0" y1="300" x2="164.0" y2="330" stroke="#8a8a8a" stroke-width="1.3"/>
+    <line x1="206.0" y1="300" x2="290.0" y2="330" stroke="#8a8a8a" stroke-width="1.3"/>
+    <line x1="290.0" y1="354" x2="248.0" y2="384" stroke="#8a8a8a" stroke-width="1.3"/>
+    <rect x="146.0" y="330" width="36" height="24" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.3"/>
+    <text x="164.0" y="346" text-anchor="middle" font-size="11.5" fill="#3a3a3a">15</text>
+    <rect x="188.0" y="276" width="36" height="24" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.3"/>
+    <text x="206.0" y="292" text-anchor="middle" font-size="11.5" fill="#3a3a3a">20</text>
+    <rect x="230.0" y="384" width="36" height="24" rx="4" fill="#ffffff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="248.0" y="400" text-anchor="middle" font-size="11.5" fill="#c8823a">25</text>
+    <rect x="272.0" y="330" width="36" height="24" rx="4" fill="#ffffff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="290.0" y="346" text-anchor="middle" font-size="11.5" fill="#c8823a">30</text>
+    <line x1="516.0" y1="300" x2="432.0" y2="330" stroke="#8a8a8a" stroke-width="1.3"/>
+    <line x1="432.0" y1="354" x2="390.0" y2="384" stroke="#8a8a8a" stroke-width="1.3"/>
+    <line x1="432.0" y1="354" x2="474.0" y2="384" stroke="#8a8a8a" stroke-width="1.3"/>
+    <rect x="372.0" y="384" width="36" height="24" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.3"/>
+    <text x="390.0" y="400" text-anchor="middle" font-size="11.5" fill="#3a3a3a">15</text>
+    <rect x="414.0" y="330" width="36" height="24" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.3"/>
+    <text x="432.0" y="346" text-anchor="middle" font-size="11.5" fill="#3a3a3a">20</text>
+    <rect x="456.0" y="384" width="36" height="24" rx="4" fill="#ffffff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="474.0" y="400" text-anchor="middle" font-size="11.5" fill="#c8823a">25</text>
+    <rect x="498.0" y="276" width="36" height="24" rx="4" fill="#ffffff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="516.0" y="292" text-anchor="middle" font-size="11.5" fill="#c8823a">30</text>
+    <line x1="314.0" y1="342" x2="366.0" y2="342" stroke="#8a8a8a" stroke-width="1.3" marker-end="url(#ar)"/>
+    <text x="20" y="428" font-size="10.5" fill="#c8823a">镜像：x 升成根，y 落到左边；x 的左子树 25 过继给 y 当右子树</text>
+    <text x="20" y="466" font-size="10.5" fill="#8a8a8a">两种走法的中序都没变（右旋 10 15 20 25，左旋 15 20 25 30），变的只是层级。</text>
+  </g>
+</svg>

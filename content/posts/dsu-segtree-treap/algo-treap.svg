@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 310" width="640" height="310" role="img" aria-label="Treap 示例：权值满足二叉搜索树，随机优先级满足小根堆">
+  <defs>
+    <marker id="treap-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a8a8a"/>
+    </marker>
+  </defs>
+
+  <g stroke="#8a8a8a" stroke-width="1.5" fill="none" marker-end="url(#treap-arrow)">
+    <line x1="320" y1="68" x2="192" y2="118"/>
+    <line x1="320" y1="68" x2="448" y2="118"/>
+    <line x1="170" y1="160" x2="107" y2="210"/>
+    <line x1="170" y1="160" x2="233" y2="210"/>
+  </g>
+
+  <g fill="none" stroke="#8a8a8a" stroke-width="1.5">
+    <rect x="288" y="28" width="64" height="40" rx="4"/>
+    <rect x="138" y="120" width="64" height="40" rx="4"/>
+    <rect x="438" y="120" width="64" height="40" rx="4"/>
+    <rect x="63" y="212" width="64" height="40" rx="4"/>
+    <rect x="213" y="212" width="64" height="40" rx="4"/>
+  </g>
+
+  <g fill="#7d7d7d" text-anchor="middle">
+    <text x="320" y="45" font-size="15">50</text>
+    <text x="320" y="61" font-size="10">key 21</text>
+    <text x="170" y="137" font-size="15">30</text>
+    <text x="170" y="153" font-size="10">key 26</text>
+    <text x="470" y="137" font-size="15">70</text>
+    <text x="470" y="153" font-size="10">key 33</text>
+    <text x="95" y="229" font-size="15">20</text>
+    <text x="95" y="245" font-size="10">key 44</text>
+    <text x="245" y="229" font-size="15">45</text>
+    <text x="245" y="245" font-size="10">key 38</text>
+  </g>
+
+  <text x="245" y="278" text-anchor="middle" fill="#c8823a" font-size="10.5">45 是 30 的右儿子，却比祖父 50 小</text>
+
+  <text x="8" y="300" fill="#7d7d7d" font-size="12">中序读出来是 20 30 45 50 70（左小右大），key 从上往下递增（父小于子）</text>
+</svg>

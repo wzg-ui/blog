@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 330" width="680" height="330" role="img" aria-label="线段树懒标记：整段更新时只改根节点并记一笔账，真正下探时才下放给两个儿子">
+  <rect width="680" height="330" fill="#ffffff"/>
+  <defs>
+    <marker id="lz-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a8a8a"/>
+    </marker>
+  </defs>
+
+  <g font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+
+    <!-- ============ 左：整段命中 ============ -->
+    <text x="178" y="26" text-anchor="middle" font-size="12.5" fill="#3a3a3a">update(1, 4, +5) 命中整段</text>
+
+    <g stroke="#8a8a8a" stroke-width="1.4" fill="none">
+      <line x1="178" y1="82" x2="108" y2="140"/>
+      <line x1="178" y1="82" x2="248" y2="140"/>
+    </g>
+
+    <!-- 根：改过 -->
+    <rect x="136" y="40" width="84" height="52" rx="4" fill="#fff" stroke="#c8823a" stroke-width="1.6"/>
+    <text x="178" y="58" text-anchor="middle" font-size="11.5" fill="#3a3a3a">[1, 4]</text>
+    <text x="178" y="73" text-anchor="middle" font-size="10" fill="#555">tr = 30</text>
+    <text x="178" y="86" text-anchor="middle" font-size="10" fill="#c8823a">lazy = 5</text>
+
+    <!-- 左儿子：没收到 -->
+    <rect x="66" y="140" width="84" height="52" rx="4" fill="#fff" stroke="#cccccc" stroke-width="1.4" stroke-dasharray="4 3"/>
+    <text x="108" y="158" text-anchor="middle" font-size="11.5" fill="#8a8a8a">[1, 2]</text>
+    <text x="108" y="173" text-anchor="middle" font-size="10" fill="#8a8a8a">tr = 3</text>
+    <text x="108" y="186" text-anchor="middle" font-size="10" fill="#b0b0b0">lazy = 0</text>
+
+    <!-- 右儿子：没收到 -->
+    <rect x="206" y="140" width="84" height="52" rx="4" fill="#fff" stroke="#cccccc" stroke-width="1.4" stroke-dasharray="4 3"/>
+    <text x="248" y="158" text-anchor="middle" font-size="11.5" fill="#8a8a8a">[3, 4]</text>
+    <text x="248" y="173" text-anchor="middle" font-size="10" fill="#8a8a8a">tr = 7</text>
+    <text x="248" y="186" text-anchor="middle" font-size="10" fill="#b0b0b0">lazy = 0</text>
+
+    <text x="178" y="228" text-anchor="middle" font-size="10.5" fill="#8a8a8a">只改根，两个儿子还是旧值——账记在 lazy 上</text>
+    <text x="178" y="246" text-anchor="middle" font-size="10.5" fill="#8a8a8a">谁要问 [1, 2]，才会把账还下去</text>
+
+    <!-- ============ 中间箭头 ============ -->
+    <line x1="316" y1="120" x2="366" y2="120" stroke="#8a8a8a" stroke-width="1.4" marker-end="url(#lz-arrow)" fill="none"/>
+    <text x="341" y="106" text-anchor="middle" font-size="11" fill="#3a3a3a">pushdown</text>
+    <text x="341" y="146" text-anchor="middle" font-size="10" fill="#8a8a8a">(1, 4)</text>
+
+    <!-- ============ 右：下放之后 ============ -->
+    <text x="512" y="26" text-anchor="middle" font-size="12.5" fill="#3a3a3a">要走进 [1, 2]，先下放</text>
+
+    <g stroke="#8a8a8a" stroke-width="1.4" fill="none">
+      <line x1="512" y1="82" x2="442" y2="140"/>
+      <line x1="512" y1="82" x2="582" y2="140"/>
+    </g>
+
+    <rect x="470" y="40" width="84" height="52" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="512" y="58" text-anchor="middle" font-size="11.5" fill="#3a3a3a">[1, 4]</text>
+    <text x="512" y="73" text-anchor="middle" font-size="10" fill="#555">tr = 30</text>
+    <text x="512" y="86" text-anchor="middle" font-size="10" fill="#8a8a8a">lazy = 0</text>
+
+    <rect x="400" y="140" width="84" height="52" rx="4" fill="#fff" stroke="#c8823a" stroke-width="1.6"/>
+    <text x="442" y="158" text-anchor="middle" font-size="11.5" fill="#3a3a3a">[1, 2]</text>
+    <text x="442" y="173" text-anchor="middle" font-size="10" fill="#555">tr = 13</text>
+    <text x="442" y="186" text-anchor="middle" font-size="10" fill="#c8823a">lazy = 5</text>
+
+    <rect x="540" y="140" width="84" height="52" rx="4" fill="#fff" stroke="#c8823a" stroke-width="1.6"/>
+    <text x="582" y="158" text-anchor="middle" font-size="11.5" fill="#3a3a3a">[3, 4]</text>
+    <text x="582" y="173" text-anchor="middle" font-size="10" fill="#555">tr = 17</text>
+    <text x="582" y="186" text-anchor="middle" font-size="10" fill="#c8823a">lazy = 5</text>
+
+    <text x="512" y="228" text-anchor="middle" font-size="10.5" fill="#8a8a8a">父亲清空，把 5 × 2 分给两个儿子</text>
+    <text x="512" y="246" text-anchor="middle" font-size="10.5" fill="#c8823a">13 + 17 = 30，跟父亲对得上</text>
+
+  </g>
+</svg>

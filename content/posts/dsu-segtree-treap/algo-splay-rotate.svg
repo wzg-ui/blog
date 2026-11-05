@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 440" width="680" height="440" role="img" aria-label="rotate 的三步：x 的异侧儿子过继给父亲、x 认爷爷、y 降成 x 的儿子">
+  <rect width="680" height="440" fill="#ffffff"/>
+  <defs>
+    <marker id="rot-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a8a8a"/>
+    </marker>
+  </defs>
+  <g font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+
+    <text x="20" y="26" font-size="12.5" fill="#3a3a3a">rotate(x)：把 x 提一层，替掉父亲 y 的位置。方框里是权值；橙色是 x、它要过继的 25，和动过的三条边</text>
+    <text x="20" y="46" font-size="10" fill="#8a8a8a">前：x 是 y 的右儿子</text>
+    <text x="470" y="46" font-size="10" fill="#8a8a8a">后：x 站在 y 的位置上</text>
+
+    <g stroke="#8a8a8a" stroke-width="1.4" fill="none">
+      <line x1="150" y1="78" x2="88" y2="118"/>
+
+      <line x1="210" y1="146" x2="155" y2="186"/>
+
+      <line x1="265" y1="214" x2="315" y2="254"/>
+
+      <line x1="500" y1="78" x2="438" y2="118"/>
+
+      <line x1="575" y1="146" x2="635" y2="186"/>
+
+      <line x1="515" y1="214" x2="455" y2="254"/>
+
+    </g>
+    <g stroke="#c8823a" stroke-width="1.6" fill="none">
+      <line x1="150" y1="78" x2="210" y2="118"/>
+
+      <line x1="210" y1="146" x2="265" y2="186"/>
+
+      <line x1="265" y1="214" x2="215" y2="254"/>
+
+      <line x1="500" y1="78" x2="575" y2="118"/>
+
+      <line x1="575" y1="146" x2="515" y2="186"/>
+
+      <line x1="515" y1="214" x2="575" y2="254"/>
+
+    </g>
+    <rect x="129" y="50" width="42" height="28" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="150" y="68" text-anchor="middle" font-size="11" fill="#3a3a3a">10</text>
+
+    <rect x="67" y="118" width="42" height="28" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="88" y="136" text-anchor="middle" font-size="11" fill="#3a3a3a">5</text>
+
+    <rect x="189" y="118" width="42" height="28" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="210" y="136" text-anchor="middle" font-size="11" fill="#3a3a3a">20</text>
+
+    <rect x="134" y="186" width="42" height="28" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="155" y="204" text-anchor="middle" font-size="11" fill="#3a3a3a">15</text>
+
+    <rect x="244" y="186" width="42" height="28" rx="4" fill="#fff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="265" y="204" text-anchor="middle" font-size="11" fill="#3a3a3a">30</text>
+
+    <rect x="194" y="254" width="42" height="28" rx="4" fill="#fff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="215" y="272" text-anchor="middle" font-size="11" fill="#3a3a3a">25</text>
+
+    <rect x="294" y="254" width="42" height="28" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="315" y="272" text-anchor="middle" font-size="11" fill="#3a3a3a">35</text>
+
+    <rect x="479" y="50" width="42" height="28" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="500" y="68" text-anchor="middle" font-size="11" fill="#3a3a3a">10</text>
+
+    <rect x="417" y="118" width="42" height="28" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="438" y="136" text-anchor="middle" font-size="11" fill="#3a3a3a">5</text>
+
+    <rect x="554" y="118" width="42" height="28" rx="4" fill="#fff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="575" y="136" text-anchor="middle" font-size="11" fill="#3a3a3a">30</text>
+
+    <rect x="494" y="186" width="42" height="28" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="515" y="204" text-anchor="middle" font-size="11" fill="#3a3a3a">20</text>
+
+    <rect x="614" y="186" width="42" height="28" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="635" y="204" text-anchor="middle" font-size="11" fill="#3a3a3a">35</text>
+
+    <rect x="434" y="254" width="42" height="28" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="455" y="272" text-anchor="middle" font-size="11" fill="#3a3a3a">15</text>
+
+    <rect x="554" y="254" width="42" height="28" rx="4" fill="#fff" stroke="#c8823a" stroke-width="1.8"/>
+    <text x="575" y="272" text-anchor="middle" font-size="11" fill="#3a3a3a">25</text>
+
+
+    <line x1="352" y1="200" x2="404" y2="200" stroke="#8a8a8a" stroke-width="1.4" marker-end="url(#rot-arrow)" fill="none"/>
+    <text x="378" y="190" text-anchor="middle" font-size="10" fill="#c8823a">rotate(x)</text>
+
+    <line x1="20" y1="306" x2="660" y2="306" stroke="#e4e4e4" stroke-width="1"/>
+    <text x="20" y="332" font-size="11" fill="#3a3a3a">① x 的左儿子 25 过继给 y：y 的右儿子从 x 变成 25</text>
+    <text x="20" y="354" font-size="11" fill="#3a3a3a">② x 顶掉 y：z 的右儿子从 y 变成 x</text>
+    <text x="20" y="376" font-size="11" fill="#3a3a3a">③ y 降一级：y 变成 x 的左儿子</text>
+    <text x="20" y="402" font-size="10.5" fill="#c8823a">断三条、接三条：z→y、y→x、x→25 断了，接上 z→x、x→y、y→25</text>
+    <text x="20" y="422" font-size="10.5" fill="#8a8a8a">中序读出来还是 5 10 15 20 25 30 35，一条没乱</text>
+    <text x="118" y="68" font-size="10" fill="#8a8a8a" text-anchor="middle">z</text>
+    <text x="178" y="136" font-size="10" fill="#8a8a8a" text-anchor="middle">y</text>
+    <text x="233" y="204" font-size="10" fill="#c8823a" text-anchor="middle">x</text>
+    <text x="543" y="136" font-size="10" fill="#c8823a" text-anchor="middle">x</text>
+    <text x="483" y="204" font-size="10" fill="#8a8a8a" text-anchor="middle">y</text>
+  </g>
+</svg>

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 390" width="680" height="390" role="img" aria-label="Treap 合并：x 和 y 两棵树按根节点随机优先级比较，小的当新根，另一棵整棵递归挂到空位上">
+  <rect width="680" height="390" fill="#ffffff"/>
+  <defs>
+    <marker id="mg-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a8a8a"/>
+    </marker>
+  </defs>
+
+  <g font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+
+    <!-- ============ 左：两棵输入树 ============ -->
+    <text x="150" y="26" text-anchor="middle" font-size="12.5" fill="#3a3a3a">merge(x, y)　x 里的值全 ≤ y 里的</text>
+
+    <!-- x 树：30 带左儿子 20 -->
+    <text x="40" y="58" font-size="11" fill="#c8823a">x</text>
+    <line x1="110" y1="100" x2="58" y2="128" stroke="#8a8a8a" stroke-width="1.4" fill="none"/>
+    <rect x="80" y="60" width="60" height="40" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="110" y="77" text-anchor="middle" font-size="12" fill="#3a3a3a">30</text>
+    <text x="110" y="91" text-anchor="middle" font-size="9.5" fill="#c8823a">key 26</text>
+    <rect x="20" y="130" width="60" height="40" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="50" y="147" text-anchor="middle" font-size="12" fill="#3a3a3a">20</text>
+    <text x="50" y="161" text-anchor="middle" font-size="9.5" fill="#c8823a">key 44</text>
+
+    <!-- y 树：50 带左右儿子 45、70 -->
+    <text x="40" y="212" font-size="11" fill="#c8823a">y</text>
+    <g stroke="#8a8a8a" stroke-width="1.4" fill="none">
+      <line x1="110" y1="264" x2="58" y2="292"/>
+      <line x1="110" y1="264" x2="162" y2="292"/>
+    </g>
+    <rect x="80" y="224" width="60" height="40" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="110" y="241" text-anchor="middle" font-size="12" fill="#3a3a3a">50</text>
+    <text x="110" y="255" text-anchor="middle" font-size="9.5" fill="#c8823a">key 21</text>
+    <rect x="20" y="294" width="60" height="40" rx="4" fill="#fff" stroke="#c8823a" stroke-width="1.6"/>
+    <text x="50" y="311" text-anchor="middle" font-size="12" fill="#3a3a3a">45</text>
+    <text x="50" y="325" text-anchor="middle" font-size="9.5" fill="#c8823a">key 38</text>
+    <rect x="140" y="294" width="60" height="40" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="170" y="311" text-anchor="middle" font-size="12" fill="#3a3a3a">70</text>
+    <text x="170" y="325" text-anchor="middle" font-size="9.5" fill="#c8823a">key 33</text>
+
+    <!-- ============ 中间箭头 ============ -->
+    <line x1="262" y1="180" x2="312" y2="180" stroke="#8a8a8a" stroke-width="1.4" marker-end="url(#mg-arrow)" fill="none"/>
+    <text x="287" y="166" text-anchor="middle" font-size="11" fill="#3a3a3a">比 key</text>
+    <text x="287" y="200" text-anchor="middle" font-size="10" fill="#8a8a8a">小的当根</text>
+
+    <!-- ============ 右：合并结果 50(30(20,45),70) ============ -->
+    <text x="510" y="26" text-anchor="middle" font-size="12.5" fill="#3a3a3a">合并后</text>
+
+    <g stroke="#8a8a8a" stroke-width="1.4" fill="none">
+      <line x1="510" y1="110" x2="466" y2="158"/>
+      <line x1="510" y1="110" x2="584" y2="158"/>
+      <line x1="460" y1="200" x2="426" y2="248"/>
+      <line x1="460" y1="200" x2="494" y2="248"/>
+    </g>
+
+    <rect x="480" y="70" width="60" height="40" rx="4" fill="#fff" stroke="#c8823a" stroke-width="1.6"/>
+    <text x="510" y="87" text-anchor="middle" font-size="12" fill="#3a3a3a">50</text>
+    <text x="510" y="101" text-anchor="middle" font-size="9.5" fill="#c8823a">key 21</text>
+
+    <rect x="430" y="160" width="60" height="40" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="460" y="177" text-anchor="middle" font-size="12" fill="#3a3a3a">30</text>
+    <text x="460" y="191" text-anchor="middle" font-size="9.5" fill="#c8823a">key 26</text>
+
+    <rect x="560" y="160" width="60" height="40" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="590" y="177" text-anchor="middle" font-size="12" fill="#3a3a3a">70</text>
+    <text x="590" y="191" text-anchor="middle" font-size="9.5" fill="#c8823a">key 33</text>
+
+    <rect x="390" y="250" width="60" height="40" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="420" y="267" text-anchor="middle" font-size="12" fill="#3a3a3a">20</text>
+    <text x="420" y="281" text-anchor="middle" font-size="9.5" fill="#c8823a">key 44</text>
+
+    <rect x="470" y="250" width="60" height="40" rx="4" fill="#fff" stroke="#c8823a" stroke-width="1.6"/>
+    <text x="500" y="267" text-anchor="middle" font-size="12" fill="#3a3a3a">45</text>
+    <text x="500" y="281" text-anchor="middle" font-size="9.5" fill="#c8823a">key 38</text>
+
+    <!-- 底部说明 -->
+    <text x="340" y="352" text-anchor="middle" font-size="10.5" fill="#8a8a8a">比 key：21 &lt; 26 → 50 当根；26 &lt; 38 → 30 当根；30 的右儿子接上 45</text>
+    <text x="340" y="374" text-anchor="middle" font-size="10.5" fill="#c8823a">合回去正好是拆之前那棵树——merge 和 split 互为逆操作</text>
+
+  </g>
+</svg>

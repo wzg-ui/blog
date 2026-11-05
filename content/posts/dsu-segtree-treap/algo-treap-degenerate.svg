@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 372" width="680" height="372" role="img" aria-label="同一个键集合，key 随机时树高 3 层，key 单调时退化成一条 7 层的链">
+  <rect width="680" height="372" fill="#ffffff"/>
+
+  <g font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+
+    <text x="170" y="24" text-anchor="middle" font-size="12.5" fill="#3a3a3a">key 随机：高度 3</text>
+    <text x="500" y="24" text-anchor="middle" font-size="12.5" fill="#3a3a3a">key 恰好单调：高度 7</text>
+
+    <!-- ================= 左：平衡 ================= -->
+    <g stroke="#8a8a8a" stroke-width="1.4" fill="none">
+      <line x1="170" y1="83" x2="110" y2="115"/>
+      <line x1="170" y1="83" x2="230" y2="115"/>
+      <line x1="110" y1="149" x2="70" y2="181"/>
+      <line x1="110" y1="149" x2="140" y2="181"/>
+      <line x1="230" y1="149" x2="200" y2="181"/>
+      <line x1="230" y1="149" x2="270" y2="181"/>
+    </g>
+
+    <rect x="145" y="49" width="50" height="34" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="170" y="64" text-anchor="middle" font-size="12" fill="#3a3a3a">50</text>
+    <text x="170" y="76" text-anchor="middle" font-size="9" fill="#c8823a">key 12</text>
+
+    <rect x="85" y="115" width="50" height="34" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="110" y="130" text-anchor="middle" font-size="12" fill="#3a3a3a">30</text>
+    <text x="110" y="142" text-anchor="middle" font-size="9" fill="#c8823a">key 25</text>
+
+    <rect x="205" y="115" width="50" height="34" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="230" y="130" text-anchor="middle" font-size="12" fill="#3a3a3a">70</text>
+    <text x="230" y="142" text-anchor="middle" font-size="9" fill="#c8823a">key 31</text>
+
+    <rect x="45" y="181" width="50" height="34" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="70" y="196" text-anchor="middle" font-size="12" fill="#3a3a3a">20</text>
+    <text x="70" y="208" text-anchor="middle" font-size="9" fill="#c8823a">key 47</text>
+
+    <rect x="115" y="181" width="50" height="34" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="140" y="196" text-anchor="middle" font-size="12" fill="#3a3a3a">40</text>
+    <text x="140" y="208" text-anchor="middle" font-size="9" fill="#c8823a">key 52</text>
+
+    <rect x="175" y="181" width="50" height="34" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="200" y="196" text-anchor="middle" font-size="12" fill="#3a3a3a">60</text>
+    <text x="200" y="208" text-anchor="middle" font-size="9" fill="#c8823a">key 60</text>
+
+    <rect x="245" y="181" width="50" height="34" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="270" y="196" text-anchor="middle" font-size="12" fill="#3a3a3a">80</text>
+    <text x="270" y="208" text-anchor="middle" font-size="9" fill="#c8823a">key 71</text>
+
+    <!-- ================= 右：退化 ================= -->
+    <g stroke="#8a8a8a" stroke-width="1.4" fill="none">
+      <line x1="500" y1="70" x2="500" y2="78"/>
+      <line x1="500" y1="108" x2="500" y2="116"/>
+      <line x1="500" y1="146" x2="500" y2="154"/>
+      <line x1="500" y1="184" x2="500" y2="192"/>
+      <line x1="500" y1="222" x2="500" y2="230"/>
+      <line x1="500" y1="260" x2="500" y2="268"/>
+    </g>
+
+    <rect x="462" y="40" width="76" height="30" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="500" y="54" text-anchor="middle" font-size="11.5" fill="#3a3a3a">20</text>
+    <text x="500" y="65" text-anchor="middle" font-size="9" fill="#c8823a">key 3</text>
+
+    <rect x="462" y="78" width="76" height="30" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="500" y="92" text-anchor="middle" font-size="11.5" fill="#3a3a3a">30</text>
+    <text x="500" y="103" text-anchor="middle" font-size="9" fill="#c8823a">key 8</text>
+
+    <rect x="462" y="116" width="76" height="30" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="500" y="130" text-anchor="middle" font-size="11.5" fill="#3a3a3a">40</text>
+    <text x="500" y="141" text-anchor="middle" font-size="9" fill="#c8823a">key 15</text>
+
+    <rect x="462" y="154" width="76" height="30" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="500" y="168" text-anchor="middle" font-size="11.5" fill="#3a3a3a">50</text>
+    <text x="500" y="179" text-anchor="middle" font-size="9" fill="#c8823a">key 22</text>
+
+    <rect x="462" y="192" width="76" height="30" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="500" y="206" text-anchor="middle" font-size="11.5" fill="#3a3a3a">60</text>
+    <text x="500" y="217" text-anchor="middle" font-size="9" fill="#c8823a">key 40</text>
+
+    <rect x="462" y="230" width="76" height="30" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="500" y="244" text-anchor="middle" font-size="11.5" fill="#3a3a3a">70</text>
+    <text x="500" y="255" text-anchor="middle" font-size="9" fill="#c8823a">key 55</text>
+
+    <rect x="462" y="268" width="76" height="30" rx="4" fill="#fff" stroke="#8a8a8a" stroke-width="1.4"/>
+    <text x="500" y="282" text-anchor="middle" font-size="11.5" fill="#3a3a3a">80</text>
+    <text x="500" y="293" text-anchor="middle" font-size="9" fill="#c8823a">key 71</text>
+
+    <!-- 退化标注 -->
+    <text x="550" y="158" font-size="10" fill="#c8823a">每一步都挂在</text>
+    <text x="550" y="173" font-size="10" fill="#c8823a">上一个的右边</text>
+
+    <!-- ================= 说明 ================= -->
+    <text x="170" y="248" text-anchor="middle" font-size="10.5" fill="#8a8a8a">查一个数最多走 3 步</text>
+    <text x="500" y="318" text-anchor="middle" font-size="10.5" fill="#c8823a">查 80 要走 7 步</text>
+
+    <text x="340" y="346" text-anchor="middle" font-size="10.5" fill="#8a8a8a">代价就是树高。key 由 rand() 当场生成，出题人看不到，所以才说「期望」O(log n) 而不是最坏</text>
+
+  </g>
+</svg>

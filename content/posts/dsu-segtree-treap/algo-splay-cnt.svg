@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 428" width="680" height="428" role="img" aria-label="副本数：三个 20 只占一个方框，cnt 记 3，按名次读出来却占三个位置">
+  <rect width="680" height="428" fill="#ffffff"/>
+  <g font-family="system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+
+    <text x="20" y="28" font-size="12.5" fill="#3a3a3a">同一个值只占一个方框：插 20 三次，树上还是一个 20，只是方框里的 &#215;3 变了</text>
+    <text x="20" y="48" font-size="10.5" fill="#8a8a8a">方框内上行是 val，下行是 cnt（副本数）；方框下方 sz 是这棵子树有几个元素</text>
+
+    <g stroke="#8a8a8a" stroke-width="1.3" fill="none">
+      <line x1="340" y1="119" x2="248" y2="183"/>
+      <line x1="340" y1="119" x2="432" y2="183"/>
+    </g>
+    <rect x="308" y="69" width="64" height="50" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.3"/>
+    <text x="340" y="91" text-anchor="middle" font-size="15" fill="#3a3a3a">30</text>
+    <text x="340" y="109" text-anchor="middle" font-size="10.5" fill="#8a8a8a">&#215;1</text>
+    <text x="340" y="134" text-anchor="middle" font-size="10" fill="#8a8a8a">sz 6</text>
+    <rect x="216" y="183" width="64" height="50" rx="4" fill="#ffffff" stroke="#c8823a" stroke-width="1.7"/>
+    <text x="248" y="205" text-anchor="middle" font-size="15" fill="#3a3a3a">20</text>
+    <text x="248" y="223" text-anchor="middle" font-size="10.5" fill="#c8823a">&#215;3</text>
+    <text x="248" y="248" text-anchor="middle" font-size="10" fill="#8a8a8a">sz 3</text>
+    <rect x="400" y="183" width="64" height="50" rx="4" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.3"/>
+    <text x="432" y="205" text-anchor="middle" font-size="15" fill="#3a3a3a">50</text>
+    <text x="432" y="223" text-anchor="middle" font-size="10.5" fill="#8a8a8a">&#215;2</text>
+    <text x="432" y="248" text-anchor="middle" font-size="10" fill="#8a8a8a">sz 2</text>
+
+    <text x="340" y="292" text-anchor="middle" font-size="10.5" fill="#8a8a8a">按中序读出来 6 个元素，名次就是下面这一排</text>
+    <rect x="214" y="304" width="42" height="34" fill="#fdf3e7" stroke="#c8823a" stroke-width="1.1"/>
+    <text x="235" y="325" text-anchor="middle" font-size="11.5" fill="#c8823a">20</text>
+    <text x="235" y="353" text-anchor="middle" font-size="9.5" fill="#8a8a8a">k=1</text>
+    <rect x="256" y="304" width="42" height="34" fill="#fdf3e7" stroke="#c8823a" stroke-width="1.1"/>
+    <text x="277" y="325" text-anchor="middle" font-size="11.5" fill="#c8823a">20</text>
+    <text x="277" y="353" text-anchor="middle" font-size="9.5" fill="#8a8a8a">k=2</text>
+    <rect x="298" y="304" width="42" height="34" fill="#fdf3e7" stroke="#c8823a" stroke-width="1.1"/>
+    <text x="319" y="325" text-anchor="middle" font-size="11.5" fill="#c8823a">20</text>
+    <text x="319" y="353" text-anchor="middle" font-size="9.5" fill="#8a8a8a">k=3</text>
+    <rect x="340" y="304" width="42" height="34" fill="#ffffff" stroke="#cccccc" stroke-width="1.1"/>
+    <text x="361" y="325" text-anchor="middle" font-size="11.5" fill="#3a3a3a">30</text>
+    <text x="361" y="353" text-anchor="middle" font-size="9.5" fill="#8a8a8a">k=4</text>
+    <rect x="382" y="304" width="42" height="34" fill="#ffffff" stroke="#cccccc" stroke-width="1.1"/>
+    <text x="403" y="325" text-anchor="middle" font-size="11.5" fill="#3a3a3a">50</text>
+    <text x="403" y="353" text-anchor="middle" font-size="9.5" fill="#8a8a8a">k=5</text>
+    <rect x="424" y="304" width="42" height="34" fill="#ffffff" stroke="#cccccc" stroke-width="1.1"/>
+    <text x="445" y="325" text-anchor="middle" font-size="11.5" fill="#3a3a3a">50</text>
+    <text x="445" y="353" text-anchor="middle" font-size="9.5" fill="#8a8a8a">k=6</text>
+
+    <text x="20" y="392" font-size="11" fill="#c8823a">k = 1、2、3 都落在这一个方框里：查 k = 2 时 leftSz = 0，2 &#8804; 0 + 3，直接命中</text>
+    <text x="20" y="416" font-size="10.5" fill="#8a8a8a">sz = 左 sz + 右 sz + cnt &#8212;&#8212; 数的是元素个数，不是方框个数</text>
+  </g>
+</svg>

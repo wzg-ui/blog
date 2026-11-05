@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" width="640" height="300" role="img" aria-label="区间 1 到 8 的线段树，查询区间 3 到 6 拆成两个节点">
+  <g stroke="#8a8a8a" stroke-width="1.2" fill="none">
+    <line x1="325" y1="58" x2="171" y2="97"/>
+    <line x1="325" y1="58" x2="479" y2="97"/>
+    <line x1="171" y1="123" x2="94" y2="157"/>
+    <line x1="171" y1="123" x2="248" y2="157"/>
+    <line x1="479" y1="123" x2="402" y2="157"/>
+    <line x1="479" y1="123" x2="556" y2="157"/>
+    <line x1="94" y1="183" x2="55" y2="217"/>
+    <line x1="94" y1="183" x2="132" y2="217"/>
+    <line x1="248" y1="183" x2="209" y2="217"/>
+    <line x1="248" y1="183" x2="286" y2="217"/>
+    <line x1="402" y1="183" x2="363" y2="217"/>
+    <line x1="402" y1="183" x2="440" y2="217"/>
+    <line x1="556" y1="183" x2="517" y2="217"/>
+    <line x1="556" y1="183" x2="594" y2="217"/>
+  </g>
+
+  <g fill="none" stroke="#8a8a8a" stroke-width="1.5">
+    <rect x="296" y="32" width="58" height="26" rx="3"/>
+    <rect x="142" y="97" width="58" height="26" rx="3"/>
+    <rect x="450" y="97" width="58" height="26" rx="3"/>
+    <rect x="65" y="157" width="58" height="26" rx="3"/>
+    <rect x="527" y="157" width="58" height="26" rx="3"/>
+    <rect x="26" y="217" width="58" height="26" rx="3"/>
+    <rect x="103" y="217" width="58" height="26" rx="3"/>
+    <rect x="180" y="217" width="58" height="26" rx="3"/>
+    <rect x="257" y="217" width="58" height="26" rx="3"/>
+    <rect x="334" y="217" width="58" height="26" rx="3"/>
+    <rect x="411" y="217" width="58" height="26" rx="3"/>
+    <rect x="488" y="217" width="58" height="26" rx="3"/>
+    <rect x="565" y="217" width="58" height="26" rx="3"/>
+  </g>
+
+  <g fill="none" stroke="#c8823a" stroke-width="2.4">
+    <rect x="219" y="157" width="58" height="26" rx="3"/>
+    <rect x="373" y="157" width="58" height="26" rx="3"/>
+  </g>
+
+  <g fill="#7d7d7d" font-size="12" text-anchor="middle">
+    <text x="325" y="49">[1,8]</text>
+    <text x="171" y="114">[1,4]</text>
+    <text x="479" y="114">[5,8]</text>
+    <text x="94" y="174">[1,2]</text>
+    <text x="556" y="174">[7,8]</text>
+    <text x="55" y="234">1</text>
+    <text x="132" y="234">2</text>
+    <text x="209" y="234">3</text>
+    <text x="286" y="234">4</text>
+    <text x="363" y="234">5</text>
+    <text x="440" y="234">6</text>
+    <text x="517" y="234">7</text>
+    <text x="594" y="234">8</text>
+  </g>
+  <g fill="#c8823a" font-size="12" text-anchor="middle">
+    <text x="248" y="174">[3,4]</text>
+    <text x="402" y="174">[5,6]</text>
+    <text x="248" y="263">命中</text>
+    <text x="402" y="263">命中</text>
+  </g>
+
+  <text x="8" y="290" fill="#7d7d7d" font-size="12">查询 [3,6]：只有两个节点被整段命中，其余分支在递归里被剪掉</text>
+</svg>
