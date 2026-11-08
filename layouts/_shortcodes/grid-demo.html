@@ -1,0 +1,360 @@
+{{- /* 二维滑动窗口（P2216）交互演示
+       ------------------------------------------------------------
+       用法（正文里）：
+
+           {{< grid-demo >}}
+
+       为什么用交互：二维的做法是「横着扫一遍填两张表，竖着再扫一遍」，
+       静态图只能并排画出三个矩阵的最终状态，看不到表是一格一格填起来的，
+       也看不到第二遍扫描时方块是怎么从两张表里读出来的。
+       所以把 31 步全展开，读者自己点。
+
+       数据就是 P2216 的官方样例（5 行 4 列，k = 2，答案 1），
+       和正文代码跑出来的一致。
+
+       CSS 与 JS 各自只输出一次，靠 .Page.Store 去重。
+       ⚠️ 配色不写死明暗：底色一律半透明灰叠在主题背景上，
+          文字取 --card-text-color-primary / --card-text-color-secondary。 */ -}}
+
+{{- if not (.Page.Store.Get "gridDemoCss") -}}
+    {{- .Page.Store.Set "gridDemoCss" true -}}
+<style>
+.m2d{
+    --m2d-line: rgba(127,140,155,.32);
+    --m2d-fill: rgba(127,140,155,.10);
+    --m2d-hi:   #6f93b3;
+    --m2d-warn: #c0705c;
+    border: 1px solid var(--m2d-line);
+    border-radius: 14px;
+    padding: 16px 18px 14px;
+    margin: 26px 0;
+    background: rgba(127,140,155,.045);
+}
+.m2d-h{
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--card-text-color-secondary);
+    margin-bottom: 14px;
+    letter-spacing: .02em;
+}
+.m2d-body{
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+.m2d-cap{
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--card-text-color-secondary);
+    margin-bottom: 6px;
+    letter-spacing: .03em;
+    white-space: nowrap;
+}
+.m2d-grid{
+    display: grid;
+    gap: 4px;
+}
+.m2d-cell{
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid var(--m2d-line);
+    background-color: var(--m2d-fill);
+    font-size: 12.5px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    transition: background-color .18s ease, border-color .18s ease, color .18s ease, opacity .18s ease;
+}
+.m2d-cell.void{
+    opacity: .22;
+}
+.m2d-cell.on{
+    border-color: var(--m2d-hi);
+    background-color: rgba(111,147,179,.28);
+    font-weight: 600;
+}
+.m2d-cell.box{
+    border-color: var(--m2d-warn);
+    background-color: rgba(192,112,92,.22);
+}
+.m2d-msg{
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--card-text-color-secondary);
+    margin: 14px 0 12px;
+    min-height: 42px;
+}
+.m2d-bar{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.m2d-btn{
+    font: inherit;
+    font-size: 12px;
+    line-height: 1;
+    padding: 7px 12px;
+    border-radius: 7px;
+    border: 1px solid var(--m2d-line);
+    background-color: transparent;
+    color: var(--card-text-color-secondary);
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease;
+}
+.m2d-btn:hover{
+    border-color: var(--m2d-hi);
+    color: var(--card-text-color-primary);
+}
+.m2d-step{
+    font-size: 11px;
+    line-height: 1;
+    color: var(--card-text-color-secondary);
+    opacity: .75;
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+}
+@media (max-width: 600px){
+    .m2d{ padding: 14px 12px 12px; }
+    .m2d-body{ gap: 10px; }
+    .m2d-grid{ gap: 2px; }
+    .m2d-cell{ width: 20px; height: 20px; font-size: 10.5px; border-radius: 4px; }
+    .m2d-cap{ font-size: 10px; margin-bottom: 5px; }
+    .m2d-msg{ font-size: 12px; }
+}
+</style>
+{{- end -}}
+
+<div class="m2d">
+    <div class="m2d-h">二维滑动窗口 · 横着扫一遍填出每行的窗口最值，竖着扫一遍得到方块极差</div>
+    <div class="m2d-body">
+        <div>
+            <div class="m2d-cap">原矩阵 a</div>
+            <div class="m2d-grid" data-grid="src"></div>
+        </div>
+        <div>
+            <div class="m2d-cap">rowMax</div>
+            <div class="m2d-grid" data-grid="rmax"></div>
+        </div>
+        <div>
+            <div class="m2d-cap">rowMin</div>
+            <div class="m2d-grid" data-grid="rmin"></div>
+        </div>
+    </div>
+    <div class="m2d-msg"></div>
+    <div class="m2d-bar">
+        <button class="m2d-btn" data-act="prev">上一步</button>
+        <button class="m2d-btn" data-act="next">下一步</button>
+        <button class="m2d-btn" data-act="auto">自动</button>
+        <button class="m2d-btn" data-act="reset">重置</button>
+        <span class="m2d-step"></span>
+    </div>
+</div>
+
+{{- if not (.Page.Store.Get "gridDemoJs") -}}
+    {{- .Page.Store.Set "gridDemoJs" true -}}
+<script>
+(function(){
+    var A = [
+        [1, 2, 5, 6],
+        [0, 17, 16, 0],
+        [16, 17, 2, 1],
+        [2, 10, 2, 1],
+        [1, 2, 2, 2]
+    ];
+    var N = A.length;
+    var M = A[0].length;
+    var K = 2;
+
+    var rmax = zeros(), rmin = zeros();
+    var steps = [];
+    var i, j, t;
+
+    for (i = 0; i < N; i++) {
+        for (j = K - 1; j < M; j++) {
+            var mx = -Infinity, mn = Infinity;
+            for (t = j - K + 1; t <= j; t++) {
+                if (A[i][t] > mx) mx = A[i][t];
+                if (A[i][t] < mn) mn = A[i][t];
+            }
+            rmax[i][j] = mx;
+            rmin[i][j] = mn;
+            steps.push({ p: 1, i: i, j: j, mx: mx, mn: mn });
+        }
+    }
+
+    var ans = Infinity;
+    var first = true;
+    for (j = K - 1; j < M; j++) {
+        for (i = K - 1; i < N; i++) {
+            var hi = -Infinity, lo = Infinity;
+            for (t = i - K + 1; t <= i; t++) {
+                if (rmax[t][j] > hi) hi = rmax[t][j];
+                if (rmin[t][j] < lo) lo = rmin[t][j];
+            }
+            var before = ans;
+            if (hi - lo < ans) ans = hi - lo;
+            steps.push({ p: 2, i: i, j: j, hi: hi, lo: lo, ans: ans, before: before, first: first });
+            first = false;
+        }
+    }
+
+    function zeros(){
+        var g = [];
+        for (var r = 0; r < N; r++) {
+            var row = [];
+            for (var c = 0; c < M; c++) row.push(null);
+            g.push(row);
+        }
+        return g;
+    }
+
+    function msg(st){
+        if (st.p === 1) {
+            return '第 ' + (st.i + 1) + ' 行、右端在第 ' + (st.j + 1) + ' 列：窗口是 a['
+                + (st.i + 1) + '][' + st.j + '] 和 a[' + (st.i + 1) + '][' + (st.j + 1)
+                + ']，最大 ' + st.mx + ' 记进 rowMax[' + (st.i + 1) + '][' + (st.j + 1)
+                + ']，最小 ' + st.mn + ' 记进 rowMin 同一格。';
+        }
+        var s = '第 ' + (st.j + 1) + ' 列、下端在第 ' + (st.i + 1) + ' 行：竖着取这一列的第 '
+            + st.i + '、' + (st.i + 1) + ' 行，最大 ' + st.hi + '、最小 ' + st.lo
+            + '，差 ' + (st.hi - st.lo) + '。';
+        if (st.first) {
+            s += '这是第一个方块，答案先记 ' + st.ans + '。';
+        } else if (st.ans < st.before) {
+            s += '比之前的 ' + st.before + ' 小，答案更新成 ' + st.ans + '。';
+        } else {
+            s += '没有比 ' + st.before + ' 更小，答案不动。';
+        }
+        return s;
+    }
+
+    function init(root){
+        var src = root.querySelector('[data-grid="src"]');
+        var grMax = root.querySelector('[data-grid="rmax"]');
+        var grMin = root.querySelector('[data-grid="rmin"]');
+        var msgBox = root.querySelector('.m2d-msg');
+        var stepBox = root.querySelector('.m2d-step');
+        var timer = null;
+
+        [src, grMax, grMin].forEach(function(g){
+            g.style.gridTemplateColumns = 'repeat(' + M + ', auto)';
+            for (var r = 0; r < N; r++) {
+                for (var c = 0; c < M; c++) {
+                    var d = document.createElement('div');
+                    d.className = 'm2d-cell';
+                    d.dataset.r = r;
+                    d.dataset.c = c;
+                    g.appendChild(d);
+                }
+            }
+        });
+
+        var idx = 0;
+
+        function cellOf(grid, r, c){
+            return grid.children[r * M + c];
+        }
+
+        function render(){
+            var st = steps[idx];
+            var accMax = zeros(), accMin = zeros();
+            for (var k = 0; k <= idx; k++) {
+                var s = steps[k];
+                if (s.p === 1) {
+                    accMax[s.i][s.j] = s.mx;
+                    accMin[s.i][s.j] = s.mn;
+                }
+            }
+
+            var inBox = st.p === 2;
+            for (var r = 0; r < N; r++) {
+                for (var c = 0; c < M; c++) {
+                    var cs = cellOf(src, r, c);
+                    cs.textContent = A[r][c];
+                    cs.classList.remove('on', 'box', 'void');
+                    var nMx = cellOf(grMax, r, c);
+                    var nMn = cellOf(grMin, r, c);
+                    nMx.textContent = accMax[r][c] === null ? '' : accMax[r][c];
+                    nMn.textContent = accMin[r][c] === null ? '' : accMin[r][c];
+                    nMx.classList.toggle('void', accMax[r][c] === null);
+                    nMn.classList.toggle('void', accMin[r][c] === null);
+                    nMx.classList.remove('on');
+                    nMn.classList.remove('on');
+
+                    if (st.p === 1 && r === st.i && c >= st.j - K + 1 && c <= st.j) {
+                        cs.classList.add('on');
+                    }
+                    if (st.p === 1 && r === st.i && c === st.j) {
+                        nMx.classList.add('on');
+                        nMn.classList.add('on');
+                    }
+                    if (inBox && r >= st.i - K + 1 && r <= st.i && c >= st.j - K + 1 && c <= st.j) {
+                        cs.classList.add('box');
+                    }
+                    if (inBox && c === st.j && (r === st.i - K + 1 || r === st.i)) {
+                        nMx.classList.add('on');
+                        nMn.classList.add('on');
+                    }
+                }
+            }
+
+            msgBox.textContent = msg(st);
+            stepBox.textContent = (idx + 1) + ' / ' + steps.length
+                + (st.p === 2 ? ' · ans = ' + st.ans : '');
+        }
+
+        function go(n){
+            if (n < 0) n = 0;
+            if (n > steps.length - 1) n = steps.length - 1;
+            idx = n;
+            render();
+        }
+
+        function stop(){
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+                root.querySelector('[data-act="auto"]').textContent = '自动';
+            }
+        }
+
+        root.querySelector('[data-act="prev"]').addEventListener('click', function(){
+            stop();
+            go(idx - 1);
+        });
+        root.querySelector('[data-act="next"]').addEventListener('click', function(){
+            stop();
+            go(idx + 1);
+        });
+        root.querySelector('[data-act="reset"]').addEventListener('click', function(){
+            stop();
+            go(0);
+        });
+        root.querySelector('[data-act="auto"]').addEventListener('click', function(e){
+            if (timer) { stop(); return; }
+            e.target.textContent = '暂停';
+            timer = setInterval(function(){
+                if (idx >= steps.length - 1) { stop(); return; }
+                go(idx + 1);
+            }, 1100);
+        });
+
+        render();
+    }
+
+    function scan(){
+        document.querySelectorAll('.m2d').forEach(init);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', scan);
+    } else {
+        scan();
+    }
+})();
+</script>
+{{- end -}}

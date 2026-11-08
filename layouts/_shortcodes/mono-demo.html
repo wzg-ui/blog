@@ -1,0 +1,469 @@
+{{- /* 单调栈 / 单调队列 交互演示
+       ------------------------------------------------------------
+       用法（正文里）：
+
+           {{< mono-demo kind="stack" >}}
+           {{< mono-demo kind="queue" >}}
+
+       为什么不用静态图：这两个结构的全部内容就是「什么时候弹」，
+       一张图只能定格一帧，讲不清弹出与入队之间的先后。所以这里做成交互的：
+       每一步一个动作，读者自己点，能看到谁被标红、谁消失、答案什么时候定下来。
+
+       样式和脚本全在本文件里，正文只有一行调用。
+       CSS 与 JS 各自只输出一次（同页多个演示共用），靠 .Page.Store 去重。
+
+       ⚠️ 配色不写死明暗：底色一律用半透明灰叠在主题背景上，
+          文字取 --card-text-color-primary / --card-text-color-secondary，
+          这样深色模式下不用另写一套。 */ -}}
+
+{{- $kind := .Get "kind" | default "stack" -}}
+
+{{- if not (.Page.Store.Get "monoDemoCss") -}}
+    {{- .Page.Store.Set "monoDemoCss" true -}}
+<style>
+.msq{
+    --msq-line: rgba(127,140,155,.32);
+    --msq-fill: rgba(127,140,155,.10);
+    --msq-hi:   #6f93b3;
+    --msq-warn: #c0705c;
+    border: 1px solid var(--msq-line);
+    border-radius: 14px;
+    padding: 16px 18px 14px;
+    margin: 26px 0;
+    background: rgba(127,140,155,.045);
+    line-height: 1;
+}
+.msq-h{
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--card-text-color-secondary);
+    margin-bottom: 14px;
+    letter-spacing: .02em;
+}
+.msq-lane{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+.msq-slots{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 38px;
+}
+.msq-tag{
+    flex: 0 0 40px;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--card-text-color-secondary);
+    text-align: right;
+    letter-spacing: .03em;
+}
+.msq-tag.r{ text-align: left; }
+.msq-cell{
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--msq-line);
+    background-color: var(--msq-fill);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    line-height: 1;
+    transition: background-color .18s ease, border-color .18s ease, opacity .18s ease;
+}
+.msq-cell i{
+    font-style: normal;
+    font-size: 10px;
+    opacity: .5;
+    margin-top: 3px;
+}
+.msq-cell.cur{
+    border-color: var(--msq-hi);
+    background-color: rgba(111,147,179,.26);
+    font-weight: 600;
+}
+.msq-cell.out{
+    border-color: var(--msq-warn);
+    background-color: rgba(192,112,92,.20);
+    color: var(--msq-warn);
+}
+/* 窗口标记走 background-image，不会被 .cur / .out 的 background-color 盖掉；
+   颜色要够亮，否则压在 cur 的蓝底上看不出来 */
+.msq-cell.win{
+    background-image: linear-gradient(to top, rgba(126,172,212,.95) 0, rgba(126,172,212,.95) 3px, transparent 3px);
+    background-repeat: no-repeat;
+}
+.msq-cell.done{ font-weight: 600; }
+.msq-cell.blank{ opacity: .35; }
+.msq-none{
+    font-size: 12px;
+    color: var(--card-text-color-secondary);
+    opacity: .65;
+    padding: 0 4px;
+}
+.msq-msg{
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--card-text-color-primary);
+    min-height: 46px;
+    margin: 4px 0 12px;
+}
+.msq-bar{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.msq-btn{
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 13px;
+    border-radius: 8px;
+    border: 1px solid var(--msq-line);
+    background: transparent;
+    color: var(--card-text-color-primary);
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, opacity .15s ease;
+}
+.msq-btn:hover:not(:disabled){ background: rgba(127,140,155,.16); }
+.msq-btn:disabled{ opacity: .35; cursor: default; }
+.msq-btn.on{ border-color: var(--msq-hi); color: var(--msq-hi); }
+.msq-count{
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--card-text-color-secondary);
+    font-variant-numeric: tabular-nums;
+}
+@media (max-width: 600px){
+    .msq{ padding: 14px 12px 12px; }
+    .msq-lane{ gap: 2px; scrollbar-width: thin; }
+    .msq-slots{ gap: 2px; }
+    .msq-cell{ width: 27px; height: 32px; font-size: 13px; }
+    .msq-cell i{ font-size: 9px; margin-top: 2px; }
+    .msq-tag{ flex-basis: 28px; font-size: 10px; }
+    .msq-msg{ font-size: 12.5px; }
+}
+</style>
+{{- end -}}
+
+<div class="msq" data-kind="{{ $kind }}"></div>
+
+{{- if not (.Page.Store.Get "monoDemoJs") -}}
+    {{- .Page.Store.Set "monoDemoJs" true -}}
+<script>
+(function(){
+'use strict';
+
+/* 两个演示各有一段固定的数据与规划好的动作序列。
+   步数不多，就照着正文的代码一步步走，不做通用化处理。 */
+
+var A_STACK = [0, 1, 4, 2, 3, 5];
+var A_QUEUE = [0, 1, 3, -1, -3, 5, 3, 6, 7];
+var K = 3;
+
+/* ---------- 单调栈：右边第一个更大，从右往左 ---------- */
+function buildStack(a){
+    var n = a.length - 1;
+    var st = [], ans = [], steps = [], i, z;
+
+    for (z = 0; z <= n; z++) ans.push(null);
+
+    steps.push({
+        i: 0, st: [], ans: ans.slice(), cell: {},
+        msg: '起点：栈空。从最右边开始扫 —— 答案在右边，右边先算完，才知道谁还配留在栈里。'
+    });
+
+    for (i = n; i >= 1; i--){
+        steps.push({
+            i: i, st: st.slice(), ans: ans.slice(), cell: {},
+            msg: '轮到 i = ' + i + '，a[i] = ' + a[i] + '。先看栈顶谁该走。'
+        });
+
+        while (st.length > 0 && a[st[st.length - 1]] <= a[i]){
+            var t = st[st.length - 1];
+            var c1 = {};
+            c1[t] = 'out';
+            c1[i] = 'cur';
+            steps.push({
+                i: i, st: st.slice(), ans: ans.slice(), cell: c1,
+                msg: '栈顶 a[' + t + '] = ' + a[t] + ' 不比 ' + a[i] + ' 强，被挡住了，弹掉。'
+            });
+            st.pop();
+        }
+
+        ans[i] = st.length > 0 ? st[st.length - 1] : 0;
+
+        var c2 = {};
+        c2[i] = 'cur';
+        var why = ans[i] > 0
+            ? '弹完栈顶是 ' + ans[i] + '，a[' + ans[i] + '] = ' + a[ans[i]] + ' 就是右边第一个更大的，ans[' + i + '] = ' + ans[i] + '。'
+            : '栈弹空了，右边没有比它高的，ans[' + i + '] = 0。';
+        steps.push({
+            i: i, st: st.slice(), ans: ans.slice(), cell: c2,
+            msg: why + '然后 ' + i + ' 自己入栈。'
+        });
+
+        st.push(i);
+    }
+
+    steps.push({
+        i: 0, st: st.slice(), ans: ans.slice(), cell: {},
+        msg: '扫完了，ans = ' + ans.slice(1).join(' ') + '。每个下标只进出栈各一次，内层那个 while 再凶也摊不出 O(n) 以外。'
+    });
+
+    return steps;
+}
+
+/* ---------- 单调队列：定长窗口最小值 ---------- */
+function buildQueue(a, k){
+    var n = a.length - 1;
+    var q = [], out = [], steps = [], i;
+
+    steps.push({
+        i: 0, q: [], out: [], cell: {},
+        msg: '起点：空队列。i 每往前走一格，做四件事：弹过期、弹队尾、进队、取答案。'
+    });
+
+    for (i = 1; i <= n; i++){
+        if (q.length > 0 && q[0] <= i - k){
+            var e = q[0];
+            var c1 = {};
+            c1[e] = 'out';
+            c1[i] = 'cur';
+            steps.push({
+                i: i, q: q.slice(), out: out.slice(), cell: c1,
+                msg: '队首 ' + e + ' 已经滑出窗口（' + e + ' ≤ ' + (i - k) + '），过期，弹掉。这是队列比栈多出来的那种死法。'
+            });
+            q.shift();
+        }
+
+        while (q.length > 0 && a[q[q.length - 1]] >= a[i]){
+            var b = q[q.length - 1];
+            var c2 = {};
+            c2[b] = 'out';
+            c2[i] = 'cur';
+            steps.push({
+                i: i, q: q.slice(), out: out.slice(), cell: c2,
+                msg: '队尾 a[' + b + '] = ' + a[b] + ' 比 a[i] = ' + a[i] + ' 大，还会比它先滑出窗口，永远轮不到它当最小值，弹掉。'
+            });
+            q.pop();
+        }
+
+        q.push(i);
+        var c3 = {};
+        c3[i] = 'cur';
+        var msg = 'a[' + i + '] = ' + a[i] + ' 进队。队列里从队首到队尾，值是递增的。';
+        if (i >= k){
+            out.push(a[q[0]]);
+            msg += '窗口满了，队首 a[' + q[0] + '] = ' + a[q[0]] + ' 就是这一格的最小值，输出。';
+        } else {
+            msg += '窗口还没满，不出答案。';
+        }
+        steps.push({ i: i, q: q.slice(), out: out.slice(), cell: c3, msg: msg });
+    }
+
+    steps.push({
+        i: 0, q: q.slice(), out: out.slice(), cell: {},
+        msg: '输出 ' + out.join(' ') + '。队列里最多 k = ' + k + ' 个元素，被挤掉的早就不在了 —— 这就是它省时间的地方。'
+    });
+
+    return steps;
+}
+
+/* ---------- 渲染 ---------- */
+function mk(cls, txt){
+    var d = document.createElement('div');
+    d.className = cls;
+    if (txt !== undefined && txt !== null) d.textContent = txt;
+    return d;
+}
+
+function mkCell(val, lab, mod){
+    var d = mk('msq-cell' + (mod ? ' ' + mod : ''));
+    var s = document.createElement('span');
+    s.textContent = val;
+    var x = document.createElement('i');
+    x.textContent = lab;
+    d.appendChild(s);
+    d.appendChild(x);
+    return d;
+}
+
+function mkBtn(txt){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'msq-btn';
+    b.textContent = txt;
+    return b;
+}
+
+function paint(inst){
+    var st = inst.steps[inst.idx];
+    var a = inst.a, n = a.length - 1;
+    var i, idx, mod;
+
+    inst.arr.innerHTML = '';
+    for (i = 1; i <= n; i++){
+        mod = st.cell[i] || '';
+        if (inst.kind === 'queue' && st.i >= 1 && i >= st.i - inst.k + 1 && i <= st.i){
+            mod = mod ? mod + ' win' : 'win';
+        }
+        if (i === st.i && mod.indexOf('cur') < 0){
+            mod = mod ? mod + ' cur' : 'cur';
+        }
+        inst.arr.appendChild(mkCell(a[i], i, mod));
+    }
+
+    inst.slots.innerHTML = '';
+    var list = inst.kind === 'queue' ? st.q : st.st;
+    inst.tail.style.visibility = list.length === 0 ? 'hidden' : '';
+    if (list.length === 0){
+        inst.slots.appendChild(mk('msq-none', '空'));
+    } else {
+        for (i = 0; i < list.length; i++){
+            idx = list[i];
+            mod = st.cell[idx] || '';
+            if (idx === st.i && mod.indexOf('cur') < 0){
+                mod = mod ? mod + ' cur' : 'cur';
+            }
+            inst.slots.appendChild(mkCell(a[idx], idx, mod));
+        }
+    }
+
+    inst.outs.innerHTML = '';
+    if (inst.kind === 'queue'){
+        if (st.out.length === 0){
+            inst.outs.appendChild(mk('msq-none', '窗口还没满'));
+        } else {
+            for (i = 0; i < st.out.length; i++){
+                inst.outs.appendChild(mkCell(st.out[i], inst.k + i, 'done'));
+            }
+        }
+    } else {
+        for (i = 1; i <= n; i++){
+            var v = st.ans[i];
+            inst.outs.appendChild(mkCell(v === null ? '·' : v, i, v === null ? 'blank' : 'done'));
+        }
+    }
+
+    inst.msg.textContent = st.msg;
+    inst.count.textContent = (inst.idx + 1) + ' / ' + inst.steps.length;
+    inst.prev.disabled = inst.idx === 0;
+    inst.next.disabled = inst.idx === inst.steps.length - 1;
+}
+
+function init(root){
+    var kind = root.getAttribute('data-kind');
+    if (kind !== 'queue') kind = 'stack';
+
+    var a = kind === 'queue' ? A_QUEUE : A_STACK;
+    var k = kind === 'queue' ? K : 0;
+    var inst = {
+        kind: kind, a: a, k: k, idx: 0, timer: null,
+        steps: kind === 'queue' ? buildQueue(a, k) : buildStack(a)
+    };
+
+    root.innerHTML = '';
+
+    root.appendChild(mk('msq-h', kind === 'queue'
+        ? '单调队列 · 滑动窗口最小值 · k = 3'
+        : '单调栈 · 右边第一个更大'));
+
+    var laneA = mk('msq-lane');
+    laneA.appendChild(mk('msq-tag', '数组'));
+    inst.arr = mk('msq-slots');
+    laneA.appendChild(inst.arr);
+    root.appendChild(laneA);
+
+    var laneB = mk('msq-lane');
+    laneB.appendChild(mk('msq-tag', kind === 'queue' ? '队首' : '栈底'));
+    inst.slots = mk('msq-slots');
+    laneB.appendChild(inst.slots);
+    inst.tail = mk('msq-tag r', kind === 'queue' ? '队尾' : '栈顶');
+    laneB.appendChild(inst.tail);
+    root.appendChild(laneB);
+
+    var laneC = mk('msq-lane');
+    laneC.appendChild(mk('msq-tag', kind === 'queue' ? '输出' : '答案'));
+    inst.outs = mk('msq-slots');
+    laneC.appendChild(inst.outs);
+    root.appendChild(laneC);
+
+    inst.msg = mk('msq-msg');
+    root.appendChild(inst.msg);
+
+    var bar = mk('msq-bar');
+    inst.prev = mkBtn('上一步');
+    inst.next = mkBtn('下一步');
+    inst.play = mkBtn('自动');
+    inst.reset = mkBtn('重置');
+    inst.count = mk('msq-count');
+    bar.appendChild(inst.prev);
+    bar.appendChild(inst.next);
+    bar.appendChild(inst.play);
+    bar.appendChild(inst.reset);
+    bar.appendChild(inst.count);
+    root.appendChild(bar);
+
+    function stop(){
+        if (inst.timer){ clearInterval(inst.timer); inst.timer = null; }
+        inst.play.textContent = '自动';
+        inst.play.classList.remove('on');
+    }
+
+    inst.prev.onclick = function(){
+        stop();
+        if (inst.idx > 0){ inst.idx--; paint(inst); }
+    };
+
+    inst.next.onclick = function(){
+        stop();
+        if (inst.idx < inst.steps.length - 1){ inst.idx++; paint(inst); }
+    };
+
+    inst.reset.onclick = function(){
+        stop();
+        inst.idx = 0;
+        paint(inst);
+    };
+
+    inst.play.onclick = function(){
+        if (inst.timer){ stop(); return; }
+        if (inst.idx >= inst.steps.length - 1) inst.idx = 0;
+        paint(inst);
+        inst.play.textContent = '暂停';
+        inst.play.classList.add('on');
+        inst.timer = setInterval(function(){
+            if (inst.idx >= inst.steps.length - 1){ stop(); return; }
+            inst.idx++;
+            paint(inst);
+        }, 1100);
+    };
+
+    paint(inst);
+}
+
+function scan(){
+    var nodes = document.querySelectorAll('.msq:not([data-ok])');
+    for (var i = 0; i < nodes.length; i++){
+        nodes[i].setAttribute('data-ok', '1');
+        init(nodes[i]);
+    }
+}
+
+if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', scan);
+} else {
+    scan();
+}
+
+})();
+</script>
+{{- end -}}
