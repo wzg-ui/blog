@@ -1,0 +1,604 @@
+{{- /* ST 表 交互演示
+       ------------------------------------------------------------
+       用法（正文里）：
+
+           {{< st-demo kind="build" >}}
+           {{< st-demo kind="query" >}}
+
+       两个演示共用一份数据 a = 5 3 6 1 4 2 7 3：
+         build 走一遍倍增搭表，看 st[i][j] 从哪两块拼出来；
+         query 换着抽查询，看 k 怎么定、两块怎么盖住 [l, r]。
+
+       样式和脚本全在本文件里，正文只有一行调用。
+       CSS 与 JS 各自只输出一次（同页多个演示共用），靠 .Page.Store 去重。
+
+       ⚠️ 配色不写死明暗：底色一律用半透明色叠在主题背景上，
+          文字取 --card-text-color-primary / --card-text-color-secondary，
+          这样深色模式下不用另写一套。 */ -}}
+
+{{- $kind := .Get "kind" | default "build" -}}
+
+{{- if not (.Page.Store.Get "stDemoCss") -}}
+    {{- .Page.Store.Set "stDemoCss" true -}}
+<style>
+.std{
+    --std-line: rgba(127,140,155,.32);
+    --std-fill: rgba(127,140,155,.10);
+    --std-a:    #6f93b3;
+    --std-b:    #b58a5c;
+    border: 1px solid var(--std-line);
+    border-radius: 14px;
+    padding: 16px 18px 14px;
+    margin: 26px 0;
+    background: rgba(127,140,155,.045);
+    line-height: 1;
+}
+.std-h{
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--card-text-color-secondary);
+    margin-bottom: 14px;
+    letter-spacing: .02em;
+}
+.std-lane{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+.std-tag{
+    flex: 0 0 44px;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--card-text-color-secondary);
+    text-align: right;
+    letter-spacing: .03em;
+}
+.std-arr{ display: flex; gap: 4px; }
+.std-cell{
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 7px;
+    border: 1px solid var(--std-line);
+    background-color: var(--std-fill);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    transition: background-color .18s ease, border-color .18s ease, opacity .18s ease;
+}
+.std-cell i{
+    font-style: normal;
+    font-size: 9px;
+    opacity: .5;
+    margin-top: 2px;
+}
+.std-cell.cur{
+    border-color: var(--std-b);
+    background-color: rgba(181,138,92,.26);
+    font-weight: 600;
+}
+/* 表：一行一层，列对齐，上面一行是下标 */
+.std-grid{ display: flex; flex-direction: column; gap: 4px; }
+.std-grow{ display: flex; align-items: center; gap: 4px; }
+.std-idx{ display: flex; gap: 4px; }
+.std-idx span{
+    width: 34px;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1;
+    color: var(--card-text-color-secondary);
+    opacity: .7;
+}
+.std-gcell{
+    flex: 0 0 auto;
+    width: 34px;
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--std-line);
+    background-color: var(--std-fill);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 1;
+    transition: background-color .18s ease, border-color .18s ease, opacity .18s ease;
+}
+.std-gcell.blank{
+    border-style: dashed;
+    background: none;
+    opacity: .12;
+}
+.std-gcell.src{
+    border-color: var(--std-a);
+    background-color: rgba(111,147,179,.26);
+    font-weight: 600;
+}
+.std-gcell.cur{
+    border-color: var(--std-b);
+    background-color: rgba(181,138,92,.30);
+    font-weight: 600;
+}
+/* 查询高亮：左块蓝、右块褐、重叠走斜纹，三者叠加不打架 */
+.std-cell.l{
+    border-color: var(--std-a);
+    background-color: rgba(111,147,179,.22);
+}
+.std-cell.r{
+    border-color: var(--std-b);
+    background-color: rgba(181,138,92,.20);
+}
+.std-cell.both{
+    border-color: var(--std-b);
+    background-color: rgba(181,138,92,.20);
+    background-image: repeating-linear-gradient(45deg,
+        rgba(111,147,179,.55) 0, rgba(111,147,179,.55) 2px,
+        transparent 2px, transparent 5px);
+}
+.std-line{
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--card-text-color-secondary);
+    margin: 2px 0 10px;
+    font-variant-numeric: tabular-nums;
+}
+.std-line b{
+    color: var(--card-text-color-primary);
+    font-weight: 600;
+}
+.std-chip{
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 74px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--std-line);
+    background-color: var(--std-fill);
+    font-size: 13px;
+    line-height: 1.35;
+}
+.std-chip i{
+    font-style: normal;
+    font-size: 10px;
+    opacity: .55;
+    margin-top: 2px;
+}
+.std-chip.a{ border-color: rgba(111,147,179,.75); background-color: rgba(111,147,179,.16); }
+.std-chip.b{ border-color: rgba(181,138,92,.75); background-color: rgba(181,138,92,.14); }
+.std-none{
+    font-size: 12px;
+    color: var(--card-text-color-secondary);
+    opacity: .55;
+    padding: 0 4px;
+}
+.std-msg{
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--card-text-color-primary);
+    min-height: 46px;
+    margin: 4px 0 12px;
+}
+.std-bar{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.std-btn{
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 13px;
+    border-radius: 8px;
+    border: 1px solid var(--std-line);
+    background: transparent;
+    color: var(--card-text-color-primary);
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, opacity .15s ease;
+}
+.std-btn:hover:not(:disabled){ background: rgba(127,140,155,.16); }
+.std-btn:disabled{ opacity: .35; cursor: default; }
+.std-btn.on{ border-color: var(--std-a); color: var(--std-a); }
+.std-count{
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--card-text-color-secondary);
+    font-variant-numeric: tabular-nums;
+}
+@media (max-width: 600px){
+    .std{ padding: 14px 12px 12px; }
+    .std-lane{ gap: 3px; }
+    .std-tag{ flex-basis: 34px; font-size: 10px; }
+    .std-cell{ width: 28px; height: 30px; font-size: 12px; }
+    .std-arr{ gap: 2px; }
+    .std-grow{ gap: 2px; }
+    .std-gcell{ width: 28px; height: 24px; font-size: 12px; }
+    .std-idx{ gap: 2px; }
+    .std-idx span{ width: 28px; font-size: 10px; }
+    .std-btn{ padding: 5px 9px; font-size: 11px; }
+    .std-msg{ font-size: 12.5px; }
+}
+</style>
+{{- end -}}
+
+<div class="std" data-kind="{{ $kind }}"></div>
+
+{{- if not (.Page.Store.Get "stDemoJs") -}}
+    {{- .Page.Store.Set "stDemoJs" true -}}
+<script>
+(function(){
+'use strict';
+
+/* 两个演示共用一份数据，n = 8，正好搭到第 3 层。 */
+var A = [0, 5, 3, 6, 1, 4, 2, 7, 3];
+var N = 8;
+var LOG = 4;
+
+/* ---------- 先把表搭出来，两边的值都从这里取 ---------- */
+var ST = [];
+(function(){
+    var i, j, h;
+    for (j = 0; j < LOG; j++) ST[j] = [];
+    for (i = 1; i <= N; i++) ST[0][i] = A[i];
+    for (j = 1; j < LOG; j++){
+        h = 1 << (j - 1);
+        for (i = 1; i + (1 << j) - 1 <= N; i++){
+            ST[j][i] = Math.max(ST[j - 1][i], ST[j - 1][i + h]);
+        }
+    }
+})();
+
+function lg(v){
+    var k = -1;
+    while (v > 0){ v >>= 1; k++; }
+    return k;
+}
+
+/* ---------- 搭表：一层一层往上，每块都由下一层两块拼成 ---------- */
+function buildSteps(){
+    var steps = [], j, i, h, v, a, b;
+
+    steps.push({
+        lj: 0, li: N, src: [],
+        msg: '第 0 层就是原数组：每块长 1，一共 ' + N + ' 块。上面每一层的块长翻倍、块数减半。'
+    });
+
+    for (j = 1; j < LOG; j++){
+        h = 1 << (j - 1);
+        for (i = 1; i + (1 << j) - 1 <= N; i++){
+            a = ST[j - 1][i];
+            b = ST[j - 1][i + h];
+            v = Math.max(a, b);
+            steps.push({
+                lj: j, li: i,
+                src: [{ i: i, j: j - 1 }, { i: i + h, j: j - 1 }],
+                cur: { i: i, j: j },
+                msg: 'st[' + i + '][' + j + '] = max(st[' + i + '][' + (j - 1) + '], st[' +
+                     (i + h) + '][' + (j - 1) + ']) = max(' + a + ', ' + b + ') = ' + v +
+                     '，盖住 [' + i + ', ' + (i + (1 << j) - 1) + ']。'
+            });
+        }
+    }
+
+    steps.push({
+        lj: LOG, li: 0, src: [],
+        msg: '搭完。第 3 层只有 1 块，因为 n = 8 正好是 2^3；表里一共 n log n 个数。'
+    });
+
+    return steps;
+}
+
+/* ---------- 查询：k 定长度，两块贴住两端 ---------- */
+var QUERIES = [
+    { l: 2, r: 7 },
+    { l: 1, r: 8 },
+    { l: 3, r: 5 },
+    { l: 6, r: 6 }
+];
+
+function querySteps(l, r){
+    var len = r - l + 1;
+    var k = lg(len);
+    var blk = 1 << k;
+    var ls = l, le = l + blk - 1;
+    var rs = r - blk + 1, re = r;
+    var vL = ST[k][ls], vR = ST[k][rs];
+    var ans = Math.max(vL, vR);
+    var steps = [];
+
+    steps.push({
+        hi: 0, left: null, right: null, res: false,
+        msg: '读入 l = ' + l + '、r = ' + r + '。先算长度：len = ' + r + ' - ' + l + ' + 1 = ' + len + '。'
+    });
+
+    steps.push({
+        hi: len, left: null, right: null, res: false,
+        msg: 'k = lg[' + len + '] = ' + k + '。' + (k >= 0 ? (1 << k) + ' ≤ ' + len + ' < ' + (1 << (k + 1)) : '') +
+             '，k 取的是「2 的幂不超过 len」的那个最大值。'
+    });
+
+    steps.push({
+        hi: len, left: { s: ls, e: le }, right: null, res: false,
+        msg: '左块从 l 起，长 2^' + k + ' = ' + blk + '：st[' + ls + '][' + k + '] 盖住 [' + ls + ', ' + le + ']，值 ' + vL + '。'
+    });
+
+    steps.push({
+        hi: len, left: { s: ls, e: le }, right: { s: rs, e: re }, res: false,
+        msg: ls === rs
+            ? '右块贴着 r 结束，落点还是 ' + rs + '：这一问两块是同一块，压根没有重叠。'
+            : '右块贴着 r 结束：st[' + rs + '][' + k + '] 盖住 [' + rs + ', ' + re + ']，值 ' + vR + '。'
+    });
+
+    steps.push({
+        hi: len, left: { s: ls, e: le }, right: { s: rs, e: re }, res: true,
+        msg: '两块一起盖满 [' + l + ', ' + r + ']' +
+             (le < rs ? '' : '，[' + Math.max(ls, rs) + ', ' + Math.min(le, re) + '] 重叠') +
+             '。max(' + vL + ', ' + vR + ') = ' + ans + '。'
+    });
+
+    return steps;
+}
+
+/* ---------- 渲染 ---------- */
+function mk(cls, txt){
+    var d = document.createElement('div');
+    d.className = cls;
+    if (txt !== undefined && txt !== null) d.textContent = txt;
+    return d;
+}
+
+function mkCell(val, lab, mod){
+    var d = mk('std-cell' + (mod ? ' ' + mod : ''));
+    var s = document.createElement('span');
+    s.textContent = val;
+    var x = document.createElement('i');
+    x.textContent = lab;
+    d.appendChild(s);
+    d.appendChild(x);
+    return d;
+}
+
+function mkBtn(txt){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'std-btn';
+    b.textContent = txt;
+    return b;
+}
+
+function bar(inst, extra){
+    var b = mk('std-bar');
+    inst.prev = mkBtn('上一步');
+    inst.next = mkBtn('下一步');
+    if (extra){
+        inst.alt = mkBtn('换一组');
+        b.appendChild(inst.alt);
+    }
+    inst.play = mkBtn('自动');
+    inst.reset = mkBtn('重置');
+    inst.count = mk('std-count');
+    b.appendChild(inst.prev);
+    b.appendChild(inst.next);
+    b.appendChild(inst.play);
+    b.appendChild(inst.reset);
+    b.appendChild(inst.count);
+    return b;
+}
+
+function bind(inst){
+    function stop(){
+        if (inst.timer){ clearInterval(inst.timer); inst.timer = null; }
+        inst.play.textContent = '自动';
+        inst.play.classList.remove('on');
+    }
+    inst.stop = stop;
+    inst.prev.onclick = function(){ stop(); if (inst.idx > 0){ inst.idx--; inst.paint(); } };
+    inst.next.onclick = function(){ stop(); if (inst.idx < inst.steps.length - 1){ inst.idx++; inst.paint(); } };
+    inst.reset.onclick = function(){ stop(); inst.idx = 0; inst.paint(); };
+    inst.play.onclick = function(){
+        if (inst.timer){ stop(); return; }
+        if (inst.idx >= inst.steps.length - 1) inst.idx = 0;
+        inst.paint();
+        inst.play.textContent = '暂停';
+        inst.play.classList.add('on');
+        inst.timer = setInterval(function(){
+            if (inst.idx >= inst.steps.length - 1){ stop(); return; }
+            inst.idx++;
+            inst.paint();
+        }, 1100);
+    };
+}
+
+/* ---------- 搭表 ---------- */
+function initBuild(root){
+    var inst = { idx: 0, steps: buildSteps() };
+    root.innerHTML = '';
+    root.appendChild(mk('std-h', 'ST 表 · 倍增搭表 · a = 5 3 6 1 4 2 7 3'));
+
+    var head = mk('std-grow');
+    head.appendChild(mk('std-tag', '下标'));
+    var idxRow = mk('std-idx');
+    for (var t = 1; t <= N; t++){
+        var sp = document.createElement('span');
+        sp.textContent = t;
+        idxRow.appendChild(sp);
+    }
+    head.appendChild(idxRow);
+    root.appendChild(head);
+
+    inst.rows = [];
+    for (var j = 0; j < LOG; j++){
+        var row = mk('std-grow');
+        row.appendChild(mk('std-tag', '第 ' + j + ' 层'));
+        var cells = [];
+        for (var i = 1; i <= N; i++){
+            var c = mk('std-gcell');
+            row.appendChild(c);
+            cells.push(c);
+        }
+        root.appendChild(row);
+        inst.rows.push(cells);
+    }
+
+    inst.msg = mk('std-msg');
+    root.appendChild(inst.msg);
+    root.appendChild(bar(inst, false));
+
+    inst.paint = function(){
+        var st = inst.steps[inst.idx];
+        var j, i, cnt, mod, src, s, filled;
+
+        for (j = 0; j < LOG; j++){
+            cnt = N - (1 << j) + 1;
+            for (i = 1; i <= N; i++){
+                var c = inst.rows[j][i - 1];
+                filled = i <= cnt && ((j < st.lj) || (j === st.lj && i <= st.li));
+                mod = filled ? '' : 'blank';
+                src = st.src || [];
+                for (s = 0; s < src.length; s++){
+                    if (filled && src[s].i === i && src[s].j === j) mod = 'src';
+                }
+                if (filled && st.cur && st.cur.i === i && st.cur.j === j) mod = 'cur';
+                c.className = 'std-gcell' + (mod ? ' ' + mod : '');
+                c.textContent = filled ? ST[j][i] : '';
+            }
+        }
+
+        inst.msg.textContent = st.msg;
+        inst.count.textContent = (inst.idx + 1) + ' / ' + inst.steps.length;
+        inst.prev.disabled = inst.idx === 0;
+        inst.next.disabled = inst.idx === inst.steps.length - 1;
+    };
+
+    bind(inst);
+    inst.paint();
+}
+
+/* ---------- 查询 ---------- */
+function initQuery(root){
+    var qi = 0;
+    var inst = { idx: 0, steps: querySteps(QUERIES[0].l, QUERIES[0].r) };
+    root.innerHTML = '';
+    root.appendChild(mk('std-h', 'ST 表 · 查询 [l, r] · 两块各长 2^k'));
+
+    var laneA = mk('std-lane');
+    laneA.appendChild(mk('std-tag', '原数组'));
+    inst.arr = mk('std-arr');
+    laneA.appendChild(inst.arr);
+    root.appendChild(laneA);
+
+    var laneL = mk('std-lane');
+    laneL.appendChild(mk('std-tag', 'lg'));
+    inst.lgs = mk('std-arr');
+    for (var v = 1; v <= N; v++) inst.lgs.appendChild(mkCell(lg(v), v, ''));
+    laneL.appendChild(inst.lgs);
+    root.appendChild(laneL);
+
+    inst.formula = mk('std-line');
+    root.appendChild(inst.formula);
+
+    var laneB = mk('std-lane');
+    laneB.appendChild(mk('std-tag', '两块'));
+    inst.chips = mk('std-arr');
+    inst.chips.style.alignItems = 'center';
+    laneB.appendChild(inst.chips);
+    root.appendChild(laneB);
+
+    inst.msg = mk('std-msg');
+    root.appendChild(inst.msg);
+    root.appendChild(bar(inst, true));
+
+    inst.alt.onclick = function(){
+        inst.stop();
+        qi = (qi + 1) % QUERIES.length;
+        inst.steps = querySteps(QUERIES[qi].l, QUERIES[qi].r);
+        inst.idx = 0;
+        inst.paint();
+    };
+
+    inst.paint = function(){
+        var st = inst.steps[inst.idx];
+        var q = QUERIES[qi];
+        var i, mod, cell, c;
+        var len = q.r - q.l + 1;
+
+        inst.arr.innerHTML = '';
+        for (i = 1; i <= N; i++){
+            mod = '';
+            if (st.left && i >= st.left.s && i <= st.left.e) mod = 'l';
+            if (st.right && i >= st.right.s && i <= st.right.e) mod = mod ? 'both' : 'r';
+            inst.arr.appendChild(mkCell(A[i], i, mod));
+        }
+
+        inst.lgs.innerHTML = '';
+        for (i = 1; i <= N; i++){
+            inst.lgs.appendChild(mkCell(lg(i), i, i === st.hi ? 'cur' : ''));
+        }
+
+        inst.formula.innerHTML = 'len = <b>' + len + '</b>　　k = lg[' + len + '] = <b>' + lg(len) +
+                                 '</b>　　2^k = <b>' + (1 << lg(len)) + '</b>';
+
+        inst.chips.innerHTML = '';
+        if (!st.left){
+            inst.chips.appendChild(mk('std-none', '还没到这一步'));
+        } else {
+            c = mk('std-chip a');
+            c.appendChild(document.createTextNode('st[' + st.left.s + '][' + lg(len) + '] = ' + ST[lg(len)][st.left.s]));
+            var s1 = document.createElement('i');
+            s1.textContent = '盖 [' + st.left.s + ', ' + st.left.e + ']';
+            c.appendChild(s1);
+            inst.chips.appendChild(c);
+        }
+        if (st.right){
+            c = mk('std-chip b');
+            c.appendChild(document.createTextNode('st[' + st.right.s + '][' + lg(len) + '] = ' + ST[lg(len)][st.right.s]));
+            var s2 = document.createElement('i');
+            s2.textContent = '盖 [' + st.right.s + ', ' + st.right.e + ']';
+            c.appendChild(s2);
+            inst.chips.appendChild(c);
+        }
+        if (st.res){
+            var ans = Math.max(ST[lg(len)][st.left.s], ST[lg(len)][st.right.s]);
+            var r2 = mk('std-chip');
+            r2.appendChild(document.createTextNode('答案 ' + ans));
+            var s3 = document.createElement('i');
+            s3.textContent = 'max 取一次';
+            r2.appendChild(s3);
+            inst.chips.appendChild(r2);
+        }
+
+        inst.msg.textContent = st.msg;
+        inst.count.textContent = (inst.idx + 1) + ' / ' + inst.steps.length;
+        inst.prev.disabled = inst.idx === 0;
+        inst.next.disabled = inst.idx === inst.steps.length - 1;
+    };
+
+    bind(inst);
+    inst.paint();
+}
+
+function scan(){
+    var nodes = document.querySelectorAll('.std:not([data-ok])');
+    for (var i = 0; i < nodes.length; i++){
+        nodes[i].setAttribute('data-ok', '1');
+        if (nodes[i].getAttribute('data-kind') === 'query') initQuery(nodes[i]);
+        else initBuild(nodes[i]);
+    }
+}
+
+if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', scan);
+} else {
+    scan();
+}
+
+})();
+</script>
+{{- end -}}
