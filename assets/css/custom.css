@@ -1097,6 +1097,8 @@ body::before {
    稍小一号的字号；深浅色下都只用 --card-text-color-secondary，不引入别的颜色。 */
 .article-content figure.article-figure {
     margin: 1.6rem 0;
+    /* 不写 width 时 figure 会撑到父元素的 border 边，比正文宽出两侧内边距 */
+    width: 100%;
 }
 
 .article-content figure.article-figure img {
@@ -1109,7 +1111,8 @@ body::before {
 .article-content figure.article-figure figcaption {
     margin-top: .6rem;
     color: var(--card-text-color-secondary);
-    font-size: .82rem;
+    /* 站点 html 是 62.5%，1rem = 10px；.82rem 只有 8px，太小 */
+    font-size: 1.32rem;
     line-height: 1.6;
     text-align: center;
 }
