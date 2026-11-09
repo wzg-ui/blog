@@ -1,0 +1,342 @@
+{{- /* 哈希表（拉链法）交互演示
+       ------------------------------------------------------------
+       用法（正文里）：
+
+           {{< hash-demo >}}
+
+       固定一串数 37 12 19 26 8 63 44 5 5，MOD = 7，逐个插入拉链法哈希表：
+       每步算 h = x % MOD，桶里有同值就标出来当重复，没有就头插。
+       演示的重点是「同桶挂链」和「头插导致链条逆序」这两件事。
+
+       样式和脚本全在本文件里，正文只有一行调用。
+       CSS 与 JS 各自只输出一次，靠 .Page.Store 去重。
+
+       ⚠️ 配色不写死明暗：底色一律用半透明色叠在主题背景上，
+          文字取 --card-text-color-*，深浅两套主题共用一份样式。 */ -}}
+
+{{- if not (.Page.Store.Get "hsDemoCss") -}}
+    {{- .Page.Store.Set "hsDemoCss" true -}}
+<style>
+.hs{
+    --hs-line: rgba(127,140,155,.32);
+    --hs-fill: rgba(127,140,155,.10);
+    --hs-a:    #6f93b3;
+    --hs-b:    #b58a5c;
+    border: 1px solid var(--hs-line);
+    border-radius: 14px;
+    padding: 16px 18px 14px;
+    margin: 26px 0;
+    background: rgba(127,140,155,.045);
+    line-height: 1;
+}
+.hs-h{
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--card-text-color-secondary);
+    margin-bottom: 12px;
+    letter-spacing: .02em;
+}
+/* 待插入序列：已插过的压暗，当前这个提亮 */
+.hs-seq{ display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 16px; }
+.hs-chip{
+    flex: 0 0 auto;
+    font-size: 11.5px;
+    line-height: 1;
+    padding: 4px 7px;
+    border-radius: 5px;
+    border: 1px solid var(--hs-line);
+    color: var(--card-text-color-secondary);
+    opacity: .45;
+    transition: opacity .18s ease, color .18s ease, border-color .18s ease;
+}
+.hs-chip.done{ opacity: .85; }
+.hs-chip.cur{
+    opacity: 1;
+    border-color: var(--hs-a);
+    color: var(--hs-a);
+    font-weight: 600;
+}
+/* 桶：一行横排，七个桶均分宽度，每个桶竖着挂链 */
+.hs-buckets{ display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
+.hs-col{
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.hs-idx{
+    font-size: 10.5px;
+    line-height: 1;
+    padding: 3px 6px;
+    border-radius: 4px;
+    color: var(--card-text-color-secondary);
+    letter-spacing: .02em;
+    margin-bottom: 8px;
+    transition: color .18s ease, background-color .18s ease;
+}
+.hs-idx.on{
+    color: var(--hs-a);
+    background-color: rgba(111,147,179,.16);
+}
+.hs-idx.hit{
+    color: var(--hs-b);
+    background-color: rgba(181,138,92,.16);
+}
+.hs-chain{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 24px;
+}
+.hs-node{
+    position: relative;
+    width: 100%;
+    max-width: 54px;
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--hs-line);
+    background-color: var(--hs-fill);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12.5px;
+    line-height: 1;
+    transition: background-color .18s ease, border-color .18s ease;
+}
+/* 节点之间的连接线，画在上一格的下沿，避免和节点背景叠在一起 */
+.hs-node + .hs-node::before{
+    content: '';
+    position: absolute;
+    top: -7px;
+    left: 50%;
+    width: 1px;
+    height: 7px;
+    background: var(--hs-line);
+}
+.hs-node.new{
+    border-color: var(--hs-a);
+    background-color: rgba(111,147,179,.24);
+    font-weight: 600;
+}
+.hs-node.dup{
+    border-color: var(--hs-b);
+    background-color: rgba(181,138,92,.26);
+    font-weight: 600;
+}
+.hs-eq{
+    margin-top: 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--card-text-color-secondary);
+    min-height: 44px;
+}
+.hs-eq b{ font-weight: 600; color: var(--card-text-color-primary); }
+.hs-bar{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+.hs-btn{
+    font-size: 12.5px;
+    line-height: 1;
+    padding: 6px 11px;
+    border-radius: 7px;
+    border: 1px solid var(--hs-line);
+    background: transparent;
+    color: var(--card-text-color-primary);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background-color .15s ease, opacity .15s ease;
+}
+.hs-btn:hover:not(:disabled){ background: rgba(127,140,155,.16); }
+.hs-btn:disabled{ opacity: .35; cursor: default; }
+.hs-btn.on{ border-color: var(--hs-a); color: var(--hs-a); }
+.hs-count{
+    margin-left: auto;
+    font-size: 11.5px;
+    color: var(--card-text-color-secondary);
+    letter-spacing: .04em;
+}
+@media (max-width: 600px){
+    .hs{ padding: 14px 12px 12px; }
+    .hs-buckets{ gap: 2px; }
+    .hs-node{ max-width: 40px; height: 22px; font-size: 10.5px; border-radius: 5px; }
+    .hs-chain{ gap: 5px; }
+    .hs-node + .hs-node::before{ top: -6px; height: 6px; }
+    .hs-idx{ font-size: 9.5px; padding: 2px 3px; margin-bottom: 6px; }
+    .hs-btn{ padding: 5px 9px; font-size: 11px; }
+    .hs-eq{ font-size: 12.5px; min-height: 60px; }
+}
+</style>
+{{- end -}}
+
+<div class="hs"></div>
+
+{{- if not (.Page.Store.Get "hsDemoJs") -}}
+    {{- .Page.Store.Set "hsDemoJs" true -}}
+<script>
+(function(){
+
+var VALS = [37, 12, 19, 26, 8, 63, 44, 5, 5];
+var MOD = 7;
+
+function mk(cls, txt){
+    var d = document.createElement('div');
+    d.className = cls;
+    if (txt !== undefined && txt !== null) d.textContent = txt;
+    return d;
+}
+function mkBtn(txt){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'hs-btn';
+    b.textContent = txt;
+    return b;
+}
+function bar(inst){
+    var b = mk('hs-bar');
+    inst.prev = mkBtn('上一步');
+    inst.next = mkBtn('下一步');
+    inst.play = mkBtn('自动');
+    inst.reset = mkBtn('重置');
+    inst.count = mk('hs-count');
+    b.appendChild(inst.prev);
+    b.appendChild(inst.next);
+    b.appendChild(inst.play);
+    b.appendChild(inst.reset);
+    b.appendChild(inst.count);
+    return b;
+}
+function bind(inst){
+    function stop(){
+        if (inst.timer){ clearInterval(inst.timer); inst.timer = null; }
+        inst.play.textContent = '自动';
+        inst.play.classList.remove('on');
+    }
+    inst.stop = stop;
+    inst.prev.onclick = function(){ stop(); if (inst.idx > 0){ inst.idx--; inst.paint(); } };
+    inst.next.onclick = function(){ stop(); if (inst.idx < inst.steps.length - 1){ inst.idx++; inst.paint(); } };
+    inst.reset.onclick = function(){ stop(); inst.idx = 0; inst.paint(); };
+    inst.play.onclick = function(){
+        if (inst.timer){ stop(); return; }
+        if (inst.idx >= inst.steps.length - 1) inst.idx = 0;
+        inst.paint();
+        inst.play.textContent = '暂停';
+        inst.play.classList.add('on');
+        inst.timer = setInterval(function(){
+            if (inst.idx >= inst.steps.length - 1){ stop(); return; }
+            inst.idx++;
+            inst.paint();
+        }, 1100);
+    };
+}
+
+/* 每一步存一份桶的快照：每桶是一个数组，头部在 [0]（头插法） */
+function buildSteps(){
+    var buckets = [], steps = [], i;
+    for (i = 0; i < MOD; i++) buckets.push([]);
+    function snap(){
+        var o = [], k;
+        for (k = 0; k < MOD; k++) o.push(buckets[k].slice());
+        return o;
+    }
+    steps.push({ list: snap(), cur: -1, x: null, h: -1, dup: false });
+    for (i = 0; i < VALS.length; i++){
+        var x = VALS[i];
+        var h = ((x % MOD) + MOD) % MOD;
+        var dup = buckets[h].indexOf(x) !== -1;
+        if (!dup) buckets[h].unshift(x);
+        steps.push({ list: snap(), cur: i, x: x, h: h, dup: dup });
+    }
+    return steps;
+}
+
+function init(root){
+    var inst = { idx: 0, steps: buildSteps() };
+    root.innerHTML = '';
+    root.appendChild(mk('hs-h', '拉链法 · MOD = 7 · 依次插入 37 12 19 26 8 63 44 5 5'));
+
+    inst.seq = mk('hs-seq');
+    root.appendChild(inst.seq);
+
+    var row = mk('hs-buckets');
+    root.appendChild(row);
+    inst.cols = [];
+    for (var b = 0; b < MOD; b++){
+        var col = mk('hs-col');
+        var idx = mk('hs-idx', '桶 ' + b);
+        var chain = mk('hs-chain');
+        col.appendChild(idx);
+        col.appendChild(chain);
+        row.appendChild(col);
+        inst.cols.push({ idx: idx, chain: chain });
+    }
+
+    inst.eq = mk('hs-eq');
+    root.appendChild(inst.eq);
+    root.appendChild(bar(inst));
+
+    inst.paint = function(){
+        var st = inst.steps[inst.idx];
+        var i, b, list, cls;
+
+        inst.seq.innerHTML = '';
+        for (i = 0; i < VALS.length; i++){
+            cls = 'hs-chip';
+            if (st.cur === i) cls += ' cur';
+            else if (st.cur > i) cls += ' done';
+            inst.seq.appendChild(mk(cls, String(VALS[i])));
+        }
+
+        for (b = 0; b < MOD; b++){
+            list = st.list[b];
+            inst.cols[b].chain.innerHTML = '';
+            inst.cols[b].idx.className = 'hs-idx';
+            if (st.cur >= 0 && st.h === b) inst.cols[b].idx.className += st.dup ? ' hit' : ' on';
+            for (i = 0; i < list.length; i++){
+                cls = 'hs-node';
+                if (st.cur >= 0 && st.h === b && list[i] === st.x) cls += st.dup ? ' dup' : ' new';
+                inst.cols[b].chain.appendChild(mk(cls, String(list[i])));
+            }
+        }
+
+        if (st.cur < 0){
+            inst.eq.innerHTML = '一开始 7 个桶的 head 全是 -1，表是空的。';
+        } else if (st.dup){
+            inst.eq.innerHTML = 'x = <b>' + st.x + '</b>　h = ' + st.x + ' % ' + MOD + ' = <b>' + st.h + '</b>　→　'
+                + st.h + ' 号桶里已经有一个 ' + st.x + '，跳过，不插。';
+        } else {
+            inst.eq.innerHTML = 'x = <b>' + st.x + '</b>　h = ' + st.x + ' % ' + MOD + ' = <b>' + st.h + '</b>　→　'
+                + '挂在 ' + st.h + ' 号桶的<b>链头</b>，原来的链整条接到它后面。';
+        }
+
+        inst.count.textContent = (inst.idx + 1) + ' / ' + inst.steps.length;
+        inst.prev.disabled = inst.idx === 0;
+        inst.next.disabled = inst.idx === inst.steps.length - 1;
+    };
+
+    bind(inst);
+    inst.paint();
+}
+
+function scan(){
+    var nodes = document.querySelectorAll('.hs:not([data-ok])');
+    for (var i = 0; i < nodes.length; i++){
+        nodes[i].setAttribute('data-ok', '1');
+        init(nodes[i]);
+    }
+}
+
+if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', scan);
+} else {
+    scan();
+}
+
+})();
+</script>
+{{- end -}}
