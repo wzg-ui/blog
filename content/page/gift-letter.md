@@ -8,15 +8,24 @@ layout: "gift-letter"
 # 和 /gift/ 那一页共用同一对时间戳；这里再写一遍是因为
 # 过期后整页要下线，不靠上一页兜底。
 unlockAt: "2026-11-23T00:00:00+08:00"
-expireAt: "2026-11-30T23:59:59+08:00"
+expireAt: "2026-11-23T23:59:59+08:00"
 
 happy: "Happy Birthday"
 cake: true
 subtitle: "拆开看看"
 signature: "PIEMM"
 
-# 这一版不放音乐：原 intro 是《还是分开》，给父亲不合适。
-# 要加回来就补 giftMusic 段（introId / letterId 等，见 git 历史里的旧版）。
+# 李荣浩《爸爸妈妈》。片段只取第一遍副歌 ——
+# 「恩重如山 听起来不自然」进来（01:20.88），
+# 到「这时候这个季节 / 又想起了这首歌」唱完收住（02:09.6）。
+# 动画固定 44 秒，80.88 + 44 = 124.88 正好落在这句里，信封出来时还在唱。
+# ⚠️ 换歌或换片段就得重算这两个数（歌词自带的时间戳在 meting 的 lrc 接口里）。
+# 读信时不再放第二条音轨 —— 信要读几分钟，一段副歌循环反而吵。
+giftMusic:
+    introId: 407450223
+    introStart: 80.88
+    introEnd: 129.6
+    introTitle: "爸爸妈妈 — 李荣浩"
 
 sitemap:
     disable: true

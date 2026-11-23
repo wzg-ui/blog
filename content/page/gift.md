@@ -8,7 +8,7 @@ layout: "gift"
 # 时间窗：到点自动放行，过期整页下线；侧栏入口用同一对时间戳控制显隐
 # （见 layouts/_partials/sidebar/left.html 和 custom.ts 的 setupGiftMenu）。
 unlockAt: "2026-11-23T00:00:00+08:00"
-expireAt: "2026-11-30T23:59:59+08:00"
+expireAt: "2026-11-23T23:59:59+08:00"
 
 lead: "四道题，你和我各填一栏"
 

@@ -21,8 +21,14 @@ export function setupGiftAudio(root: HTMLElement, time: () => number, canPlay: (
     const intro = root.querySelector<HTMLAudioElement>('[data-gift-audio]');
     const letter = root.querySelector<HTMLAudioElement>('[data-gift-letter-audio]');
     const button = root.querySelector<HTMLButtonElement>('[data-gift-music]');
+    // 片段：data-start / data-end 是秒数。intro 的起点还要喂给 syncIntro，
+    // 所以单独留一份；letter 轨按自己的属性走。
     const startAt = Number(intro?.dataset.start ?? 30);
     const endAt = Number(intro?.dataset.end ?? 74);
+    const startOf = (track: HTMLAudioElement | null): number =>
+        Number(track?.dataset.start ?? 0) || 0;
+    const endOf = (track: HTMLAudioElement): number =>
+        Number(track.dataset.end ?? NaN);
     const failed = new Set<HTMLAudioElement>();
     let active: HTMLAudioElement | null = null;
     let wanted = true;
@@ -66,6 +72,22 @@ export function setupGiftAudio(root: HTMLElement, time: () => number, canPlay: (
         track.addEventListener('pause', update);
         track.addEventListener('ended', update);
         track.addEventListener('error', () => { failed.add(track); update(); });
+        // 片段到 data-end 就收住：不接着放第二遍，也不留一个「空着的开关」。
+        // timeupdate 大约 250ms 一次，所以会把多余的尾巴拉回到 end。
+        track.addEventListener('timeupdate', () => {
+            const end = endOf(track);
+            if (!Number.isFinite(end) || track.currentTime < end) return;
+            const stopAt = Number.isFinite(track.duration)
+                ? Math.min(end, track.duration - 0.05)
+                : end;
+            track.pause();
+            track.currentTime = Math.max(0, stopAt);
+            if (track === active) {
+                active = null;
+                if (button) button.hidden = true;
+            }
+            update();
+        });
     }
     intro?.addEventListener('loadedmetadata', syncIntro);
     button?.addEventListener('click', () => {
@@ -90,7 +112,7 @@ export function setupGiftAudio(root: HTMLElement, time: () => number, canPlay: (
             if (active !== intro) select(intro, startAt, 0.65);
             else if (intro?.paused) play();
         },
-        readLetter: () => { waitingForLetter = false; select(letter, 0, 0.4); },
+        readLetter: () => { waitingForLetter = false; select(letter, startOf(letter), 0.4); },
         pause,
         resume: play,
         stop: () => { pause(); active = null; waitingForLetter = false; if (button) button.hidden = true; },

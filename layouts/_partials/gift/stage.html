@@ -16,8 +16,13 @@
         <audio data-gift-audio preload="metadata"
                data-start="{{ .introStart }}" data-end="{{ .introEnd }}" data-title="{{ .introTitle }}"
                src="{{ replace $api ":id" (string .introId) }}"></audio>
-        <audio data-gift-letter-audio preload="metadata" data-title="{{ .letterTitle }}"
-               src="{{ replace $api ":id" (string .letterId) }}"></audio>
+        {{- /* 第二轨是可选的：不给 letterId 就只有一段音乐，读完信静场 */ -}}
+        {{- with .letterId }}
+        <audio data-gift-letter-audio preload="metadata"
+               data-start="{{ $.Params.giftMusic.letterStart }}" data-end="{{ $.Params.giftMusic.letterEnd }}"
+               data-title="{{ $.Params.giftMusic.letterTitle }}"
+               src="{{ replace $api ":id" (string .) }}"></audio>
+        {{- end }}
         {{- end }}
         <div class="gift-controls">
             <button type="button" data-gift-music aria-pressed="false" hidden>开启音乐</button>
