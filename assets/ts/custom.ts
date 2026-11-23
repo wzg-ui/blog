@@ -1305,24 +1305,24 @@ document.addEventListener('DOMContentLoaded', setupSiteRuntime);
 document.addEventListener('DOMContentLoaded', setupArchiveMenu);
 document.addEventListener('DOMContentLoaded', setupMusicPlayer);
 /* ============================================================
-   Gift 流程：三道题 → 爱心弹窗 → 星空蛋糕 → 信封 → 正文
+   Gift 流程：四道题 → 爱心弹窗 → 星空蛋糕 → 信封 → 正文
    ------------------------------------------------------------
    两个页面各管一段：
 
-     /gift/          setupGiftQuiz()  收三题答案 → 拼串 → SHA-256
+     /gift/          setupGiftQuiz()  收四题（每道「你」「我」两格）→ 拼串 → SHA-256
                      比对 front matter 里的 answersHash，对上了就跳走。
 
      /gift/letter/   setupGiftShow()  播放 gift-show.ts 中的连续演出，点信封显示正文。
 
    ⚠️ 正文**不加密** —— 明文写在 gift-letter.md 里，由 Hugo 正常渲染。
-      所以这三道题就是唯一的门：校验过不去，表演根本不会开始；
+      所以这四道题就是唯一的门：校验过不去，表演根本不会开始；
       校验过去了，表演页直接就能读，不需要任何密码、密钥、中转。
       （早期版本在表演页做过 AES-GCM 解密，靠 sessionStorage 传密码 ——
         那层已经撤掉了，改字直接改 md，不用重跑任何脚本。）
 
    ⚠️ 仓库公开，所以页面里只有 answersHash。
-      整体判定，不提示哪一题错了 —— 逐题提示就得存三个单独哈希，
-      等于把每题的可搜索空间砍到 1/5，白送爆破面。
+      整体判定，不提示哪一题错了 —— 逐题提示就得存八个单独哈希，
+      等于把每题的可搜索空间砍到 1/8，白送爆破面。
    ============================================================ */
 
 /**
@@ -1428,7 +1428,7 @@ function setupGiftQuiz() {
     const gate = root.querySelector<HTMLElement>('[data-gift-gate]');
     const state = root.querySelector<HTMLElement>('[data-gift-state]');
     const form = root.querySelector<HTMLFormElement>('[data-gift-form]');
-    // 每题一个框；判定还是拼成一整串，所以顺序必须和 front matter 的 questions 一致
+    // 每题两格（你 / 我）；判定还是拼成一整串，所以顺序必须和 DOM 一致
     const inputs = Array.from(root.querySelectorAll<HTMLInputElement>('[data-gift-input]'));
     const submit = root.querySelector<HTMLButtonElement>('[data-gift-submit]');
     const msg = root.querySelector<HTMLElement>('[data-gift-msg]');
@@ -1583,7 +1583,7 @@ function setupGiftQuiz() {
         shown = true;
         gate.hidden = true;
         form.hidden = false;
-        input.focus({ preventScroll: true });
+        inputs[0].focus({ preventScroll: true });
     };
 
     const timer = window.setInterval(tick, 1000);

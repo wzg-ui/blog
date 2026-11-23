@@ -2294,7 +2294,6 @@ html:has(body.gift-page) {
     gap: 1rem;
     align-items: flex-start;
     margin-bottom: 0.9rem;
-    cursor: pointer;
 }
 
 .gift-q__no {
@@ -2335,6 +2334,38 @@ html:has(body.gift-page) {
 .gift-q__input {
     min-height: 4.8rem;
     resize: none;
+}
+
+/* ---------- 每道题两栏：你 / 我 ----------
+   并排放，方便一眼比对；栏名是瘦的，宽度只够两个字，
+   剩下的都给输入框。整块左缩 3.6rem，跟题干文字对齐（让开序号圆点）。 */
+.gift-q__pair {
+    display: flex;
+    gap: 1.2rem;
+    padding-left: 3.6rem;
+}
+
+.gift-q__cell {
+    display: flex;
+    flex: 1 1 0;
+    gap: 0.8rem;
+    align-items: center;
+    min-width: 0;
+}
+
+.gift-q__who {
+    flex: none;
+    color: var(--card-text-color-secondary);
+    font-size: 1.4rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+/* 两栏并排时输入框不能再吃满整行 —— 宽度由 flex 分配 */
+.gift-q__pair .gift-q__input {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
 }
 
 /* ---------- 答案输入框 ----------

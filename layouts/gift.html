@@ -1,15 +1,17 @@
 {{- /*
-  Gift 第一页：三道题 → 一封信
+  Gift 第一页：四道题 → 一封信
   ============================================================
   由 content/page/gift.md 的 `layout: gift` 触发。
 
-  这一页只干一件事：收下三题的答案，按顺序接成一整串、规范化后取
-  SHA-256，跟 front matter 里的 `gift.answersHash` 对一下。
+  这一页只干一件事：收下四道题（每道「你」「我」两格）的答案，按 DOM
+  顺序接成一整串、规范化后取 SHA-256，跟 front matter 里的
+  `gift.answersHash` 对一下。
   对上了就把同一页里预埋的表演块（partial "gift/stage.html"）放出来，
   正文在那个块里，不跳转 —— 跳转要重新加载，音频和动画都会断。
 
-  ⚠️ 每题一个输入框，判定时按 DOM 顺序拼接。
-     所以 questions 的条数和顺序必须跟生成哈希时给的答案一致。
+  ⚠️ 每题两个输入框（`pair` 里那两个字），判定时按 DOM 顺序（你我、
+     你我……）拼接。所以 questions 的条数、pair 的顺序必须跟生成哈希时
+     给的答案一致。
 
   ⚠️ 规范化（giftCanonical）会 NFKC → 转小写 → 只留字母数字。
      所以大小写、空格、全角半角、句号顿号都不影响判定 ——
@@ -17,10 +19,10 @@
 
   ⚠️ 仓库公开，所以 front matter 里只有 answersHash（SHA-256），
      答案明文不入库。整体判定，不提示哪一题错了 ——
-     逐题提示就得存三个单独哈希，等于把每题的可搜索空间缩到 1/3。
+     逐题提示就得存八个单独哈希，等于把每题的可搜索空间砍到 1/8。
 
   ⚠️ 信是明文写在 content/page/gift-letter.md 里由 Hugo 正常渲染的，
-     不加密。所以这三道题就是唯一的门。
+     不加密。所以这四道题就是唯一的门。
 */ -}}
 
 {{ define "main" }}
@@ -47,28 +49,40 @@
             </noscript>
         </div>
 
-        {{- /* ---------- 三道题，每题一个框 ---------- */ -}}
+        {{- /* ---------- 四道题，每题两栏：你 / 我 ---------- */ -}}
         <form class="gift-quiz" data-gift-form hidden autocomplete="off" novalidate>
             <p class="gift-quiz__lead">{{ .Params.lead | default "来看看能不能 Get 到我的问题" }}</p>
             {{- with .Params.note }}<p class="gift-quiz__note">{{ . }}</p>{{ end }}
 
-            {{- /* 每题一个框。拼串判定没变：提交时按顺序把几个框的值接起来，
-                   规范化后取 SHA-256 —— 前端不做分隔，规则只在 giftCanonical() 一处。 */ -}}
+            {{- /* 每题的框数、栏名都取自 pair，模板里不写死 ——
+                   顺序就是拼串顺序：你、我、你、我…… */ -}}
+            {{- $pair := .Params.pair | default (slice "你" "我") }}
             <ol class="gift-questions">
                 {{- range $i, $q := .Params.questions }}
-                {{- $id := printf "gift-q-%d" (add $i 1) }}
+                {{- $no := add $i 1 }}
                 <li class="gift-q">
-                    <label class="gift-q__label" for="{{ $id }}">
-                        <span class="gift-q__no">{{ add $i 1 }}</span>
+                    <p class="gift-q__label">
+                        <span class="gift-q__no">{{ $no }}</span>
                         <span class="gift-q__text">{{ $q.text }}</span>
-                    </label>
+                    </p>
                     {{- with $q.hint }}
                     <p class="gift-q__hint">{{ . }}</p>
                     {{- end }}
-                    <input id="{{ $id }}" class="gift-answer__input gift-q__input"
-                        data-gift-input type="text" spellcheck="false"
-                        autocapitalize="off" autocorrect="off" autocomplete="off"
-                        placeholder="{{ $.Params.placeholder | default "填在下面" }}">
+                    {{- /* 两栏并排时不再给 placeholder —— 每行两个「填在下面」
+                           纯属噪音，栏名已经说明该填谁的了。要加就在
+                           front matter 写 placeholder。 */ -}}
+                    <div class="gift-q__pair">
+                        {{- range $j, $who := $pair }}
+                        {{- $id := printf "gift-q-%d-%d" $no (add $j 1) }}
+                        <label class="gift-q__cell" for="{{ $id }}">
+                            <span class="gift-q__who">{{ $who }}</span>
+                            <input id="{{ $id }}" class="gift-answer__input gift-q__input"
+                                data-gift-input type="text" spellcheck="false"
+                                autocapitalize="off" autocorrect="off" autocomplete="off"
+                                {{ with $.Params.placeholder }}placeholder="{{ . }}"{{ end }}>
+                        </label>
+                        {{- end }}
+                    </div>
                 </li>
                 {{- end }}
             </ol>
