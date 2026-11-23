@@ -1305,23 +1305,23 @@ document.addEventListener('DOMContentLoaded', setupSiteRuntime);
 document.addEventListener('DOMContentLoaded', setupArchiveMenu);
 document.addEventListener('DOMContentLoaded', setupMusicPlayer);
 /* ============================================================
-   Gift 流程：五道题 → 爱心弹窗 → 星空蛋糕 → 信封 → 正文
+   Gift 流程：三道题 → 爱心弹窗 → 星空蛋糕 → 信封 → 正文
    ------------------------------------------------------------
    两个页面各管一段：
 
-     /gift/          setupGiftQuiz()  收五个答案 → 拼串 → SHA-256
+     /gift/          setupGiftQuiz()  收三题答案 → 拼串 → SHA-256
                      比对 front matter 里的 answersHash，对上了就跳走。
 
      /gift/letter/   setupGiftShow()  播放 gift-show.ts 中的连续演出，点信封显示正文。
 
    ⚠️ 正文**不加密** —— 明文写在 gift-letter.md 里，由 Hugo 正常渲染。
-      所以五道题就是唯一的门：校验过不去，表演根本不会开始；
+      所以这三道题就是唯一的门：校验过不去，表演根本不会开始；
       校验过去了，表演页直接就能读，不需要任何密码、密钥、中转。
       （早期版本在表演页做过 AES-GCM 解密，靠 sessionStorage 传密码 ——
         那层已经撤掉了，改字直接改 md，不用重跑任何脚本。）
 
    ⚠️ 仓库公开，所以页面里只有 answersHash。
-      整体判定，不提示哪一题错了 —— 逐题提示就得存五个单独哈希，
+      整体判定，不提示哪一题错了 —— 逐题提示就得存三个单独哈希，
       等于把每题的可搜索空间砍到 1/5，白送爆破面。
    ============================================================ */
 
@@ -1331,7 +1331,7 @@ document.addEventListener('DOMContentLoaded', setupMusicPlayer);
  *
  * 三步，每一步都对应「她会怎么打」：
  *   NFKC    全角「ＡＢＣ」≡ 半角「ABC」，全角标点、圈码也一并归一
- *   toLower 大小写不该有影响（五个答案都是英文）
+ *   toLower 大小写不该有影响（答案大多是数字或单个词）
  *   只留 \p{L} \p{N}  空格、逗号、顿号、竖线、大括号、句点全丢掉
  *
  *   ⇒ 也就是说下面这几种写法，规范化之后**完全一样**：
@@ -1349,6 +1349,8 @@ document.addEventListener('DOMContentLoaded', setupMusicPlayer);
 const giftCanonical = (raw: string): string =>
     raw.normalize('NFKC')
         .toLowerCase()
+        // 「11月23日」「11月23号」「11.23」都该等价 —— 日期谁都写不一样
+        .replace(/[月日号]/g, '')
         .replace(/[^\p{L}\p{N}]+/gu, '');
 
 const giftPad = (n: number): string => String(n).padStart(2, '0');
@@ -1426,12 +1428,12 @@ function setupGiftQuiz() {
     const gate = root.querySelector<HTMLElement>('[data-gift-gate]');
     const state = root.querySelector<HTMLElement>('[data-gift-state]');
     const form = root.querySelector<HTMLFormElement>('[data-gift-form]');
-    // 只有一个框：五题答案连成一整串，她自己填进来的就是那个串
-    const input = root.querySelector<HTMLTextAreaElement>('[data-gift-input]');
+    // 每题一个框；判定还是拼成一整串，所以顺序必须和 front matter 的 questions 一致
+    const inputs = Array.from(root.querySelectorAll<HTMLInputElement>('[data-gift-input]'));
     const submit = root.querySelector<HTMLButtonElement>('[data-gift-submit]');
     const msg = root.querySelector<HTMLElement>('[data-gift-msg]');
 
-    if (!gate || !state || !form || !submit || !msg || !input) return;
+    if (!gate || !state || !form || !submit || !msg || !inputs.length) return;
 
     const expectHash = (root.dataset.hash ?? '').trim().toLowerCase();
     if (!/^[0-9a-f]{64}$/.test(expectHash)) return;
@@ -1471,12 +1473,19 @@ function setupGiftQuiz() {
         }
         if (hasUnlock && now < unlockAt) return;
 
-        // 她填的是「五题答案连起来的一整串」，规范化后直接拿去哈希 ——
+        // 她填的是「几道题的答案按顺序接起来的一整串」，规范化后直接拿去哈希 ——
         // 不再由前端拼，前端拼就得知道分隔符，两边规则容易对不上
-        const phrase = giftCanonical(input.value);
+        // 先看有没有空的：空一个就拼出来一串短的，报「有答案不对」会让人以为答错了题
+        const blank = inputs.find((el) => !giftCanonical(el.value));
+        if (blank) {
+            say('还有没填的', 'error');
+            blank.focus();
+            return;
+        }
+        const phrase = inputs.map((el) => giftCanonical(el.value)).join('');
         if (!phrase) {
             say('还没填呢', 'error');
-            input.focus();
+            inputs[0].focus();
             return;
         }
 
@@ -1534,13 +1543,16 @@ function setupGiftQuiz() {
         }, 16);
     });
 
-    // 只有一个输入框了，Enter 必须能直接提交 —— 五个框的时候靠 Tab 串，
-    // 只有一个框再让人去点按钮是倒退
-    input.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
+    // 一个框按 Enter 直接提交是倒退 —— 后面几题还空着。
+    // 前几个框 Enter 跳到下一个，最后一个才提交。
+    inputs.forEach((el, i) => {
+        el.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' || event.shiftKey) return;
             event.preventDefault();
-            form.requestSubmit();
-        }
+            const next = inputs[i + 1];
+            if (next) next.focus();
+            else form.requestSubmit();
+        });
     });
 
     /* ---------- 时间锁 ---------- */

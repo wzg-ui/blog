@@ -2167,6 +2167,9 @@ html:has(body.gift-page) {
    ============================================================ */
 .gift-article {
     padding-bottom: 1rem;
+    /* 这一页不走 .article-content，没设色的子元素会继承 body 的默认黑，
+       深色模式下题干就成了一片黑 —— 在容器上兜住 */
+    color: var(--card-text-color-main);
 }
 
 /* ---------- Hero ---------- */
@@ -2250,7 +2253,7 @@ html:has(body.gift-page) {
     line-height: 1.8;
 }
 
-/* ---------- 「五个答案都是英文」这行提示 ----------
+/* ---------- 题干上方那行小字 ----------
    做成一枚小胶囊挂在题干上方，位置显眼但不抢戏 ——
    她扫一眼就能注意到，不用逐字读题干。 */
 .gift-quiz__note {
@@ -2317,10 +2320,25 @@ html:has(body.gift-page) {
     font-weight: 600;
 }
 
+/* 题干下面那行格式提示（如「写成 10.15 这样」）。
+   左边留 3.6rem 跟题干文字对齐 —— 让开序号圆点的 2.6rem + 1rem 间隙。 */
+.gift-q__hint {
+    margin: 0 0 0.9rem;
+    padding-left: 3.6rem;
+    color: var(--card-text-color-tertiary);
+    font-size: 1.25rem;
+    line-height: 1.5;
+}
+
+/* 每题下面那一个框。沿用 .gift-answer__input 的外观，
+   只把高度收回来 —— 那个样式原本是给多行 textarea 的。 */
+.gift-q__input {
+    min-height: 4.8rem;
+    resize: none;
+}
+
 /* ---------- 答案输入框 ----------
-   五题答案要连成一整串，所以只有一个框，不是五个。
-   用 textarea 不是 input：她大概率是粘贴的，单行框粘贴会自动折行、
-   而且只显示一行 —— 看不全自己写的东西会让人怀疑打错了。
+   每题一个框，外观由这里统一定义（.gift-q__input 只收高度）。
 
    字号 1.6rem = 16px：iOS Safari 对小于 16px 的输入框会自动放大整页。 */
 .gift-answer {
@@ -2367,7 +2385,7 @@ html:has(body.gift-page) {
 }
 
 .gift-answer__hint {
-    margin: 0.8rem 0 0;
+    margin: 1.6rem 0 0;
     color: var(--card-text-color-tertiary);
     font-size: 1.25rem;
     line-height: 1.6;
