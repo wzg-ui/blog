@@ -6,7 +6,7 @@
 #     content/page/search/index.md     搜索   weight -60
 #     content/page/archives/index.md   归档   weight -50
 #
-#  最终顺序（按 weight 升序）：主页 → 搜索 → 归档 → 投稿
+#  最终顺序（按 weight 升序）：主页 → 搜索 → 归档 → 专栏 → Python 语法课 → 投稿
 #
 #  曾经的 [[main]] posts（「文章」）已删除：/posts/ 栏目页不再生成
 #  （见 content/posts/_index.md 的 build 设置），首页就是文章入口。
@@ -48,6 +48,15 @@
     name       = "专栏"
     url        = "/series/"
     weight     = -44
+
+    [main.params]
+        icon = "book-2"
+
+[[main]]
+    identifier = "python-study"
+    name       = "Python 语法课"
+    url        = "/python-study/"
+    weight     = -42
 
     [main.params]
         icon = "book-2"
